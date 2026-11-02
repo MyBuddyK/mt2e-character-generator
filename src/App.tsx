@@ -4,14 +4,20 @@ import { CHARACTERISTICS, characteristicDM, upp } from './engine/characteristics
 import { current, isOverridden } from './engine/overridable'
 import { careers } from './data/careers'
 
+/** Returns the ?seed= value from the page URL, or a new random seed when there is none. */
 function initialSeed(): string {
   return new URLSearchParams(window.location.search).get('seed') ?? randomSeed()
 }
 
+/** Returns a dice modifier as text with an explicit sign for positive values, e.g. "+2", "0", "-1". */
 function formatDM(dm: number): string {
   return dm > 0 ? `+${dm}` : String(dm)
 }
 
+/**
+ * Renders the characteristics table and the list of loaded careers. Reroll picks a new seed, writes it
+ * to the URL and rolls a new character. Editing a value stores it as an override of the rolled value.
+ */
 export default function App() {
   const [character, setCharacter] = useState<Character>(() => newCharacter(initialSeed()))
 

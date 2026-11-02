@@ -1,11 +1,12 @@
 # Traveller (MT2e) Character Generator
 
-An unofficial fan-made web app for building Mongoose Traveller 2nd Edition characters as a group. Players
-step through careers one term at a time, see events that could connect their characters, override any
-roll, and export the finished character to Foundry VTT.
+An unofficial fan-made web app for building Mongoose Traveller 2nd Edition characters as a group.
 
-> Status: foundation only. Characteristics roll, can be overridden, and are reproducible from a seed. The
-> career loop and Foundry export come next.
+Current state: the app rolls the six characteristics from a seed, and the player can override each value.
+It loads career data files but does not yet run careers.
+
+Planned: stepping through careers one term at a time, showing events that could connect characters,
+generating a whole character in one step, and exporting to Foundry VTT.
 
 ## Running it
 

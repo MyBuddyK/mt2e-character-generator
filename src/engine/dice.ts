@@ -1,12 +1,15 @@
 /**
- * Seeded dice. Every roll in the generator goes through a Dice instance so a
- * character can be reproduced exactly from its seed (useful for sharing and
- * for deterministic tests).
+ * Seeded dice. The generator makes every roll through a Dice instance, so two Dice created from
+ * the same seed return the same sequence of rolls.
  */
 
+/** A function that returns a number in the range [0, 1). */
 export type Rng = () => number
 
-/** mulberry32: small, fast, good enough for tabletop dice. Returns [0, 1). */
+/**
+ * Returns a mulberry32 pseudo-random generator for the given 32-bit seed. Each call returns the
+ * next number in the range [0, 1). The same seed always produces the same sequence.
+ */
 export function createRng(seed: number): Rng {
   let a = seed >>> 0
   return () => {
@@ -18,7 +21,7 @@ export function createRng(seed: number): Rng {
   }
 }
 
-/** Turns any string (e.g. a URL ?seed=) into a 32-bit seed. */
+/** Converts a string, such as the URL's ?seed= value, to a 32-bit seed using the FNV-1a hash. */
 export function seedFromString(text: string): number {
   let h = 2166136261
   for (let i = 0; i < text.length; i++) {
@@ -28,15 +31,17 @@ export function seedFromString(text: string): number {
   return h >>> 0
 }
 
+/** Dice rolling functions backed by one seeded generator. */
 export interface Dice {
-  /** One six-sided die. */
+  /** Returns one six-sided die roll, from 1 to 6. */
   d6(): number
-  /** Sum of `count` six-sided dice (2D is the standard Traveller roll). */
+  /** Returns the sum of `count` six-sided dice. */
   roll(count: number): number
-  /** D66: two dice read as tens and units (11 to 66). */
+  /** Returns a D66 roll: the first die as the tens digit and the second as the units (11 to 66). */
   d66(): number
 }
 
+/** Returns a Dice instance whose rolls come from a generator seeded with `seed`. */
 export function createDice(seed: number): Dice {
   const rng = createRng(seed)
   const d6 = () => Math.floor(rng() * 6) + 1

@@ -6,9 +6,9 @@ model: sonnet
 color: blue
 ---
 
-You are a Playwright Test Generator, an expert in browser automation and end-to-end testing.
-Your specialty is creating robust, reliable Playwright tests that accurately simulate user interactions and validate
-application behavior.
+You write Playwright tests that carry out the steps in a test plan and check the results it specifies.
+
+Follow the documentation rules in `CLAUDE.md` for every comment and test plan you write.
 
 # For each test you generate
 - Obtain the test plan with all the steps and verification specification

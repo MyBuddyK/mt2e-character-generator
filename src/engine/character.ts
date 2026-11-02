@@ -3,8 +3,8 @@ import { rollCharacteristics, type Characteristic, type Characteristics } from '
 import { withOverride } from './overridable'
 
 /**
- * The character being built. For now this covers characteristics only; the
- * career loop (terms, events, mustering out) is added in step 2 of the plan.
+ * The character being built. It currently holds the seed, name and characteristics; career terms
+ * are not modelled yet.
  */
 export interface Character {
   seed: string
@@ -12,6 +12,7 @@ export interface Character {
   characteristics: Characteristics
 }
 
+/** Returns a new character whose characteristics are rolled from `seed`. */
 export function newCharacter(seed: string): Character {
   const dice = createDice(seedFromString(seed))
   return {
@@ -21,6 +22,10 @@ export function newCharacter(seed: string): Character {
   }
 }
 
+/**
+ * Returns a copy of `character` with one characteristic's override set to `value`. Passing undefined
+ * removes the override.
+ */
 export function overrideCharacteristic(
   character: Character,
   key: Characteristic,
@@ -35,6 +40,7 @@ export function overrideCharacteristic(
   }
 }
 
+/** Returns an 8-character base-36 string from Math.random(), for use as a new seed. */
 export function randomSeed(): string {
   return Math.random().toString(36).slice(2, 10)
 }

@@ -1,35 +1,36 @@
 import { CHARACTERISTICS, type Characteristic } from './characteristics'
 
 /**
- * Shape of a career data file in src/data/careers. The engine reads these so
- * careers can be added from your own books without touching code.
+ * Types for the career data files in src/data/careers. Adding a career means adding a JSON file
+ * in this shape; no code changes are needed.
  *
- * Keep descriptions short and in your own words: this repo is public, so
- * don't paste rulebook text into it.
+ * Descriptions hold short summaries, not rulebook text (see the rules in CLAUDE.md).
  */
 
-/** A check such as "END 7+". */
+/** A characteristic check that succeeds on 2D + DM >= target, e.g. END 7+. */
 export interface Check {
   characteristic: Characteristic
   target: number
 }
 
-/** One entry in a D6 skill table: a skill name, optionally with a level or speciality. */
+/** One entry in a D6 skill table: a skill or characteristic name, optionally with a level or speciality. */
 export type SkillTableEntry = string
 
-/** An event or mishap table entry. `connection` marks it as a good prompt for linking characters. */
+/** An event or mishap table entry. `connection: true` marks an entry as a possible link between two characters. */
 export interface EventEntry {
   roll: number
   summary: string
   connection?: boolean
 }
 
+/** A rank within an assignment: its number, optional title and optional bonus gained on reaching it. */
 export interface Rank {
   rank: number
   title?: string
   bonus?: string
 }
 
+/** One assignment within a career, with its own survival and advancement checks, skill table and ranks. */
 export interface Assignment {
   id: string
   name: string
@@ -40,12 +41,14 @@ export interface Assignment {
   ranks: Rank[]
 }
 
+/** One mustering-out row: the 1D roll, the cash amount and the benefit. */
 export interface MusterOutEntry {
   roll: number
   cash: number
   benefit: string
 }
 
+/** The full contents of one career data file. */
 export interface CareerDefinition {
   id: string
   name: string
@@ -67,7 +70,10 @@ export interface CareerDefinition {
   musteringOut: MusterOutEntry[]
 }
 
-/** Returns a list of problems; an empty list means the career file is usable. */
+/**
+ * Checks a parsed career file against CareerDefinition and returns one message per problem found.
+ * An empty array means every checked field is present and has the expected shape.
+ */
 export function validateCareer(data: unknown): string[] {
   const errors: string[] = []
   const c = data as Partial<CareerDefinition>

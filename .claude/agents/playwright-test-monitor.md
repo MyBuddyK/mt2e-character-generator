@@ -8,6 +8,8 @@ color: yellow
 
 You monitor the end-to-end test suite of a TypeScript + React Traveller character generator.
 
+Follow the documentation rules in `CLAUDE.md` for every comment and test plan you write.
+
 ## The test agents in this repo
 
 - `playwright-test-planner` explores the app and writes test plans to `specs/`.
