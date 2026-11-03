@@ -240,7 +240,6 @@ crisis, not for points lost to ordinary aging.
 ### Acceptance criteria (aging)
 
 - [x] A reduce effect asks for a different characteristic for each amount, and doesn't ask when there is no choice.
-- [x] An ignored aging roll changes nothing.
 - [x] With `rules.aging.crisis`, a crisis asks for care or death; care restores the characteristics to 1,
       adds the cost, and fails later qualification rolls; death finishes the character.
 - [x] A term on anagathics adds its cost, a second survival roll and the aging DM; stopping rolls aging at once.

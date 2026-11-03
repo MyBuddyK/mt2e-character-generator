@@ -77,16 +77,6 @@ describe('aging asks which characteristics to reduce', () => {
     expect(result.characteristicChanges).toMatchObject({ STR: -1, DEX: -1, END: -1 })
   })
 
-  // Ignores the aging roll and expects no pick, no change, and the ignored reason on the step.
-  it('an ignored aging result is not applied', () => {
-    const result = build(term1({ 'term-1.aging.ignore': 'ignore' }), agingRules([PHYSICAL]))
-    expect(result.pending?.kind).toBe('next')
-    expect(result.characteristicChanges).toMatchObject({ STR: 0, DEX: 0, END: 0 })
-    const aging = step(result, 1, 'term-1.aging')
-    expect(aging.ignore).toEqual({ key: 'term-1.aging.ignore', ignored: true })
-    expect(aging.reasons).toContain('Ignored: this aging result is not applied.')
-  })
-
   // Asks the policy about a characteristic choice under 40 seeds and expects only the options, and more than one of them.
   it('Finish career picks the characteristic at random', () => {
     const result = build(term1(), agingRules([PHYSICAL]))
@@ -217,15 +207,15 @@ describe('anagathics', () => {
     expect(stop.dm).toBe(sampleRules.aging.dmPerTerm * 1)
   })
 
-  // Takes anagathics in term 1, stops in term 2 with a character at STR 1 whose stop roll causes a
-  // crisis, lets them die, and expects the age at the start of term 2.
+  // Starts with STR 2, takes anagathics in term 1 (whose aging takes STR to 1), stops in term 2 so the
+  // stop roll takes STR to 0, lets the character die, and expects the age at the start of term 2.
   it('a death in the stop roll gives the age at the start of that term', () => {
     const rules: Rules = { ...CRISIS_RULES, anagathics: DRUG_RULES.anagathics }
     const input = term1(
-      { 'term-1.anagathics': 'take', 'term-1.aging.ignore': 'ignore', 'term-1.next': 'continue', 'term-2.anagathics-stop.crisis': 'die' },
+      { 'term-1.anagathics': 'take', 'term-1.next': 'continue', 'term-2.anagathics-stop.crisis': 'die' },
       { 'term-1.anagathics': 12, 'term-1.survival-2': 12 },
     )
-    const result = build(input, rules, WEAK)
+    const result = build(input, rules, { ...BASE, STR: 2 })
     expect(result.dead).toBe(true)
     expect(result.age).toBe(sampleRules.startingAge + sampleRules.termLength)
   })
