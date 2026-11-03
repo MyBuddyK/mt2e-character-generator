@@ -56,6 +56,7 @@ function step(result: CareerResult, n: number, key: string) {
 describe('aging asks which characteristics to reduce', () => {
   // Rolls aging with "reduce two physical characteristics by 2 and 1" and expects the first pick (by
   // 2) from STR, DEX and END, then the second pick (by 1) from the two left.
+  // Criteria: CR-28.
   it('asks for a different characteristic for each amount', () => {
     const rules = agingRules([PHYSICAL])
     expect(build(term1(), rules).pending).toEqual({
@@ -71,6 +72,7 @@ describe('aging asks which characteristics to reduce', () => {
   })
 
   // Rolls aging with "reduce three physical characteristics by 1" and expects no choice and -1 on each.
+  // Criteria: CR-28.
   it('reduces every listed characteristic without asking when the amounts are the same', () => {
     const result = build(term1(), agingRules([{ type: 'reduce', characteristics: ['STR', 'DEX', 'END'], amounts: [1, 1, 1] }]))
     expect(result.pending?.kind).toBe('next')
@@ -105,6 +107,7 @@ const WEAK = { ...BASE, STR: 1 }
 // Tests for the ageing crisis with rules.aging.crisis set.
 describe('the ageing crisis', () => {
   // Ages a character with STR 1 to STR 0 and expects the crisis choice naming STR.
+  // Criteria: CR-29.
   it('asks whether to pay for medical care', () => {
     expect(build(term1(), CRISIS_RULES, WEAK).pending).toEqual({
       kind: 'ageing-crisis',
@@ -117,6 +120,7 @@ describe('the ageing crisis', () => {
 
   // Pays for care with the cost dice set to 3, leaves, and expects STR back to 1, costs of Cr30000 taken
   // from cash, and the next career's qualification failing without a roll.
+  // Criteria: CR-29.
   it('medical care restores the characteristic, costs cash and fails later qualification rolls', () => {
     const input = term1(
       { 'term-1.aging.crisis': 'care', 'term-1.next': 'leave', 'benefit-0': 'cash', 'career-2.start.career': 'sample-sanitation', 'career-2.start.assignment': 'debris-sweep' },
@@ -139,6 +143,7 @@ describe('the ageing crisis', () => {
   })
 
   // Lets the character die and expects a dead, finished character with nothing pending and no next career.
+  // Criteria: CR-29.
   it('a character who dies is finished', () => {
     const result = build(term1({ 'term-1.aging.crisis': 'die' }), CRISIS_RULES, WEAK)
     expect(result.dead).toBe(true)
@@ -176,6 +181,7 @@ const DRUG_RULES: Rules = agingRules([], { anagathics: { characteristic: 'SOC', 
 describe('anagathics', () => {
   // Takes anagathics in term 1 with the SOC roll at 12 and the cost dice at 2, and expects the term on
   // anagathics, a Cr400000 cost, a second survival roll, and DM +1 on the aging roll.
+  // Criteria: CR-30.
   it('a term on anagathics costs cash, needs a second survival roll and helps the aging roll', () => {
     const result = build(term1({ 'term-1.anagathics': 'take' }, { 'term-1.anagathics': 12, 'term-1.anagathics-cost': 2, 'term-1.survival-2': 12 }), DRUG_RULES)
     expect(result.terms[0]?.anagathics).toBe(true)
@@ -202,6 +208,7 @@ describe('anagathics', () => {
   })
 
   // Takes anagathics in term 1 but not in term 2, and expects an immediate aging roll at the start of term 2.
+  // Criteria: CR-30.
   it('stopping anagathics rolls aging at once', () => {
     const input = term1(
       { 'term-1.anagathics': 'take', 'term-1.next': 'continue', 'term-2.skill-0.table': 'serviceSkills' },

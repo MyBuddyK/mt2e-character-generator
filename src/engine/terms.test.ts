@@ -73,6 +73,7 @@ describe('buildCareer start', () => {
   })
 
   // Builds the same input twice and expects the same first-term steps.
+  // Criteria: CT-1.
   it('gives the same first term for the same seed and input', () => {
     const input = started({ ...SERVICE, 'term-1.next': 'continue' })
     expect(build(input).terms[0]).toEqual(build(input).terms[0])
@@ -80,8 +81,10 @@ describe('buildCareer start', () => {
 })
 
 // Tests for the steps of a term in buildCareer.
+// Criteria: CR-17.
 describe('buildCareer terms', () => {
   // Passes qualification and expects term 1 to add every service skill at the basic training level, and rank 0.
+  // Criteria: CT-7.
   it('applies basic training and rank 0 in the first term', () => {
     const result = build(started(SERVICE, PASSING))
     for (const skill of sampleCareer().skillTables.serviceSkills) expect(result.skills).toHaveProperty(skill)
@@ -103,6 +106,7 @@ describe('buildCareer terms', () => {
 
   // Overrides survival to a failing total and expects a mishap instead of an event, no advancement
   // roll, and a forced end; then removes the override and expects the event and advancement back.
+  // Criteria: CT-2, CT-3.
   it('a failed survival gives a mishap and ends the career; resetting brings back the event', () => {
     const failed = build(started(SERVICE, { qualification: 12, 'term-1.survival': 2 }))
     const keys = failed.terms[0]?.steps.map((s) => s.key) ?? []
@@ -126,6 +130,7 @@ describe('buildCareer terms', () => {
 
   // Builds two terms, then overrides the term 1 advancement dice both ways, and expects the term 2
   // skill roll to be the same each time.
+  // Criteria: CT-4.
   it('overriding a roll in term 1 does not change the skill roll in term 2', () => {
     const choices = { ...SERVICE, 'term-1.next': 'continue', 'term-2.skill-0.table': 'serviceSkills' }
     const rolls = { ...PASSING, 'term-2.survival': 12 }
@@ -136,6 +141,7 @@ describe('buildCareer terms', () => {
 
   // Overrides the event to 6 (a skill effect with two options), and expects the skill option
   // pending; picking Engineer adds Engineer 1.
+  // Criteria: CT-5.
   it('an event with a skill effect adds the skill, asking first when there is a choice', () => {
     const rolls = { ...PASSING, 'term-1.event': 6 }
     expect(build(started(SERVICE, rolls)).pending).toEqual({
@@ -149,6 +155,7 @@ describe('buildCareer terms', () => {
 
   // Overrides the event to 9 (no effects, connection: true) and expects its summary as a note, the
   // connection marker, and the character's skills unchanged by it.
+  // Criteria: CT-13.
   it('an event without effects is a note, and a connection event is listed', () => {
     const plain = build(started(SERVICE, { ...PASSING, 'term-1.event': 7 }))
     const result = build(started(SERVICE, { ...PASSING, 'term-1.event': 9 }))
@@ -160,6 +167,7 @@ describe('buildCareer terms', () => {
   })
 
   // Passes advancement in term 1 and expects rank 1 with its skill effect (Pilot 1).
+  // Criteria: CT-6.
   it('reaching a rank applies its effects', () => {
     const result = build(started({ ...SERVICE, 'term-1.advancement-skill-0.table': 'serviceSkills' }, { ...PASSING, 'term-1.advancement': 12 }))
     expect(result.rank).toBe(1)
@@ -168,6 +176,7 @@ describe('buildCareer terms', () => {
   })
 
   // Removes the effects from the rank 1 entry and expects its bonus shown as a note instead.
+  // Criteria: CT-6.
   it('a rank bonus without effects is shown as a note', () => {
     const career = sampleCareer()
     const assignment = career.assignments[0]
@@ -186,6 +195,7 @@ describe('buildCareer terms', () => {
   })
 
   // Continues into term 2 and expects its age range to start one term length after term 1's.
+  // Criteria: CT-16.
   it('each term adds the term length to the age', () => {
     const result = build(started({ ...SERVICE, 'term-1.next': 'continue' }, PASSING))
     expect(result.terms.map((t) => t.ageStart)).toEqual([
@@ -196,6 +206,7 @@ describe('buildCareer terms', () => {
 
   // Generates a career that survives every term, and expects an aging step only from the sample's
   // fromTerm onwards.
+  // Criteria: CT-17.
   it('rolls aging only from the term set in rules', () => {
     const rolls: Record<string, number> = { qualification: 12 }
     for (let n = 1; n <= 5; n += 1) rolls[`term-${n}.survival`] = 12
@@ -209,6 +220,7 @@ describe('buildCareer terms', () => {
 // Tests for mustering out in buildCareer.
 describe('buildCareer mustering out', () => {
   // Leaves after one term at rank 0 and expects one benefit roll (sample perTerm 1) pending with cash allowed.
+  // Criteria: CT-19.
   it('gives the number of benefit rolls set in rules', () => {
     const result = build(started({ ...SERVICE, 'term-1.next': 'leave', 'benefit-0': 'benefit' }, { ...PASSING, 'term-1.advancement': 2 }))
     expect(result.finished).toBe(true)
@@ -217,6 +229,7 @@ describe('buildCareer mustering out', () => {
 
   // Uses rules with three benefit rolls per term and a cash limit of 1, takes cash on the first, and
   // expects cash not allowed on the second.
+  // Criteria: CT-20.
   it('stops offering cash once the cash roll limit is reached', () => {
     const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, perTerm: 3, cashRollLimit: 1 } }
     const result = build(started({ ...SERVICE, 'term-1.next': 'leave', 'benefit-0': 'cash' }, { ...PASSING, 'term-1.advancement': 2 }), rules)
@@ -226,6 +239,7 @@ describe('buildCareer mustering out', () => {
   // Takes the event with a +1 benefit DM (event roll 8), uses rules with a +2 rank DM on benefit
   // rolls, sets the benefit die to 6 for a total of 9, and expects the row for roll 7 with
   // outOfRange set.
+  // Criteria: CR-8, CT-9.
   it('a benefit total above the table uses the highest row and says so', () => {
     const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, rankBenefitDM: [{ minRank: 0, dm: 2 }] } }
     const result = build(
@@ -293,6 +307,7 @@ describe('buildCareer effect and override details', () => {
 describe('finishCareer', () => {
   // Generates from a started career and expects a finished character with no pending choice, at most
   // termLimit terms, and cash on the first benefit roll.
+  // Criteria: CT-18.
   it('finishes the character within the term limit', () => {
     const input = finishCareer(SEED, BASE, started(), { careers: [sampleCareer()], rules: sampleRules })
     const result = build(input)
@@ -309,6 +324,7 @@ describe('finishCareer', () => {
 
   // Asks the policy about a forced end, a forced stay past the limit, and a term past the limit, and
   // expects muster, continue and leave.
+  // Criteria: CR-18.
   it('follows a forced muster or continue, and leaves at the term limit', () => {
     const result = build(started(SERVICE, PASSING))
     expect(policyChoice({ kind: 'next', key: 'k', forced: 'muster', reason: 'x' }, result, 5, SEED)).toBe('muster')
@@ -347,6 +363,7 @@ describe('pack rules', () => {
 
   // Passes two packs with different rules in both orders and expects the rules of the pack whose id
   // sorts first, with differ set.
+  // Criteria: CT-10.
   it('uses the rules of the pack whose id sorts first', () => {
     const a = { id: 'a', name: 'A', rules: other }
     const b = { id: 'b', name: 'B', rules: sampleRules }
@@ -369,6 +386,7 @@ describe('pack rules', () => {
 
   // Adds rules to a version 1 pack, then effects to a version 1 career, and expects each rejected
   // with a message that the pack must be version 2; with formatVersion 2 the pack loads with its rules.
+  // Criteria: CT-12.
   it('requires format version 2 for rules and effects', () => {
     const withRules = { ...structuredClone(validPack), rules: sampleRules }
     expect(parseCareerPack(withRules)).toMatchObject({ ok: false, reason: 'this pack uses "rules", so its "formatVersion" must be 2' })
@@ -453,6 +471,7 @@ describe('buildCareer rule enforcement', () => {
 
   // Sets survival target 2 and survival dice 2: without the rule it passes; with failOnNatural 2 it
   // fails and the step gives the reason.
+  // Criteria: CR-1.
   it('a natural 2 fails survival when rules.survival.failOnNatural is 2', () => {
     const career = withAssignment({ survival: { characteristic: 'DEX', target: 2 } })
     const input = started(SERVICE, { qualification: 12, 'term-1.survival': 2 })
@@ -463,6 +482,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Overrides the outcome of that natural-2 survival to Pass and expects it to pass.
+  // Criteria: CR-5.
   it('an outcome override beats the natural-fail rule', () => {
     const career = withAssignment({ survival: { characteristic: 'DEX', target: 2 } })
     const input = started(SERVICE, { qualification: 12, 'term-1.survival': 2 }, { 'term-1.survival': 'pass' })
@@ -470,6 +490,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Fails survival in term 2 and expects 2 benefit rolls without mishapLosesTerm and 1 with it.
+  // Criteria: CR-2.
   it('a mishap that ends the career loses that term benefit roll when mishapLosesTerm is true', () => {
     const input = started(mishapInTerm2.choices, mishapInTerm2.rolls)
     expect(build(input).benefitCount).toBe(2)
@@ -479,12 +500,14 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Gives mishap 1 keep-benefit and expects 2 benefit rolls with mishapLosesTerm true.
+  // Criteria: CR-15.
   it('a mishap with keep-benefit keeps the term benefit roll', () => {
     const input = started(mishapInTerm2.choices, mishapInTerm2.rolls)
     expect(build(input, losesTerm, withMishap1([{ type: 'keep-benefit' }])).benefitCount).toBe(2)
   })
 
   // Gives mishap 1 stay-in-career and expects the term-2 next choice not to be forced.
+  // Criteria: CR-15.
   it('a mishap with stay-in-career lets the career continue', () => {
     const { 'term-2.next': _ignored, ...choices } = mishapInTerm2.choices
     const result = build(started(choices, mishapInTerm2.rolls), sampleRules, withMishap1([{ type: 'stay-in-career' }]))
@@ -492,6 +515,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Passes term 1, then rolls advancement 2 in term 2 (total 2, at or below 2 terms) and expects a forced muster with the reason.
+  // Criteria: CR-3.
   it('an advancement total at or below the terms served forces leaving when leaveAtOrBelowTerms is true', () => {
     const rules: Rules = { ...sampleRules, advancement: { leaveAtOrBelowTerms: true } }
     const input = started(
@@ -505,6 +529,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Rolls advancement 12 in term 1 with stayOnNatural 12, stores "leave", and expects a forced continue.
+  // Criteria: CR-4.
   it('natural 12 on advancement forces staying when stayOnNatural is 12', () => {
     const rules: Rules = { ...sampleRules, advancement: { stayOnNatural: 12 } }
     const input = started(
@@ -518,6 +543,7 @@ describe('buildCareer rule enforcement', () => {
 
   // With maxLevel 1, rolls Vacc Suit twice in term 1 (after Vacc Suit 0 from basic training) and
   // expects Vacc Suit 1 and a Lost reason on the second roll.
+  // Criteria: CR-6.
   it('a skill gain above skillLimits.maxLevel is lost', () => {
     const rules: Rules = { ...sampleRules, skillLimits: { maxLevel: 1 } }
     const result = build(
@@ -529,6 +555,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // With totalPerIntEdu 0 the limit is 0 levels, so the first skill roll (Vacc Suit 1) is lost.
+  // Criteria: CR-7.
   it('a skill gain above totalPerIntEdu × (INT + EDU) is lost', () => {
     const rules: Rules = { ...sampleRules, skillLimits: { totalPerIntEdu: 0 } }
     const result = build(started(SERVICE, { ...PASSING, 'term-1.skill-0': 1 }), rules)
@@ -537,6 +564,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // With a +2 rank DM from rank 0, a cash roll of 1 totals 3.
+  // Criteria: CR-8.
   it('the rank benefit DM applies to cash rolls', () => {
     const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, rankBenefitDM: [{ minRank: 0, dm: 2 }] } }
     const result = build(started({ ...SERVICE, 'term-1.next': 'leave', 'benefit-0': 'cash' }, { ...PASSING, 'term-1.advancement': 2, 'benefit-0': 1 }), rules)
@@ -544,6 +572,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // With cashSkillDM Vacc Suit +1 (Vacc Suit 0 from basic training), a cash roll of 1 totals 2 and a benefit roll of 1 totals 1.
+  // Criteria: CR-9.
   it('cashSkillDM applies to cash rolls only, for a skill at any level', () => {
     const rules: Rules = {
       ...sampleRules,
@@ -557,6 +586,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Marks qualification automatic and sets its dice to 2; expects a pass with no dice.
+  // Criteria: CR-10.
   it('automatic qualification passes without a roll', () => {
     const career = { ...sampleCareer(), qualification: { characteristic: 'END' as const, target: 12, automatic: true } }
     const result = build(started(SERVICE, { qualification: 2, 'term-1.survival': 12 }), sampleRules, career)
@@ -572,6 +602,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Uses a qualification on STR or INT with INT 12 (DM +2) and expects INT used and dice 6 to reach 8.
+  // Criteria: CR-11.
   it('a check on a list of characteristics uses the highest DM', () => {
     const career = { ...sampleCareer(), qualification: { characteristic: ['STR' as const, 'INT' as const], target: 8 } }
     const result = buildCareer(SEED, { ...BASE, INT: 12 }, started(SERVICE, { qualification: 6 }), { careers: [career], rules: sampleRules })
@@ -586,6 +617,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Sets basicTraining "assignment" and expects basic training to give the assignment's Gunner, not the service skill Broker.
+  // Criteria: CR-12.
   it('basicTraining "assignment" trains in the assignment skills', () => {
     const career: CareerDefinition = { ...sampleCareer(), basicTraining: 'assignment' }
     const result = build(started(SERVICE, PASSING), sampleRules, career)
@@ -594,6 +626,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Replaces a service skill with "Drive or Flyer" and expects basic training to ask for a pick, then gives Drive 0.
+  // Criteria: CR-13.
   it('an "A or B" table entry asks the player to pick one', () => {
     const career = sampleCareer()
     const changed: CareerDefinition = {
@@ -617,6 +650,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Gives event 7 a promote effect and expects advancement to pass without dice and rank 1.
+  // Criteria: CR-14.
   it('a promote effect passes advancement without a roll', () => {
     const career = sampleCareer()
     const promoted: CareerDefinition = {
@@ -633,6 +667,7 @@ describe('buildCareer rule enforcement', () => {
   })
 
   // Uses aging from term 1 with a row that takes STR 7 down by 7, and expects an ageing crisis reason.
+  // Criteria: CR-16.
   it('aging that takes a characteristic to 0 shows an ageing crisis', () => {
     const rules: Rules = {
       ...sampleRules,

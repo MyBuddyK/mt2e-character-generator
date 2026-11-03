@@ -39,8 +39,12 @@ Check every proposal against these. Call out any conflict.
    - **User flow**: numbered steps from the player's point of view.
    - **UI**: layout and states (empty, loading, error, overridden), described in words or ASCII.
    - **Engine and data changes**: types, functions and JSON fields to add or change.
-   - **Acceptance criteria**: a checklist in testable terms. The `playwright-test-planner` agent turns
-     these into a test plan, so make each item observable in the browser.
+   - **Acceptance criteria**: a checklist in testable terms, one `- [ ] **XX-n** ...` line per
+     criterion. `XX` is the spec's prefix (`PK` career-import, `CT` career-terms, `CR` career-rules; pick
+     a new one for a new spec) and `n` counts on from the spec's last id. Never renumber an existing id.
+     The `playwright-test-planner` agent turns these into a test plan, so make each item observable in
+     the browser where it can be, and say when a criterion is rules arithmetic best checked by a unit
+     test. A criterion is ticked (`[x]`) only once a test names it in a `// Criteria:` comment.
    - **Open questions**: anything the owner should decide.
 4. Keep scope small enough to ship in one pull request. Split bigger ideas into ordered specs.
 5. Do not implement the feature unless asked. Your output is the spec and a short summary of the decisions

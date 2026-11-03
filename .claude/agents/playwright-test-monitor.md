@@ -57,9 +57,9 @@ To clean them up:
    can't name one, keep the test.
 2. Before removing a duplicate, move any assertion it has that the kept test lacks into the kept test, and
    update the kept test's comment so it still states the setup, action and expected result.
-3. If the removed test's name or comment matches an acceptance criterion in `docs/features/`, the kept
-   test's name or comment must match that criterion too. If you can't tell which criterion a test checks,
-   keep it.
+3. If the removed test's `// Criteria:` comment names an id, the kept test's comment must name it too,
+   so `npm run check:conventions` still finds a test for every ticked criterion. If you can't tell which
+   criterion a test checks, keep it.
 4. Run `npm run check` and `npm run test:e2e` after the changes. Both must pass.
 5. Make the cleanup its own commit, separate from any fix. In the commit message, list each removed test
    and the test that replaces it, or the spec line that removed the behavior. Report the test counts the

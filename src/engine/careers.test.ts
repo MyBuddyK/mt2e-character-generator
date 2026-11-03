@@ -55,6 +55,7 @@ function build(input: CareerInput, rules: Rules = sampleRules, careers: CareerDe
 describe('careers one after another', () => {
   // Musters out of the first career and expects the character finished, nothing pending, and the next
   // career's prefix with the career just left excluded.
+  // Criteria: CR-19.
   it('offers a next career after mustering out', () => {
     const result = build(FIRST_CAREER)
     expect(result.finished).toBe(true)
@@ -65,6 +66,7 @@ describe('careers one after another', () => {
 
   // Starts the second career and expects its first term to be term 2 overall, term 1 in the career,
   // with "career-2." keys and the age continuing from the first career.
+  // Criteria: CR-19.
   it('numbers terms across careers and prefixes the later career keys', () => {
     const result = build(withFirst({ ...START_SECOND }, { 'career-2.qualification': 12 }))
     expect(result.finished).toBe(false)
@@ -78,6 +80,7 @@ describe('careers one after another', () => {
 
   // Picks the first career again as the next career and expects a problem, no second career, and the
   // character still finished.
+  // Criteria: CR-19.
   it('does not allow re-entering the career just left', () => {
     const result = build(withFirst({ 'career-2.start.career': 'sample-sanitation', 'career-2.start.assignment': 'debris-sweep' }))
     expect(result.runs).toHaveLength(1)
@@ -87,6 +90,7 @@ describe('careers one after another', () => {
 
   // With dmPerPreviousCareer -1, expects the second career's qualification DM to be the END DM (0) - 1
   // and the step to give the reason.
+  // Criteria: CR-20.
   it('applies the qualification DM for each earlier career', () => {
     const rules: Rules = { ...sampleRules, qualification: { dmPerPreviousCareer: -1 } }
     const qualification = build(withFirst(START_SECOND), rules).runs[1]?.qualification
@@ -96,6 +100,7 @@ describe('careers one after another', () => {
 
   // Starts the second career and expects basic training to ask for one skill from the service skills
   // table, then gives the picked skill only.
+  // Criteria: CR-21.
   it('gives a later career one basic training skill, picked by the player', () => {
     const asked = build(withFirst(START_SECOND, { 'career-2.qualification': 12 }))
     expect(asked.pending).toEqual({
@@ -109,6 +114,7 @@ describe('careers one after another', () => {
 
   // With a cash limit of 1, takes cash in the first career and expects the second career's benefit
   // roll to forbid cash.
+  // Criteria: CR-22.
   it('counts the cash roll limit across careers', () => {
     const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, cashRollLimit: 1 } }
     const input = withFirst(
@@ -129,6 +135,7 @@ describe('careers one after another', () => {
 
   // Asks the policy about the after-term choice in a second career with one term, with a term limit of
   // 1, and expects "leave": the limit counts the current career's terms only.
+  // Criteria: CR-27.
   it('Finish career counts the term limit per career', () => {
     const result = build(
       withFirst({ ...START_SECOND, 'career-2.term-1.training.pick': 'Broker', 'career-2.term-1.skill-0.table': 'serviceSkills' }, { 'career-2.qualification': 12, 'career-2.term-1.survival': 12, 'career-2.term-1.advancement': 2 }),
@@ -153,11 +160,13 @@ const FAILED: CareerInput = { ...EMPTY_INPUT, choices: { 'start.career': 'sample
 // Tests for the Draft and the fallback career after a failed qualification.
 describe('the Draft and the fallback career', () => {
   // Fails qualification with Draft and fallback rules and expects the fallback choice with both offered.
+  // Criteria: CR-23.
   it('offers the Draft and the fallback career when qualification fails', () => {
     expect(build(FAILED, DRAFT_RULES).pending).toEqual({ kind: 'fallback', key: 'fallback', draftAllowed: true, fallback: 'Drift' })
   })
 
   // Fails qualification without Draft or fallback rules and expects the start choice again, as before part 2b.
+  // Criteria: CR-24.
   it('asks for a career again when the rules have neither', () => {
     expect(build(FAILED).pending).toMatchObject({ kind: 'start', failedQualification: true })
   })
@@ -178,6 +187,7 @@ describe('the Draft and the fallback career', () => {
 
   // Takes the Draft with the roll set to 6 and expects the second career in the hazmat assignment
   // named by the row, with no assignment choice.
+  // Criteria: CR-23.
   it('the Draft uses the career and assignment of the row rolled', () => {
     const result = build({ ...FAILED, choices: { ...FAILED.choices, fallback: 'draft' }, rolls: { ...FAILED.rolls, draft: 6 } }, DRAFT_RULES)
     const run = result.runs[0]
@@ -189,6 +199,7 @@ describe('the Draft and the fallback career', () => {
 
   // Takes the Draft in the first career, then fails the qualification of the next career, and expects
   // only the fallback career offered.
+  // Criteria: CR-23.
   it('the Draft can be taken once per character', () => {
     const drafted: CareerInput = {
       ...EMPTY_INPUT,
@@ -246,12 +257,14 @@ function buildMilitary(input: CareerInput, base = BASE): CareerResult {
 // Tests for commissions and officer ranks.
 describe('commissions', () => {
   // Survives term 1 of a career with a commission and expects the commission choice before advancement.
+  // Criteria: CR-25.
   it('offers a commission in the first term', () => {
     expect(buildMilitary(military()).pending).toEqual({ kind: 'commission', key: 'term-1.commission.try' })
   })
 
   // Tries for a commission with dice 12 and expects officer rank 1 Lieutenant, no advancement roll,
   // and the officer skill table offered for the advancement skill roll.
+  // Criteria: CR-25.
   it('a commission makes the character a rank 1 officer and replaces advancement', () => {
     const result = buildMilitary(military({ 'term-1.commission.try': 'try' }, { 'term-1.commission': 12 }))
     const term = result.terms[0]
@@ -275,6 +288,7 @@ describe('commissions', () => {
 
   // Continues to term 2 with SOC 7, then with SOC 9, and expects the commission offered only with SOC
   // 9, with DM -1 for the later term (SOC 9 gives DM +1, so the total DM is 0).
+  // Criteria: CR-25.
   it('later terms allow a commission only from the SOC in the rules', () => {
     const choices = { 'term-1.commission.try': 'skip', 'term-1.next': 'continue', 'term-2.skill-0.table': 'serviceSkills' }
     const rolls = { 'term-1.advancement': 3 }
@@ -289,6 +303,7 @@ describe('commissions', () => {
 
   // Commissions at enlisted rank 0, reaches officer rank 2 in term 2, and expects benefit rank 2 to
   // give the rank extra roll in the sample rules (minRank 2): 2 terms + 1 = 3 benefit rolls.
+  // Criteria: CR-26.
   it('an officer’s benefit rank is the officer rank plus the enlisted rank at commission', () => {
     const result = buildMilitary(
       military(
@@ -302,6 +317,7 @@ describe('commissions', () => {
   })
 
   // Asks the policy about a commission choice and expects "try".
+  // Criteria: CR-27.
   it('Finish career tries for a commission', () => {
     const result = buildMilitary(military())
     expect(policyChoice({ kind: 'commission', key: 'term-1.commission.try' }, result, 5, SEED)).toBe('try')

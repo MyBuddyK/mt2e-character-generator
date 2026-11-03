@@ -10,6 +10,7 @@ function validate(file: string): { status: number | null; output: string } {
 // Tests for scripts/validate-pack.ts, run as a child process on the e2e fixtures.
 describe('validate-pack', () => {
   // Runs it on the valid fixture and expects exit code 0 and the loaded message.
+  // Criteria: PK-22.
   it('exits 0 for a valid pack', () => {
     const { status, output } = validate('e2e/fixtures/valid-pack.json')
     expect(output).toContain('Loaded "Test core pack" revision 1: 2 careers.')
@@ -17,6 +18,7 @@ describe('validate-pack', () => {
   })
 
   // Runs it on the partly invalid fixture and expects exit code 1 and the skipped career's message.
+  // Criteria: PK-22.
   it('exits 1 and lists the skipped career for a partly invalid pack', () => {
     const { status, output } = validate('e2e/fixtures/partly-invalid-pack.json')
     expect(output).toMatch(/careers\.1 \(test-surveyor\): qualification\.target: /)

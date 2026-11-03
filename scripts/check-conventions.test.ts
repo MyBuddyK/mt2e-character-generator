@@ -56,4 +56,25 @@ describe('findConventionProblems', () => {
     expect(findConventionProblems([{ path: 'docs/a.md', text: 'robustness\n' }])).toEqual([])
     expect(findConventionProblems([{ path: 'CLAUDE.md', text: 'no "robust"\n' }])).toEqual([])
   })
+
+  // Passes a feature spec with a ticked CT-1 and an unticked CT-2, and a test that names CT-1, and
+  // expects no problems: an unticked criterion needs no test yet.
+  it('accepts a ticked criterion that a test names', () => {
+    const spec = { path: 'docs/features/a.md', text: '- [x] **CT-1** One.\n- [ ] **CT-2** Two.\n' }
+    const test = { path: 'e2e/a.spec.ts', text: "// Checks one.\n// Criteria: CT-1.\ntest('one', async () => {})\n" }
+    expect(findConventionProblems([spec, test])).toEqual([])
+  })
+
+  // Passes a feature spec with a criterion with no id, an id used twice, and a ticked CT-2 that no test
+  // names, plus a test naming CT-9, and expects one problem for each.
+  it('reports missing, repeated, untested and unknown criterion ids', () => {
+    const spec = { path: 'docs/features/a.md', text: '- [x] One.\n- [x] **CT-2** Two.\n- [ ] **CT-2** Again.\n' }
+    const test = { path: 'e2e/a.spec.ts', text: "// Checks.\n// Criteria: CT-9.\ntest('t', async () => {})\n" }
+    expect(findConventionProblems([spec, test])).toEqual([
+      'docs/features/a.md:1: acceptance criterion has no id such as **CT-1**',
+      'docs/features/a.md:3: criterion id CT-2 is also used at docs/features/a.md:2',
+      "docs/features/a.md:2: ticked criterion CT-2 is not named by any test's Criteria comment",
+      'e2e/a.spec.ts:2: criterion CT-9 is not defined in docs/features',
+    ])
+  })
 })

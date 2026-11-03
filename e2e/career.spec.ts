@@ -23,6 +23,7 @@ async function importFixture(page: Page, name: string): Promise<void> {
 // Browser tests for the Career section: starting a career, terms, overrides and mustering out.
 test.describe('career terms', () => {
   // Starts the sample career with ?seed=terms in two separate pages and expects the same first term.
+  // Criteria: CT-1.
   test('the same seed gives the same first term', async ({ browser }) => {
     const texts: string[] = []
     for (let i = 0; i < 2; i += 1) {
@@ -38,6 +39,7 @@ test.describe('career terms', () => {
 
   // Sets the term 1 survival dice to 2 and expects a mishap, no event, no advancement roll and only
   // Muster out; then clicks Reset and expects the event and advancement roll back.
+  // Criteria: CT-2, CT-3, CT-8.
   test('a failing survival roll gives a mishap; reset brings back the event', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Survival', 2)
@@ -53,6 +55,7 @@ test.describe('career terms', () => {
   })
 
   // Sets the term 1 event dice to 3 (a connection event) and expects the Connection marker on it.
+  // Criteria: CT-14.
   test('a connection event shows the Connection marker', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Event', 3)
@@ -60,6 +63,7 @@ test.describe('career terms', () => {
   })
 
   // Sets the event dice to 6 (gain Mechanic or Engineer), picks Engineer, and expects Engineer 1 applied.
+  // Criteria: CT-5.
   test('an event with a skill effect adds the chosen skill', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Event', 6)
@@ -68,6 +72,7 @@ test.describe('career terms', () => {
   })
 
   // Sets the event dice to 9 (no effects) and expects its summary as an apply-by-hand note.
+  // Criteria: CT-13.
   test('an event without effects is shown as a note', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Event', 9)
@@ -75,6 +80,7 @@ test.describe('career terms', () => {
   })
 
   // Passes term 1, clicks Continue in career, and expects term 2 to start four years later (the sample term length).
+  // Criteria: CT-16.
   test('continue in career adds a term four years later', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -85,6 +91,7 @@ test.describe('career terms', () => {
 
   // Clicks Finish career and expects the finished summary; then changes the first benefit's dice and
   // expects the summary still shown.
+  // Criteria: CT-18.
   test('finish career finishes the character and its choices can still be changed', async ({ page }) => {
     await startTerm1(page)
     await expect(page.getByTestId('policy-note')).toBeVisible()
@@ -107,6 +114,7 @@ test.describe('career terms', () => {
 
   // Sets the term 1 event to 3 (a connection event that also offers Medic or Vacc Suit), picks
   // Medic, leaves, takes a benefit, and expects the event in the Connection opportunities list.
+  // Criteria: CT-15.
   test('the finished character lists connection opportunities', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -119,6 +127,7 @@ test.describe('career terms', () => {
   })
 
   // Leaves after term 1, takes one benefit, and expects one benefit roll (the sample's one per term).
+  // Criteria: CT-19.
   test('leaving gives the benefit rolls set in the rules', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -130,6 +139,7 @@ test.describe('career terms', () => {
   })
 
   // Types a term note, reloads, and expects the started career, the chosen table and the note still there.
+  // Criteria: CT-21.
   test('choices, overrides and notes are kept after a reload', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -140,6 +150,7 @@ test.describe('career terms', () => {
   })
 
   // Loads the page with only bundled data and expects the sample rules notice.
+  // Criteria: CT-22.
   test('the sample rules notice is shown with only bundled data', async ({ page }) => {
     await page.goto('./?seed=terms')
     await expect(page.getByTestId('sample-rules-notice')).toBeVisible()
@@ -147,6 +158,7 @@ test.describe('career terms', () => {
 
   // Sets a 320px viewport, plays three terms with survival passed, a plain event (9) and a failed
   // advancement in each, and expects no sideways scrolling.
+  // Criteria: CT-23.
   test('the Career section fits at 320px with three terms', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 800 })
     await startTerm1(page)
@@ -164,6 +176,7 @@ test.describe('career terms', () => {
   })
 
   // Starts the career and picks the skill table with the keyboard only, and expects term 1 to show.
+  // Criteria: CT-24.
   test('the Career section works with the keyboard', async ({ page }) => {
     await page.goto('./?seed=terms')
     const start = page.getByRole('button', { name: 'Start career' })
@@ -180,6 +193,7 @@ test.describe('career terms', () => {
 test.describe('career terms with packs', () => {
   // Starts the sample career, imports valid-pack.json, and expects the saved-choices notice; clicking
   // Start over clears it, and it stays gone after a reload.
+  // Criteria: CT-11.
   test('saved choices made with other packs ask before applying', async ({ page }) => {
     await startTerm1(page)
     await importFixture(page, 'valid-pack.json')
@@ -192,6 +206,7 @@ test.describe('career terms with packs', () => {
   })
 
   // Imports two packs with different rules in both orders and expects the notice to name Rules pack A each time.
+  // Criteria: CT-10.
   test('with two packs that have different rules, the first by id is used', async ({ page }) => {
     await page.goto('./?seed=terms')
     for (const order of [
@@ -206,6 +221,7 @@ test.describe('career terms with packs', () => {
   })
 
   // Imports a version 1 pack whose careers use effects and expects an alert that it must be version 2.
+  // Criteria: CT-12.
   test('a version 1 pack that uses effects is rejected', async ({ page }) => {
     await page.goto('./?seed=terms')
     await importFixture(page, 'v1-effects-pack.json')
@@ -235,6 +251,7 @@ test.describe('career rule enforcement', () => {
   }
 
   // Sets the survival dice to 2 against a 2+ target and expects Fail with the natural-2 reason and a mishap.
+  // Criteria: CR-1.
   test('a natural 2 fails survival and says why', async ({ page }) => {
     await startEnforced(page)
     await setDice(page, 'Term 1 Survival', 2)
@@ -246,6 +263,7 @@ test.describe('career rule enforcement', () => {
 
   // Passes survival with event 9, rolls advancement 12, picks Service skills for the extra roll, and
   // expects the natural-12 reason with Continue in career and no Leave career button.
+  // Criteria: CR-4.
   test('a natural 12 on advancement offers only Continue in career', async ({ page }) => {
     await startEnforced(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -286,6 +304,7 @@ test.describe('more than one career', () => {
 
   // Starts Test fleet, sets its qualification result to Fail, takes the Draft, picks Debris sweep and
   // expects the drafted notice and term 1.
+  // Criteria: CR-23.
   test('a failed qualification offers the Draft and the fallback career', async ({ page }) => {
     await startPackCareer(page, 'Test fleet')
     await page.getByLabel('Career Qualification result').selectOption('fail')
@@ -299,6 +318,7 @@ test.describe('more than one career', () => {
 
   // Starts Test fleet, passes qualification and survival, tries for a commission with dice 12, and
   // expects officer rank 1 Ensign and the Officer skills table offered for the extra skill roll.
+  // Criteria: CR-25.
   test('a commission makes the character an officer', async ({ page }) => {
     await startPackCareer(page, 'Test fleet')
     await setDice(page, 'Career Qualification', 12)
@@ -313,6 +333,7 @@ test.describe('more than one career', () => {
   // Serves one term of Test wanderer and musters out, then expects the next-career picker without Test
   // wanderer, starts Test fleet, and expects career 2 with the earlier-career DM and term 2 asking for
   // one basic training skill.
+  // Criteria: CR-19.
   test('after mustering out the character can enter another career', async ({ page }) => {
     await startPackCareer(page, 'Test wanderer')
     await page.getByRole('button', { name: 'Service skills' }).click()
@@ -348,6 +369,7 @@ test.describe('aging and anagathics', () => {
 
   // Sets the term 1 aging dice to 2 (reduce two physical characteristics by 2 and 1), picks DEX for the
   // reduction by 2 and END for the reduction by 1, and expects the after-term choice and both reductions applied.
+  // Criteria: CR-28.
   test('aging asks which characteristic to reduce', async ({ page }) => {
     await startWanderer(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -363,6 +385,7 @@ test.describe('aging and anagathics', () => {
   })
 
   // Ticks Anagathics for term 1, sets the SOC roll to 12, and expects the cost roll and a second survival roll.
+  // Criteria: CR-30.
   test('anagathics add a cost and a second survival roll', async ({ page }) => {
     await startWanderer(page)
     await page.getByRole('checkbox', { name: 'Anagathics in term 1' }).check()
@@ -422,6 +445,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.1. Starts the sample career and expects term 1's basic training step to apply the six service
   // skills at level 0; then plays term 1 and continues, and expects no basic training step in term 2.
+  // Criteria: CT-7.
   test('1.1 basic training applies in the first term only', async ({ page }) => {
     await startTerm1(page)
     await expect(page.getByTestId('step-term-1.training')).toContainText(
@@ -435,6 +459,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.2. Passes term 1 survival and advancement with dice 12, and expects rank 1 Tug Pilot with
   // its Pilot 1 skill effect applied.
+  // Criteria: CT-6.
   test('1.2 a rank with a skill effect applies the skill', async ({ page }) => {
     await startTerm1(page)
     await setDice(page, 'Term 1 Survival', 12)
@@ -445,6 +470,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.3. Imports valid-pack.json (ranks with a bonus and no effects), starts its first career,
   // passes survival and advancement with dice 12, and expects the rank 1 bonus as an apply-by-hand note.
+  // Criteria: CT-6.
   test('1.3 a rank with only a bonus is shown as a note', async ({ page }) => {
     await page.goto('./?seed=terms')
     await importFixture(page, 'valid-pack.json')
@@ -459,6 +485,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.4. Plays term 1 with advancement dice 2 in one context and 12 in another, continues to term 2
   // in each, and expects the same term 2 skill roll dice and skill in both.
+  // Criteria: CT-4.
   test('1.4 overriding term 1 advancement does not move the term 2 skill roll', async ({ browser }) => {
     const rolls: string[] = []
     for (const advancement of [2, 12]) {
@@ -479,6 +506,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.5. Plays three terms with passing survival, a plain event (9) and failed advancement, and
   // expects an aging step in term 3 only (the sample rules age from term 3).
+  // Criteria: CT-17.
   test('1.5 aging is rolled from term 3, not before', async ({ page }) => {
     await startTerm1(page)
     for (const term of [1, 2, 3]) {
@@ -493,6 +521,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.6. Plays term 1 with event 8 (not a connection), leaves and takes a benefit, and expects the
   // empty Connection opportunities line and no list.
+  // Criteria: CT-15.
   test('1.6 a character with no connection events shows the empty line', async ({ page }) => {
     await startTerm1(page)
     await plainTerm(page, 1, 8)
@@ -506,6 +535,7 @@ test.describe('career terms plan', () => {
 
   // Plan 1.7. Plays three terms, leaves, takes two cash rolls, and expects Cash disabled with the limit
   // text on roll 3 of 3; then takes a benefit, sets the cash dice to 1 and 6, and expects Cr11000.
+  // Criteria: CT-20.
   test('1.7 the cash roll limit disables Cash and the cash total adds up', async ({ page }) => {
     await startTerm1(page)
     for (const term of [1, 2, 3]) {

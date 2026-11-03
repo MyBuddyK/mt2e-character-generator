@@ -38,6 +38,49 @@ const EXPORT_DECLARATION = /^export (default )?(async )?(function|const|let|type
 const SKIPPED_TEST = /\b(it|test|describe|test\.describe)\.(skip|fixme|only|todo)\b/
 const TEST_CALL = /^\s*(it|test|describe|test\.describe)(\.(each|concurrent|serial|parallel)\b[^(]*\([^)]*\))?\(/
 
+const CRITERION_LINE = /^- \[([x ])\] (?:\*\*([A-Z]+-\d+)\*\* )?/
+const CRITERIA_COMMENT = /^\s*\/\/ Criteria: (.+)\.$/
+const CRITERION_ID = /^[A-Z]+-\d+$/
+
+/**
+ * Returns the traceability problems in `files`, as `path:line: message`:
+ * - in a Markdown file under `docs/features/`, an acceptance criterion line (`- [x] ` or `- [ ] `) that
+ *   does not start with a bold id such as `**CT-4**`, or an id used twice;
+ * - a ticked (`[x]`) criterion whose id no `// Criteria: ...` comment in a test file names;
+ * - a `// Criteria: ...` comment in a test file that names an id no feature spec defines.
+ */
+function findTraceProblems(files: readonly SourceFile[]): string[] {
+  const problems: string[] = []
+  const defined = new Map<string, { where: string; ticked: boolean }>()
+  const named = new Map<string, string>()
+  for (const file of files) {
+    const isSpec = file.path.startsWith('docs/features/') && file.path.endsWith('.md')
+    const isTest = /\.(test|spec)\.ts$/.test(file.path)
+    file.text.split('\n').forEach((line, i) => {
+      const where = `${file.path}:${i + 1}`
+      const criterion = isSpec ? CRITERION_LINE.exec(line) : null
+      if (criterion) {
+        const id = criterion[2]
+        if (id === undefined) problems.push(`${where}: acceptance criterion has no id such as **CT-1**`)
+        else if (defined.has(id)) problems.push(`${where}: criterion id ${id} is also used at ${defined.get(id)?.where ?? ''}`)
+        else defined.set(id, { where, ticked: criterion[1] === 'x' })
+      }
+      const comment = isTest ? CRITERIA_COMMENT.exec(line) : null
+      for (const id of comment?.[1]?.split(', ') ?? []) {
+        if (CRITERION_ID.test(id)) named.set(id, where)
+        else problems.push(`${where}: "${id}" is not a criterion id such as CT-1`)
+      }
+    })
+  }
+  for (const [id, { where, ticked }] of defined) {
+    if (ticked && !named.has(id)) problems.push(`${where}: ticked criterion ${id} is not named by any test's Criteria comment`)
+  }
+  for (const [id, where] of named) {
+    if (!defined.has(id)) problems.push(`${where}: criterion ${id} is not defined in docs/features`)
+  }
+  return problems
+}
+
 /** Returns true when the last non-blank line before `index` in `lines` ends a block comment or is a line comment. */
 function hasCommentAbove(lines: string[], index: number): boolean {
   for (let i = index - 1; i >= 0; i -= 1) {
@@ -56,7 +99,10 @@ function hasCommentAbove(lines: string[], index: number): boolean {
  * - in a `.ts` file whose name ends in `.test.ts` or `.spec.ts`, an `it`, `test` or `describe` call
  *   at the start of a line with no comment directly above it, and any `.skip`, `.fixme`, `.only` or
  *   `.todo` on one of those calls (oxlint finds these in Vitest files but not in Playwright specs);
- * - a phrase from BANNED_PHRASES in any file.
+ * - a phrase from BANNED_PHRASES in any file;
+ * - a traceability problem between the acceptance criteria in `docs/features/` and the
+ *   `// Criteria: CT-1, CT-2.` comments in test files (an id missing, used twice, unknown, or a
+ *   ticked criterion that no test names).
  * The skipped test and phrase checks leave out the files in RULE_LIST_FILES.
  * It does not check whether a comment is accurate or complete; that is left to review.
  */
@@ -81,7 +127,7 @@ export function findConventionProblems(files: readonly SourceFile[]): string[] {
       if (match) problems.push(`${where}: evaluative phrase "${match[0]}"`)
     })
   }
-  return problems
+  return [...problems, ...findTraceProblems(files)]
 }
 
 /**
