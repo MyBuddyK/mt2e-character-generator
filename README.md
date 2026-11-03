@@ -21,7 +21,7 @@ Add `?seed=anything` to the URL to get the same character every time.
 
 ## Adding career data
 
-Put a JSON file in `src/data/careers/` following `sample-courier.json`. Each file is checked against
+Put a JSON file in `src/data/careers/` following `sample-sanitation.json`. Each file is checked against
 `CareerSchema` in `src/engine/career-schema.ts`. `npm test` fails and lists each problem by file and field,
 and the app shows the same list above the characteristics. Use short summaries in your own words and cite the book and
 page in `source`; don't copy rulebook text into this repo.
