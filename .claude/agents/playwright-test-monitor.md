@@ -24,7 +24,9 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
    `/opt/pw-browsers`), set `PW_CHROMIUM_PATH` to its `chrome` binary instead of running
    `playwright install`.
 2. For CI, read the latest GitHub Actions run for the branch and download the `playwright-report` artifact
-   if one exists.
+   if one exists. The weekly "Flakiness check" workflow (`.github/workflows/flaky.yml`) runs every test
+   three times with no retries; read its `flakiness-report` artifact for tests that failed in some
+   repeats only.
 3. To check whether a failure is flaky, rerun only that test several times:
    `npx playwright test <file>:<line> --repeat-each=5`.
 4. Classify each failure:
