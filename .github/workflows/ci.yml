@@ -1,6 +1,6 @@
 name: CI
 
-# Runs lint, typecheck, the conventions check and unit tests, then the Playwright suite at the site root and under the
+# Runs lint, typecheck, the conventions check and unit tests with a coverage report, then the Playwright suite at the site root and under the
 # GitHub Pages path. Runs on pull requests and on pushes to main. A new push cancels the
 # in-progress run for the same branch.
 on:
@@ -28,7 +28,16 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run check:conventions
-      - run: npm test
+      - run: npm run test:coverage
+      # Adds the line, statement, function and branch percentages to the run's summary page.
+      - if: ${{ !cancelled() }}
+        run: npx tsx scripts/coverage-summary.ts >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
 
   e2e:
     runs-on: ubuntu-latest

@@ -9,6 +9,9 @@ also the owner's portfolio project.
 - `npm run dev`: local dev server
 - `npm run check`: lint (oxlint), typecheck (tsc), the conventions check (`npm run check:conventions`) and unit
   tests (Vitest). Run before every commit.
+- `npm run test:coverage`: the unit tests with a v8 coverage report of `src/engine`, `src/storage` and
+  `scripts` in `coverage/` (git-ignored). CI runs it and shows the totals on the run's summary page. No
+  threshold is set.
 - `npm run test:e2e`: Playwright against a production build. In a sandbox with a preinstalled browser,
   set `PW_CHROMIUM_PATH` to its `chrome` binary.
 
@@ -30,7 +33,7 @@ also the owner's portfolio project.
   `rules` values. `src/data/rules/sample-rules.json`: invented rules. `src/use-career.ts` and
   `src/Career.tsx`: the Career section; `src/storage/characters.ts` saves career input per seed.
 - `scripts/`: `validate-pack`, `schema` (writes the git-ignored `public/career-pack.schema.json`) and
-  `check-conventions` (see Documentation rules), run with tsx and typechecked by `tsconfig.scripts.json`.
+  `check-conventions` (see Documentation rules) and `coverage-summary` (the CI coverage table), run with tsx and typechecked by `tsconfig.scripts.json`.
 - `src/engine/invariants.test.ts`: seed sweeps that run the same check on a fixed list of seeds, for rules
   that should hold for any seed (repeatability, characteristic ranges, how Finish career ends).
 - `src/App.tsx`: UI.
