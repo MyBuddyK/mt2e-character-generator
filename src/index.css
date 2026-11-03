@@ -376,6 +376,10 @@ input[type='number'] {
   width: 100%;
 }
 
+.remove-term {
+  margin-top: 0.5rem;
+}
+
 .career-start,
 .pending {
   display: flex;

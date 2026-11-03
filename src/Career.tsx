@@ -254,13 +254,15 @@ interface TermProps {
   anagathics: Rules['anagathics']
   input: CareerInput
   onChange: (next: CareerInput) => void
+  /** Removes this term; set only for the most recent term, which then shows a Remove term button. */
+  onRemove: (() => void) | undefined
 }
 
 /**
  * Renders one term: its age range and rank, an Anagathics checkbox when the rules allow them, its
- * steps, why the career ends (if it does), and a notes field.
+ * steps, why the career ends (if it does), a notes field, and a Remove term button when `onRemove` is set.
  */
-function Term({ term, anagathics, input, onChange }: TermProps) {
+function Term({ term, anagathics, input, onChange, onRemove }: TermProps) {
   const notesKey = `term-${term.number}`
   const drugsKey = `${term.key}.anagathics`
   return (
@@ -302,6 +304,11 @@ function Term({ term, anagathics, input, onChange }: TermProps) {
           onChange={(e) => onChange({ ...input, notes: setKey(input.notes, notesKey, e.target.value) })}
         />
       </label>
+      {onRemove && (
+        <button type="button" className="secondary remove-term" data-testid="remove-term" onClick={onRemove}>
+          Remove term {term.number}
+        </button>
+      )}
     </li>
   )
 }
@@ -550,13 +557,17 @@ interface RunProps {
   anagathics: Rules['anagathics']
   input: CareerInput
   onChange: (next: CareerInput) => void
+  /** Removes the character's most recent term, which Run passes to that term when it is in this career. */
+  onRemoveLast: () => void
+  /** The number of the character's most recent term. */
+  lastTerm: number | undefined
 }
 
 /**
  * Renders one career entered: its name and assignment (with a heading from the second career on),
  * the qualification roll, how a Draft or fallback career was entered, its terms and its mustering out.
  */
-function Run({ run, anagathics, input, onChange }: RunProps) {
+function Run({ run, anagathics, input, onChange, onRemoveLast, lastTerm }: RunProps) {
   const context = run.index === 1 ? 'Career' : `Career ${run.index}`
   return (
     <div className="career-run" data-testid={`career-run-${run.index}`}>
@@ -578,7 +589,14 @@ function Run({ run, anagathics, input, onChange }: RunProps) {
       {run.terms.length > 0 && (
         <ol className="terms">
           {run.terms.map((t) => (
-            <Term key={t.number} term={t} anagathics={anagathics} input={input} onChange={onChange} />
+            <Term
+              key={t.number}
+              term={t}
+              anagathics={anagathics}
+              input={input}
+              onChange={onChange}
+              onRemove={t.number === lastTerm ? onRemoveLast : undefined}
+            />
           ))}
         </ol>
       )}
@@ -616,9 +634,21 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
   const { input, result, update } = career
   const pending = result.pending
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)
+  const sectionRef = useRef<HTMLElement>(null)
+  const removedTerm = career.removedTerm
+  // After a removal the clicked button is gone, so focus moves to the new most recent term's Remove
+  // term button, or to Start career when no term is left.
+  useEffect(() => {
+    if (removedTerm === undefined) return
+    const section = sectionRef.current
+    const target =
+      section?.querySelector<HTMLButtonElement>('[data-testid="remove-term"]') ??
+      section?.querySelector<HTMLButtonElement>('.career-start button[type="submit"]')
+    target?.focus()
+  }, [removedTerm])
 
   return (
-    <section aria-labelledby="career-heading" data-testid="career">
+    <section aria-labelledby="career-heading" data-testid="career" ref={sectionRef}>
       <h2 id="career-heading">Career</h2>
 
       {rules.packName === undefined ? (
@@ -661,6 +691,12 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
               override{career.removedCount === 1 ? '' : 's'} that no longer apply.
             </p>
           )}
+          {/* The live region stays mounted, empty until a removal, so screen readers announce the first removal too. */}
+          <p className={removedTerm === undefined ? undefined : 'notice small'} data-testid="removed-term-notice" aria-live="polite">
+            {removedTerm === undefined
+              ? ''
+              : `Removed term ${removedTerm}. ${removedTerm > 1 ? `The character is back at the end of term ${removedTerm - 1}.` : 'Pick a career to start again.'}`}
+          </p>
           {career.saveFailed && (
             <p className="notice small" data-testid="career-save-failed">
               This character could not be saved in this browser. It stays until the page closes.
@@ -671,7 +707,15 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
             <StartForm careers={careers} prefix="" exclude={[]} input={input} onChange={update} />
           )}
           {result.runs.map((run) => (
-            <Run key={run.index} run={run} anagathics={rules.rules.anagathics} input={input} onChange={update} />
+            <Run
+              key={run.index}
+              run={run}
+              anagathics={rules.rules.anagathics}
+              input={input}
+              onChange={update}
+              onRemoveLast={career.removeLastTerm}
+              lastTerm={result.terms[result.terms.length - 1]?.number}
+            />
           ))}
           {pending?.kind === 'start' && (
             <>

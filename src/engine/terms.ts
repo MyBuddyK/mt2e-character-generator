@@ -1191,3 +1191,47 @@ export function pruneInput(input: CareerInput, used: Set<string>): { input: Care
     removed,
   }
 }
+
+/** What removeLastTerm returns: the new input, and the number of the term it removed (from 1). */
+export interface TermRemoval {
+  input: CareerInput
+  removed: number
+}
+
+/** Matches a term notes key ("term-3") and captures the term number. */
+const NOTES_KEY = /^term-(\d+)$/
+
+/**
+ * Removes the most recent term of the career built from `seed`, `base`, `input` and `data`, and
+ * returns the new input with the removed term's number, or undefined when that career has no terms.
+ * `built` is the career already built from the same arguments, when the caller has it; otherwise it
+ * is built here. The term before the removed one, when there is one, loses its after-term choice
+ * ("<term>.next"), so the rebuilt career stops at the end of that term with the after-term choice
+ * pending. Every choice, roll override and outcome override the rebuilt career no longer reads is
+ * then removed with pruneInput: the removed term's own keys, and any mustering out and later careers
+ * that followed it. When the removed term is the character's first, every choice and override is
+ * removed, so the career pick is pending again. Notes for the removed term and for every later term
+ * number (left by terms an earlier change dropped) are removed; notes for earlier terms are kept.
+ */
+export function removeLastTerm(
+  seed: string,
+  base: Record<Characteristic, number>,
+  input: CareerInput,
+  data: CareerData,
+  built: CareerResult = buildCareer(seed, base, input, data),
+): TermRemoval | undefined {
+  const { terms } = built
+  const last = terms[terms.length - 1]
+  if (!last) return undefined
+  const previous = terms[terms.length - 2]
+  const notes = Object.fromEntries(
+    Object.entries(input.notes).filter(([k]) => {
+      const match = NOTES_KEY.exec(k)
+      return match === null || Number(match[1]) < last.number
+    }),
+  )
+  if (!previous) return { input: { ...EMPTY_INPUT, notes }, removed: last.number }
+  const choices = Object.fromEntries(Object.entries(input.choices).filter(([k]) => k !== `${previous.key}.next`))
+  const trimmed: CareerInput = { ...input, choices, notes }
+  return { input: pruneInput(trimmed, buildCareer(seed, base, trimmed, data).usedKeys).input, removed: last.number }
+}
