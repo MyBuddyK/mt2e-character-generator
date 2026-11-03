@@ -1,0 +1,26 @@
+{
+  "source": "Invented sample values to show the data format. Not taken from any published rules. Replace with values from your own books in a career pack.",
+  "startingAge": 18,
+  "termLength": 4,
+  "termLimit": 5,
+  "skillRolls": { "perTerm": 1, "onAdvancement": 1 },
+  "basicTraining": { "table": "serviceSkills", "level": 0 },
+  "advancedEducationMinEDU": 9,
+  "aging": {
+    "fromTerm": 3,
+    "dice": 2,
+    "dmPerTerm": -1,
+    "table": [
+      { "roll": 0, "summary": "Joints creak in zero-g. STR -1 and DEX -1.", "effects": [{ "type": "characteristic", "characteristic": "STR", "change": -1 }, { "type": "characteristic", "characteristic": "DEX", "change": -1 }] },
+      { "roll": 1, "summary": "Years of hauling show. END -1.", "effects": [{ "type": "characteristic", "characteristic": "END", "change": -1 }] },
+      { "roll": 2, "summary": "A little slower. DEX -1.", "effects": [{ "type": "characteristic", "characteristic": "DEX", "change": -1 }] },
+      { "roll": 3, "summary": "No effect." }
+    ]
+  },
+  "benefits": {
+    "perTerm": 1,
+    "rankExtra": [{ "minRank": 2, "extra": 1 }],
+    "rankBenefitDM": [{ "minRank": 3, "dm": 1 }],
+    "cashRollLimit": 2
+  }
+}

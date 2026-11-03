@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { CareerPacks } from './use-career-packs'
 
+/** The README section that explains the career pack format and links to the sample data files. */
+export const PACK_GUIDE_URL = 'https://github.com/MyBuddyK/mt2e-character-generator#writing-a-career-pack'
+
 /**
  * Renders the Career data section: a file picker and a URL field for importing career packs, one
  * row per loaded pack with its revision, fingerprint, career count and origin, and the messages
@@ -172,6 +175,12 @@ export function CareerData({ packs }: { packs: CareerPacks }) {
         </p>
       )}
       <p className="muted small">Packs are stored only in this browser. Nothing is uploaded.</p>
+      <p className="small">
+        <a href={PACK_GUIDE_URL} target="_blank" rel="noreferrer">
+          How to write a career pack
+        </a>{' '}
+        <span className="muted">(GitHub README, with the sample data files)</span>
+      </p>
     </section>
   )
 }

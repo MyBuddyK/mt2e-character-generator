@@ -3,11 +3,12 @@
 An unofficial fan-made web app for building Mongoose Traveller 2nd Edition characters as a group.
 
 Current state: the app rolls the six characteristics from a seed, and the player can override each value.
-Players can import career packs from a file or an https link; the app checks them and lists their careers,
-but does not yet run careers.
+Players can import career packs from a file or an https link. A character can go through one career term by
+term (qualification, skills, survival, events, mishaps, advancement, aging and mustering out), with every
+roll and choice overridable and a Generate the rest button. Events marked as connections are listed for the
+group to talk through.
 
-Planned: stepping through careers one term at a time, showing events that could connect characters,
-generating a whole character in one step, and exporting to Foundry VTT.
+Planned: more than one career per character, and exporting to Foundry VTT.
 
 ## Running it
 
@@ -42,6 +43,49 @@ For the referee:
   not been tested yet. If a link is blocked, download the file and import it instead.
 - A shared link to a character includes `?packs=<id>@<fingerprint>` for the loaded packs. A player whose
   packs differ sees a notice that results may not match.
+
+## Writing a career pack
+
+A career pack is one JSON file. Start from the invented examples in this repo and replace their content with
+careers from your own books:
+
+- [`e2e/fixtures/valid-pack.json`](e2e/fixtures/valid-pack.json): a complete pack with two careers.
+- [`src/data/careers/sample-sanitation.json`](src/data/careers/sample-sanitation.json): one career with every
+  field, including `effects` on events, mishaps and ranks.
+- [`src/data/rules/sample-rules.json`](src/data/rules/sample-rules.json): an example `rules` object.
+
+The top level of a pack:
+
+```json
+{
+  "format": "mt2e-career-pack",
+  "formatVersion": 2,
+  "id": "my-group-core",
+  "name": "Core careers",
+  "revision": 1,
+  "source": "Typed up from my own copy of the Core Rulebook",
+  "rules": { "...": "optional; the values that apply to every career" },
+  "careers": [{ "...": "one career, shaped like sample-sanitation.json" }]
+}
+```
+
+- `id` names the pack. Importing a pack with an `id` that is already loaded replaces it, after a
+  confirmation.
+- Raise `revision` each time you change the pack, so players can tell copies apart.
+- `rules` and `effects` need `formatVersion` 2. A pack without them may say 1.
+- Each career has a qualification check, skill tables, assignments with survival and advancement checks and
+  ranks, an events table covering 2 to 12, a mishaps table covering 1 to 6, and a mustering-out table
+  covering 1 to 7.
+- `effects` lists what the app applies for an entry. The types are `skill`, `roll-table`, `dm-next`,
+  `benefit-dm`, `extra-benefit`, `characteristic`, `leave-career` and `mishap`; see
+  [`src/engine/effects.ts`](src/engine/effects.ts). Anything else goes in the entry's summary, which the app
+  shows for the player to apply by hand.
+- Mark an event or mishap with `"connection": true` to list it as a connection opportunity.
+
+The full field list is in [`src/engine/career-schema.ts`](src/engine/career-schema.ts),
+[`src/engine/rules-schema.ts`](src/engine/rules-schema.ts) and
+[`src/engine/career-pack.ts`](src/engine/career-pack.ts). Check a pack with `npm run validate-pack`, or import it
+on the site, which lists each problem by career and field.
 
 ## Adding bundled career data
 

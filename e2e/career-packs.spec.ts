@@ -92,11 +92,11 @@ test.describe('career packs from files', () => {
     await expect(page.getByTestId('no-packs')).toBeVisible()
   })
 
-  // Imports a pack with formatVersion 2 and expects an alert saying the app supports version 1.
+  // Imports a pack with formatVersion 3 and expects an alert naming the supported versions 1 and 2.
   test('a later format version shows an alert naming the supported version', async ({ page }) => {
     await page.goto('./?seed=packs')
     await importFixture(page, 'later-version-pack.json')
-    await expect(page.getByRole('alert')).toContainText('this app supports version 1')
+    await expect(page.getByRole('alert')).toContainText('this app supports versions 1 and 2')
     await expect(page.getByTestId('no-packs')).toBeVisible()
   })
 
@@ -301,7 +301,7 @@ test.describe('saved packs the app cannot load', () => {
     await expect(page.getByTestId('pack-test-core')).toBeVisible()
   })
 
-  // Saves a pack with formatVersion 2, reloads, and expects it listed as a pack that can't be
+  // Saves a pack with formatVersion 3, reloads, and expects it listed as a pack that can't be
   // loaded; then removes it and expects it gone after a reload.
   test('a saved pack that no longer loads can be removed', async ({ page }) => {
     const data = fixture('later-version-pack.json')
@@ -311,7 +311,7 @@ test.describe('saved packs the app cannot load', () => {
       localStorage.setItem('mt2e.careerPacks.v1', JSON.stringify([stored]))
     }, data)
     await page.reload()
-    await expect(page.getByTestId('broken-packs')).toContainText('this app supports version 1')
+    await expect(page.getByTestId('broken-packs')).toContainText('this app supports versions 1 and 2')
     await page.getByRole('button', { name: "Remove saved pack 1 that can't be loaded" }).click()
     await page.reload()
     await expect(page.getByTestId('broken-packs')).toHaveCount(0)

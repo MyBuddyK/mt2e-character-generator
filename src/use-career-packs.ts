@@ -4,8 +4,12 @@ import {
   formatPackRefs,
   packFingerprint,
   parseCareerPack,
+  selectRules,
   type PackInfo,
+  type SelectedRules,
 } from './engine/career-pack'
+import type { Rules } from './engine/rules-schema'
+import { sampleRules } from './data/rules'
 import type { CareerDefinition } from './engine/career-schema'
 import {
   browserStorage,
@@ -21,6 +25,7 @@ export interface PackEntry {
   stored: StoredPack
   pack: PackInfo
   careers: CareerDefinition[]
+  rules: Rules | undefined
   problems: string[]
 }
 
@@ -45,6 +50,8 @@ export interface CareerPacks {
   broken: BrokenPack[]
   /** The careers to list: the bundled careers when no pack is loaded, otherwise the packs' careers. */
   careers: CareerDefinition[]
+  /** The rules to use (see selectRules), with the sample rules when no loaded pack has any. */
+  rules: SelectedRules
   /** Duplicate career id messages from combineCareers. */
   duplicates: string[]
   /** How many saved values could not be read at all. They are kept in storage until discarded. */
@@ -102,7 +109,9 @@ function describePacks(stored: StoredPack[]): { entries: PackEntry[]; broken: Br
   const broken: BrokenPack[] = []
   for (const s of stored) {
     const result = parseCareerPack(s.data)
-    if (result.ok) entries.push({ stored: s, pack: result.pack, careers: result.careers, problems: result.problems })
+    if (result.ok) {
+      entries.push({ stored: s, pack: result.pack, careers: result.careers, rules: result.rules, problems: result.problems })
+    }
     else broken.push({ stored: s, reason: result.reason })
   }
   return { entries, broken }
@@ -135,7 +144,11 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
       entries.map((e) => ({ id: e.pack.id, name: e.pack.name, careers: e.careers })),
     )
     const packsParam = formatPackRefs(entries.map((e) => ({ id: e.pack.id, fingerprint: e.stored.fingerprint })))
-    return { entries, broken, combined, packsParam }
+    const rules = selectRules(
+      entries.map((e) => ({ id: e.pack.id, name: e.pack.name, rules: e.rules })),
+      sampleRules,
+    )
+    return { entries, broken, combined, packsParam, rules }
   }, [stored, bundled])
 
   /** Applies new saved packs and unreadable values to state and storage, and returns the write result. */
@@ -295,6 +308,7 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
     entries: derived.entries,
     broken: derived.broken,
     careers: derived.combined.careers,
+    rules: derived.rules,
     duplicates: derived.combined.problems,
     unreadableCount: unreadable.length,
     storageAvailable: storage !== undefined,

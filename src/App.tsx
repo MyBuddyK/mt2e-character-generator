@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { newCharacter, overrideCharacteristic, randomSeed, type Character } from './engine/character'
 import {
   CHARACTERISTICS,
@@ -13,6 +13,7 @@ import { current, isOverridden, type Overridable } from './engine/overridable'
 import { careerErrors, careers as bundledCareers } from './data/careers'
 import { formatPackRefs, parsePackRefs } from './engine/career-pack'
 import { CareerData } from './CareerData'
+import { Career } from './Career'
 import { useCareerPacks } from './use-career-packs'
 import { FAIR_USE_DISCLAIMER } from './legal'
 
@@ -134,7 +135,7 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
 }
 
 /**
- * Renders the characteristics table, the Career data section, the list of careers, any career file
+ * Renders the characteristics table, the Career section, the Career data section, the list of careers, any career file
  * errors, and a footer with Mongoose Publishing's Fair Use disclaimer. The current seed is kept in
  * the URL's ?seed= value and the loaded packs in ?packs=. Reroll picks a new seed and rolls a new
  * character. When the page was opened with a ?packs= value that differs from the loaded packs, a
@@ -146,6 +147,17 @@ export default function App() {
   const [expectedPacks] = useState(initialPacksParam)
   const packs = useCareerPacks(bundledCareers)
   const showingSample = packs.entries.length === 0
+  const base = useMemo(
+    () => ({
+      STR: current(character.characteristics.STR),
+      DEX: current(character.characteristics.DEX),
+      END: current(character.characteristics.END),
+      INT: current(character.characteristics.INT),
+      EDU: current(character.characteristics.EDU),
+      SOC: current(character.characteristics.SOC),
+    }),
+    [character.characteristics],
+  )
 
   const mismatch = expectedPacks !== undefined && expectedPacks !== packs.packsParam
   // While the loaded packs differ from the link's ?packs=, the link's value stays in the address bar,
@@ -231,6 +243,14 @@ export default function App() {
             </table>
           </div>
         </section>
+
+        <Career
+          seed={character.seed}
+          base={base}
+          careers={packs.careers}
+          rules={packs.rules}
+          packs={packs.packsParam}
+        />
 
         <CareerData packs={packs} />
 
