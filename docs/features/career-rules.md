@@ -1,6 +1,6 @@
 # Career rules enforcement (step 2, part 2)
 
-Status: part 2a (rule enforcement in one career) is built. Part 2b (more than one career) is planned.
+Status: part 2a (rule enforcement in one career) is built. Part 2b (more than one career) and aging are built.
 
 ## Problem
 
@@ -149,6 +149,100 @@ browser.
 - [x] A pack without the new fields builds the same career as before for the same seed and input, apart
       from the rank DM on cash rolls (the part 1 tests pass unchanged).
 - [x] Finish career follows the forced choices.
+
+## Part 2b: more than one career
+
+### Decisions
+
+1. **Careers follow one another in one character.** After mustering out, the player picks the next career
+   or Done. The career just left is not offered (the book's rule), except through the Draft.
+2. **Qualification failure offers the Draft or the fallback career.** The Draft can be taken once per
+   character. The fallback career (`rules.fallbackCareer`, for example a Drifter career) needs no
+   qualification roll. Overriding the qualification roll is still possible.
+3. **Keys stay stable.** The first career keeps the keys it has now ("start.career", "term-1.survival",
+   "benefit-0"), so saved characters still load. Later careers prefix their keys with "career-<n>.", and
+   their terms are numbered within the career ("career-2.term-1.survival"). Terms are shown with their
+   number across the whole character ("Term 5"), and age and aging count every term served.
+4. **Finish career finishes the current career.** It stops when the next career has to be chosen, and at
+   a qualification failure, where the player decides.
+5. **Some book rules stay notes.** The Prisoner career, changing assignments, and the ageing crisis making
+   later qualification rolls fail are not built in part 2b.
+
+### Data
+
+| Field | Where | What the app does |
+| --- | --- | --- |
+| `rules.qualification.dmPerPreviousCareer` | rules | DM on each qualification roll for every earlier career (the book: -1). Drafted and fallback careers don't roll. |
+| `rules.draft` | rules | The Draft table: `[{ "roll": 1, "career": "navy" }, { "roll": 4, "career": "merchant", "assignment": "merchant-marine" }, …]`, rolled on 1D. With no `assignment`, the player picks one. |
+| `rules.fallbackCareer` | rules | The career id offered when qualification fails. |
+| `rules.commission` | rules | `{ "anyTermFromSOC": 9, "dmPerLaterTerm": -1 }`: commission rolls are allowed in a career's first term, or in any term with SOC at or above `anyTermFromSOC`, with this DM for each term after the first. |
+| `commission` | career | The commission check (for example SOC 8+). A career without it has no commissions. |
+| `officerRanks` | career | Ranks 1 to 6 for officers, shaped like assignment ranks. |
+| `skillTables.officer` | career | The officer skill table, offered only to officers. |
+
+### Rules
+
+- Basic training: the first career gives every skill on the training table at `rules.basicTraining.level`.
+  A later career asks the player to pick one skill from it.
+- Cash rolls: `rules.benefits.cashRollLimit` counts across all careers.
+- Commission: in a term where a commission is allowed and the character isn't an officer, the player
+  chooses Try for commission or Skip after the event. Advancement DMs from events apply to it. A success
+  makes the character a rank 1 officer, gives the officer rank's bonus and the advancement skill rolls,
+  and replaces that term's advancement roll. Officers advance through `officerRanks`. For benefit rolls,
+  an officer's rank is their officer rank plus the enlisted rank they had when commissioned.
+- A dm-next qualification effect applies to the next career's qualification roll.
+
+### UI
+
+- After mustering out, the summary is followed by an optional Next career picker that leaves out the
+  career just left. Each career gets its own block ("Career 2") with its qualification roll, terms and
+  mustering out.
+- A failed qualification shows Take the Draft (while it is allowed) and Enter <fallback career>. A career
+  entered from the Draft without an assignment on its row asks for the assignment.
+- In a term that allows a commission, Try for commission and Skip commission come after the event.
+  Finish career tries for a commission, and stops at a failed qualification and before the next career.
+
+### Acceptance criteria (part 2b)
+
+- [x] After mustering out the character is finished, and a next career can be started that isn't the
+      career just left. Its terms continue the term numbers and the age.
+- [x] `dmPerPreviousCareer` applies to each later qualification roll, and the step says why.
+- [x] A later career's basic training asks for one skill.
+- [x] The cash roll limit counts every career.
+- [x] A failed qualification offers the Draft (once per character) and the fallback career. The Draft row
+      sets the career, and its assignment when it names one.
+- [x] A rules file without `draft` or `fallbackCareer` asks for a career again after a failed
+      qualification, as before.
+- [x] A commission is offered in a career's first term, and in later terms only with SOC at or above
+      `anyTermFromSOC`, with `dmPerLaterTerm` per later term. Passing it gives officer rank 1, the officer
+      skill table, and no advancement roll that term.
+- [x] An officer's benefit rank is the officer rank plus the enlisted rank at commission.
+- [x] Finish career tries for a commission and counts the term limit per career.
+
+## Aging
+
+Buddy asked for the aging rules to be applied, with the player told what to adjust and able to ignore or
+override aging or take anagathics. Medical care follows the book only (Buddy's call): it pays for an ageing
+crisis, not for points lost to ordinary aging.
+
+| Field | What the app does |
+| --- | --- |
+| effect `{ "type": "reduce", "characteristics": ["STR", "DEX", "END"], "amounts": [2, 1] }` | Reduces a different characteristic, picked by the player, by each amount. When every amount left is the same and as many characteristics are left, all of them are reduced without asking. |
+| `rules.aging.crisis` `{ "costDice": 1, "costPerDie": 10000 }` | When aging takes a characteristic to 0 or below, the player picks Pay for medical care (the cost is rolled and taken from cash, the characteristics in the crisis go back to 1, and every later qualification roll fails) or The character dies (the character is finished, with no mustering out). Without this field the crisis is noted for the player to resolve by hand, as before. |
+| `rules.anagathics` `{ "characteristic": "SOC", "target": 10, "costDice": 1, "costPerDie": 200000, "prisonOnNatural": 2 }` | Each term has an Anagathics checkbox. Starting needs the check; while taken, each term rolls the cost (taken from cash), rolls survival twice (either failure is a mishap), and adds the number of terms taken in a row to the aging roll. A term without them after a term with them rolls aging at once, with the DM for the terms served and no anagathics DM; a death in that roll gives the age at the start of the term. Dice at or below `prisonOnNatural` on the starting check add a note (the Prisoner career isn't built). |
+
+- Every aging roll has an Ignore this aging result checkbox. Its dice can be overridden like any roll.
+- Cash in the summary is mustering-out cash less anagathics and medical costs; below 0 it is shown as a debt.
+- Finish career picks characteristics to reduce at random, takes no anagathics, and stops at an ageing
+  crisis for the player to decide.
+
+### Acceptance criteria (aging)
+
+- [x] A reduce effect asks for a different characteristic for each amount, and doesn't ask when there is no choice.
+- [x] An ignored aging roll changes nothing.
+- [x] With `rules.aging.crisis`, a crisis asks for care or death; care restores the characteristics to 1,
+      adds the cost, and fails later qualification rolls; death finishes the character.
+- [x] A term on anagathics adds its cost, a second survival roll and the aging DM; stopping rolls aging at once.
 
 ## Open questions
 

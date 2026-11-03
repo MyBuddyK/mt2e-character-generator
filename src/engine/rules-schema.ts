@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CHARACTERISTICS } from './characteristics'
 import { SKILL_TABLES, EffectsSchema } from './effects'
 
 /**
@@ -43,6 +44,28 @@ export const RulesSchema = z.strictObject({
   basicTraining: z.strictObject({ table: z.enum(SKILL_TABLES), level: z.int().min(0) }),
   /** The lowest EDU that allows rolls on the advancedEducation table. */
   advancedEducationMinEDU: z.int().min(0),
+  /**
+   * Optional. `dmPerPreviousCareer`: a DM on each qualification roll for every career the character
+   * has already served.
+   */
+  qualification: z.strictObject({ dmPerPreviousCareer: z.int() }).optional(),
+  /**
+   * Optional. The Draft table, rolled on 1D when qualification fails and the player takes the Draft
+   * (once per character). Each row names a career id and, optionally, an assignment id; without one
+   * the player picks the assignment.
+   */
+  draft: z
+    .array(z.strictObject({ roll: z.int(), career: z.string().trim().min(1, 'must be a non-empty string'), assignment: z.string().trim().min(1, 'must be a non-empty string').optional() }))
+    .min(1, 'must have at least one row')
+    .superRefine(consecutiveRolls)
+    .optional(),
+  /** Optional. The id of the career offered without a qualification roll when qualification fails. */
+  fallbackCareer: z.string().trim().min(1, 'must be a non-empty string').optional(),
+  /**
+   * Optional commission rules: a commission roll is allowed in a career's first term, or in any term
+   * when SOC is at least `anyTermFromSOC`, with `dmPerLaterTerm` for each term after the first.
+   */
+  commission: z.strictObject({ anyTermFromSOC: z.int().min(0), dmPerLaterTerm: z.int() }).optional(),
   /** Optional. `failOnNatural`: survival fails when the dice (before DMs) are at or below this value. */
   survival: z.strictObject({ failOnNatural: z.int().min(0).optional() }).optional(),
   /**
@@ -61,14 +84,33 @@ export const RulesSchema = z.strictObject({
   skillLimits: z.strictObject({ maxLevel: z.int().min(0).optional(), totalPerIntEdu: z.int().min(0).optional() }).optional(),
   /**
    * Aging: from which term it is rolled, how many dice, the DM added per term served (usually
-   * negative), and the table.
+   * negative), and the table. Optional `crisis`: when aging takes a characteristic to 0 or below, the
+   * player chooses between medical care costing `costDice` D × `costPerDie` credits (characteristics at
+   * 0 or below go back to 1, and every later qualification roll fails) and the character's death.
    */
   aging: z.strictObject({
     fromTerm: z.int().min(1),
     dice: z.int().min(1),
     dmPerTerm: z.int(),
     table: z.array(AgingEntrySchema).min(1, 'must have at least one row').superRefine(consecutiveRolls),
+    crisis: z.strictObject({ costDice: z.int().min(1), costPerDie: z.int().min(0) }).optional(),
   }),
+  /**
+   * Optional anagathics. The player can take them in any term: starting needs a 2D check of
+   * `characteristic` against `target`. While taken, each term costs `costDice` D × `costPerDie` credits
+   * (taken from cash), needs a second survival roll, and adds the number of terms taken in a row to the
+   * aging roll. A term without them after a term with them rolls aging at once. `prisonOnNatural`: dice at
+   * or below it on the starting check are flagged for the player to apply by hand.
+   */
+  anagathics: z
+    .strictObject({
+      characteristic: z.enum(CHARACTERISTICS),
+      target: z.int().min(0).max(20),
+      costDice: z.int().min(1),
+      costPerDie: z.int().min(0),
+      prisonOnNatural: z.int().min(2).optional(),
+    })
+    .optional(),
   /**
    * Mustering out: benefit rolls per term served, extra rolls for reaching a rank, a DM on cash and
    * benefit rolls from a rank, and the most cash rolls one character may take. Optional:

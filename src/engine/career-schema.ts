@@ -142,8 +142,14 @@ export const CareerSchema = z.strictObject({
     personalDevelopment: SkillTableSchema,
     serviceSkills: SkillTableSchema,
     advancedEducation: SkillTableSchema.optional(),
+    /** Optional. Offered only to officers (characters who passed the commission check). */
+    officer: SkillTableSchema.optional(),
   }),
   assignments: z.array(AssignmentSchema).min(1, 'must have at least one assignment').superRefine(uniqueBy('id')),
+  /** Optional. The commission check. A career without it offers no commission. */
+  commission: CheckSchema.optional(),
+  /** Optional. Officer ranks 1 to 6, used once the character is commissioned. */
+  officerRanks: z.array(RankSchema).min(1, 'must have at least one rank').superRefine(uniqueBy('rank')).optional(),
   /** 2D events: one entry for each roll from 2 to 12. */
   events: z.array(EventEntrySchema).superRefine(coversRolls(2, 12)),
   /** D6 mishaps: one entry for each roll from 1 to 6. */

@@ -7,8 +7,11 @@ import { CHARACTERISTICS } from './characteristics'
  * shows as a note for the player to apply by hand.
  */
 
-/** The skill tables a career can have. `assignment` is the skill table of the current assignment. */
-export const SKILL_TABLES = ['personalDevelopment', 'serviceSkills', 'assignment', 'advancedEducation'] as const
+/**
+ * The skill tables a career can have. `assignment` is the skill table of the current assignment.
+ * `officer` is offered only to a commissioned officer.
+ */
+export const SKILL_TABLES = ['personalDevelopment', 'serviceSkills', 'assignment', 'advancedEducation', 'officer'] as const
 /** One of SKILL_TABLES. */
 export type SkillTableKey = (typeof SKILL_TABLES)[number]
 
@@ -28,6 +31,9 @@ const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
  * - `promote`: this term's advancement roll passes without being rolled.
  * - `stay-in-career`: on a mishap, the career does not end because of the mishap.
  * - `keep-benefit`: on a mishap, the term still gives its benefit roll.
+ * - `reduce`: reduce characteristics picked by the player from `characteristics` (each listed once), a different one for
+ *   each value in `amounts` (for example three physical characteristics by 2, 2 and 1). Values beyond
+ *   the number of characteristics listed are not applied.
  * - `wager`: the player may wager benefit rolls earned so far in this career (at most `maxWager`, when
  *   set) on a 2D roll with one of `skills` (skill level as the DM, -3 when untrained) against `target`.
  *   Success gains half the wager in extra benefit rolls, rounded up; failure loses the wager. With
@@ -49,6 +55,14 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('promote') }),
   z.strictObject({ type: z.literal('stay-in-career') }),
   z.strictObject({ type: z.literal('keep-benefit') }),
+  z.strictObject({
+    type: z.literal('reduce'),
+    characteristics: z
+      .array(z.enum(CHARACTERISTICS))
+      .min(1, 'must list at least one characteristic')
+      .refine((list) => new Set(list).size === list.length, 'must not list a characteristic twice'),
+    amounts: z.array(z.int().min(1)).min(1, 'must list at least one amount'),
+  }),
   z.strictObject({
     type: z.literal('wager'),
     skills: z.array(nonEmpty).min(1, 'must list at least one skill'),

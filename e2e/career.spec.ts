@@ -272,3 +272,100 @@ test.describe('career rule enforcement', () => {
     await expect(wager).toContainText('1 extra benefit roll')
   })
 })
+
+// Browser tests for careers one after another, the Draft and commissions (docs/features/career-rules.md,
+// part 2b), with the invented multi-career-pack.json.
+test.describe('more than one career', () => {
+  /** Opens ?seed=terms, imports multi-career-pack.json and starts the career labelled `label`. */
+  async function startPackCareer(page: Page, label: string): Promise<void> {
+    await page.goto('./?seed=terms')
+    await importFixture(page, 'multi-career-pack.json')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label })
+    await page.getByRole('button', { name: 'Start career' }).click()
+  }
+
+  // Starts Test fleet, sets its qualification result to Fail, takes the Draft, picks Debris sweep and
+  // expects the drafted notice and term 1.
+  test('a failed qualification offers the Draft and the fallback career', async ({ page }) => {
+    await startPackCareer(page, 'Test fleet')
+    await page.getByLabel('Career Qualification result').selectOption('fail')
+    const failed = page.getByRole('group', { name: 'Qualification failed' })
+    await expect(failed.getByRole('button', { name: 'Enter Test wanderer' })).toBeVisible()
+    await failed.getByRole('button', { name: 'Take the Draft' }).click()
+    await page.getByRole('group', { name: 'Choose an assignment' }).getByRole('button', { name: 'Debris sweep' }).click()
+    await expect(page.getByTestId('career-entry')).toContainText('Drafted into Test fleet')
+    await expect(page.getByTestId('term-1')).toBeVisible()
+  })
+
+  // Starts Test fleet, passes qualification and survival, tries for a commission with dice 12, and
+  // expects officer rank 1 Ensign and the Officer skills table offered for the extra skill roll.
+  test('a commission makes the character an officer', async ({ page }) => {
+    await startPackCareer(page, 'Test fleet')
+    await setDice(page, 'Career Qualification', 12)
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await setDice(page, 'Term 1 Survival', 12)
+    await page.getByRole('group', { name: 'Commission' }).getByRole('button', { name: 'Try for commission' }).click()
+    await setDice(page, 'Term 1 Commission', 12)
+    await expect(page.getByTestId('term-1').getByTestId('term-rank')).toHaveText('officer rank 1 Ensign')
+    await expect(page.getByRole('group', { name: 'Choose a skill table' }).getByRole('button', { name: 'Officer skills' })).toBeVisible()
+  })
+
+  // Serves one term of Test wanderer and musters out, then expects the next-career picker without Test
+  // wanderer, starts Test fleet, and expects career 2 with the earlier-career DM and term 2 asking for
+  // one basic training skill.
+  test('after mustering out the character can enter another career', async ({ page }) => {
+    await startPackCareer(page, 'Test wanderer')
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Advancement', 2)
+    await page.getByRole('button', { name: 'Leave career' }).click()
+    await page.getByRole('button', { name: 'Benefit', exact: true }).click()
+    await expect(page.getByTestId('career-summary')).toBeVisible()
+    const next = page.getByTestId('next-career')
+    const select = next.getByRole('combobox', { name: 'Career', exact: true })
+    await expect(select.locator('option', { hasText: 'Test wanderer' })).toHaveCount(0)
+    await select.selectOption({ label: 'Test fleet' })
+    await next.getByRole('button', { name: 'Start next career' }).click()
+    await expect(page.getByTestId('career-run-2')).toContainText('Test fleet')
+    await expect(page.getByTestId('step-career-2.qualification').getByTestId('step-reason')).toContainText('DM -1 for 1 earlier career.')
+    await setDice(page, 'Career 2 Qualification', 12)
+    await expect(page.getByTestId('term-2')).toContainText('Basic training: Service skills (one skill)')
+    await expect(page.getByRole('group', { name: 'Choose a skill' })).toBeVisible()
+  })
+})
+
+// Browser tests for aging choices and anagathics (docs/features/career-rules.md, "Aging"), with the
+// invented aging-pack.json, whose aging starts in term 1.
+test.describe('aging and anagathics', () => {
+  /** Opens ?seed=terms, imports aging-pack.json, starts Test wanderer and picks Service skills. */
+  async function startWanderer(page: Page): Promise<void> {
+    await page.goto('./?seed=terms')
+    await importFixture(page, 'aging-pack.json')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Test wanderer' })
+    await page.getByRole('button', { name: 'Start career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+  }
+
+  // Sets the term 1 aging dice to 2 (reduce two physical characteristics by 2 and 1), expects the
+  // characteristic choice, then ticks Ignore and expects the choice gone and the after-term choice shown.
+  test('aging asks which characteristic to reduce, and can be ignored', async ({ page }) => {
+    await startWanderer(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Advancement', 2)
+    await setDice(page, 'Term 1 Aging', 2)
+    const pick = page.getByRole('group', { name: 'Choose a characteristic' })
+    await expect(pick).toContainText('Reduce which characteristic by 2?')
+    await page.getByRole('checkbox', { name: /Ignore this aging result/ }).check()
+    await expect(pick).toHaveCount(0)
+    await expect(page.getByRole('group', { name: 'After this term' })).toBeVisible()
+  })
+
+  // Ticks Anagathics for term 1, sets the SOC roll to 12, and expects the cost roll and a second survival roll.
+  test('anagathics add a cost and a second survival roll', async ({ page }) => {
+    await startWanderer(page)
+    await page.getByRole('checkbox', { name: 'Anagathics in term 1' }).check()
+    await setDice(page, 'Term 1 Anagathics', 12)
+    await expect(page.getByTestId('step-term-1.anagathics-cost')).toBeVisible()
+    await expect(page.getByTestId('step-term-1.survival-2')).toBeVisible()
+  })
+})
