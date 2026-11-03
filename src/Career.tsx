@@ -3,7 +3,7 @@ import type { Characteristic } from './engine/characteristics'
 import type { CareerDefinition } from './engine/career-schema'
 import type { SelectedRules } from './engine/career-pack'
 import { current } from './engine/overridable'
-import { maxMoreTerms, POLICY_SUMMARY } from './engine/policy'
+import { POLICY_SUMMARY } from './engine/policy'
 import { skillTableName, stepOverridden, type CareerInput, type PendingChoice, type Step, type TermResult } from './engine/terms'
 import { useCareer } from './use-career'
 
@@ -189,41 +189,18 @@ interface PendingProps {
   pending: PendingChoice
   input: CareerInput
   onChange: (next: CareerInput) => void
-  onGenerate: (moreTerms: number) => void
+  onGenerate: () => void
   benefitCount: number
-  /** The most terms Generate the rest can add (see maxMoreTerms). */
-  moreTermsMax: number
 }
 
 /** Renders the controls for the choice the career needs next. */
-function Pending({ pending, input, onChange, onGenerate, benefitCount, moreTermsMax }: PendingProps) {
-  const [moreTerms, setMoreTerms] = useState<number | undefined>(undefined)
+function Pending({ pending, input, onChange, onGenerate, benefitCount }: PendingProps) {
   const choose = (key: string, value: string) => onChange({ ...input, choices: { ...input.choices, [key]: value } })
-  const terms = Math.min(moreTerms ?? moreTermsMax, moreTermsMax)
   const generate = (
     <>
-      <span className="generate">
-        {pending.kind !== 'benefit' && (
-          <label>
-            More terms
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={moreTermsMax}
-              step={1}
-              value={terms}
-              onChange={(e) => {
-                const n = Number(e.target.value)
-                if (e.target.value.trim() !== '' && Number.isInteger(n) && n >= 0) setMoreTerms(Math.min(n, moreTermsMax))
-              }}
-            />
-          </label>
-        )}
-        <button type="button" className="secondary" onClick={() => onGenerate(terms)}>
-          Generate the rest
-        </button>
-      </span>
+      <button type="button" className="secondary" onClick={onGenerate}>
+        Finish career
+      </button>
       <p className="muted small" data-testid="policy-note">
         {POLICY_SUMMARY}
       </p>
@@ -264,6 +241,7 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount, moreTerms
             <button type="button" onClick={() => choose(pending.key, 'muster')}>
               Muster out
             </button>
+            {generate}
           </div>
         )
       }
@@ -453,8 +431,8 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
             <>
               {pending.kind === 'next' && result.terms[result.terms.length - 1]?.ageingCrisis && (
                 <p className="notice" data-testid="ageing-crisis-notice">
-                  Term {result.terms.length} ended in an ageing crisis, so Generate the rest stopped here. Resolve it by
-                  hand before going on.
+                  Term {result.terms.length} ended in an ageing crisis, so Finish career stopped here. Resolve it by hand
+                  before going on.
                 </p>
               )}
               <Pending
@@ -463,7 +441,6 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
                 onChange={update}
                 onGenerate={career.generate}
                 benefitCount={result.benefitCount}
-                moreTermsMax={maxMoreTerms(result, rules.rules.termLimit)}
               />
             </>
           )}

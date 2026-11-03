@@ -83,30 +83,26 @@ test.describe('career terms', () => {
     await expect(page.getByTestId('term-2').getByTestId('term-age')).toHaveText('age 22-26')
   })
 
-  // Clicks Generate the rest and expects the finished summary; then changes the first benefit's
-  // dice and expects the summary still shown.
-  test('generate the rest finishes the character and its choices can still be changed', async ({ page }) => {
+  // Clicks Finish career and expects the finished summary; then changes the first benefit's dice and
+  // expects the summary still shown.
+  test('finish career finishes the character and its choices can still be changed', async ({ page }) => {
     await startTerm1(page)
     await expect(page.getByTestId('policy-note')).toBeVisible()
-    await page.getByRole('button', { name: 'Generate the rest' }).click()
+    await page.getByRole('button', { name: 'Finish career' }).click()
     await expect(page.getByTestId('career-summary')).toBeVisible()
     await expect(page.getByTestId('summary-skills')).toContainText('Vacc Suit')
     await page.getByLabel('Mustering out Cash roll dice').first().fill('1')
     await expect(page.getByTestId('career-summary')).toBeVisible()
   })
 
-  // Finishes term 1 (survival 12, event 9, advancement 2), sets More terms to 1, clicks Generate the
-  // rest, and expects a finished character with terms 1 and 2 only.
-  test('generate the rest plays the number of terms asked for', async ({ page }) => {
+  // Sets term 1 survival to 2 (a mishap that forces the character out), clicks Finish career, and
+  // expects a finished character with term 1 only.
+  test('finish career musters out when a mishap forces the character out', async ({ page }) => {
     await startTerm1(page)
-    await setDice(page, 'Term 1 Survival', 12)
-    await setDice(page, 'Term 1 Event', 9)
-    await setDice(page, 'Term 1 Advancement', 2)
-    await page.getByLabel('More terms').fill('1')
-    await page.getByRole('button', { name: 'Generate the rest' }).click()
+    await setDice(page, 'Term 1 Survival', 2)
+    await page.getByRole('button', { name: 'Finish career' }).click()
     await expect(page.getByTestId('career-summary')).toBeVisible()
-    await expect(page.getByTestId('term-2')).toBeVisible()
-    await expect(page.getByTestId('term-3')).toHaveCount(0)
+    await expect(page.getByTestId('term-2')).toHaveCount(0)
   })
 
   // Sets the term 1 event to 3 (a connection event that also offers Medic or Vacc Suit), picks

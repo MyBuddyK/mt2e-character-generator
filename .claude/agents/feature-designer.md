@@ -17,7 +17,7 @@ Check every proposal against these. Call out any conflict.
 
 1. **Group creation first.** Characters are made together. Pauses between terms surface events that could
    connect characters (contacts, rivals, shared voyages). Look for ways to make that easier.
-2. **Step through or skip.** Every flow works one term at a time, and also has a "generate the rest" path.
+2. **Step through or skip.** Every flow works one term at a time, and also has a "Finish career" path that makes the remaining choices.
 3. **Everything is overridable.** Any value the generator decides is stored as an `Overridable<T>`
    (`src/engine/overridable.ts`), and the UI shows both the rolled value and the override.
 4. **Reproducible.** All randomness goes through the seeded `Dice` (`src/engine/dice.ts`), so the same seed

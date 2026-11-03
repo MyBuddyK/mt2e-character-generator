@@ -3,7 +3,7 @@ import { parseCareer, type CareerDefinition } from './career-schema'
 import { parseCareerPack, selectRules } from './career-pack'
 import { RulesSchema, type Rules } from './rules-schema'
 import { diceFor } from './dice'
-import { finishedTerms, generateRest, maxMoreTerms, policyChoice } from './policy'
+import { finishCareer, policyChoice } from './policy'
 import { asCharacteristic, buildCareer, EMPTY_INPUT, entryOptions, pruneInput, type CareerInput, type CareerResult } from './terms'
 import { sampleRules } from '../data/rules'
 import { readSavedCharacter, writeSavedCharacter } from '../storage/characters'
@@ -199,7 +199,7 @@ describe('buildCareer terms', () => {
   it('rolls aging only from the term set in rules', () => {
     const rolls: Record<string, number> = { qualification: 12 }
     for (let n = 1; n <= 5; n += 1) rolls[`term-${n}.survival`] = 12
-    const input = generateRest(SEED, BASE, started({}, rolls), { careers: [sampleCareer()], rules: sampleRules })
+    const input = finishCareer(SEED, BASE, started({}, rolls), { careers: [sampleCareer()], rules: sampleRules })
     const result = build(input)
     const aging = result.terms.map((t) => t.steps.some((s) => s.key === `term-${t.number}.aging`))
     expect(aging).toEqual(result.terms.map((t) => t.number >= sampleRules.aging.fromTerm))
@@ -289,12 +289,12 @@ describe('buildCareer effect and override details', () => {
   })
 })
 
-// Tests for the Generate the rest policy in policy.ts.
-describe('generateRest', () => {
+// Tests for the Finish career policy in policy.ts.
+describe('finishCareer', () => {
   // Generates from a started career and expects a finished character with no pending choice, at most
   // termLimit terms, and cash on the first benefit roll.
   it('finishes the character within the term limit', () => {
-    const input = generateRest(SEED, BASE, started(), { careers: [sampleCareer()], rules: sampleRules })
+    const input = finishCareer(SEED, BASE, started(), { careers: [sampleCareer()], rules: sampleRules })
     const result = build(input)
     expect(result.finished).toBe(true)
     expect(result.pending).toBeUndefined()
@@ -304,7 +304,7 @@ describe('generateRest', () => {
 
   // Generates with no career chosen and expects the input unchanged.
   it('does not pick a career', () => {
-    expect(generateRest(SEED, BASE, EMPTY_INPUT, { careers: [sampleCareer()], rules: sampleRules })).toEqual(EMPTY_INPUT)
+    expect(finishCareer(SEED, BASE, EMPTY_INPUT, { careers: [sampleCareer()], rules: sampleRules })).toEqual(EMPTY_INPUT)
   })
 
   // Asks the policy about a forced end, a forced stay past the limit, and a term past the limit, and
@@ -643,8 +643,8 @@ describe('buildCareer rule enforcement', () => {
   })
 })
 
-// Tests for the review fixes and the Generate the rest term count.
-describe('generateRest term count and review fixes', () => {
+// Tests for Finish career stopping points and the review fixes.
+describe('finishCareer stopping points and review fixes', () => {
   const data = { careers: [sampleCareer()], rules: sampleRules }
   /** Rolls that pass qualification and survival in terms 1 to 5 and keep advancement at 3. */
   const surviving: Record<string, number> = { qualification: 12 }
@@ -653,26 +653,22 @@ describe('generateRest term count and review fixes', () => {
     surviving[`term-${n}.advancement`] = 3
   }
 
-  // Generates 2 more terms from the start of term 1 and expects 2 terms and a finished character.
-  it('plays the number of terms asked for', () => {
-    const result = build(generateRest(SEED, BASE, started({}, surviving), data, 2))
+  // Fails survival in term 2 and expects Finish career to muster out after 2 terms.
+  it('musters out when a mishap forces the character out', () => {
+    const result = build(finishCareer(SEED, BASE, started({}, { ...surviving, 'term-2.survival': 2 }), data))
     expect(result.terms).toHaveLength(2)
     expect(result.finished).toBe(true)
   })
 
-  // Asks for 50 more terms and expects the sample termLimit (5) instead.
-  it('caps the terms at the rules termLimit', () => {
-    expect(build(generateRest(SEED, BASE, started({}, surviving), data, 50)).terms).toHaveLength(sampleRules.termLimit)
-  })
-
-  // Finishes term 1, then expects 1 finished term and termLimit - 1 more terms allowed.
-  it('finishedTerms counts a term once its after-term choice is pending', () => {
-    const inProgress = build(started({}, surviving))
-    expect(finishedTerms(inProgress)).toBe(0)
-    const done = build(started({ ...SERVICE }, { ...surviving, 'term-1.event': 9 }))
-    expect(done.pending).toMatchObject({ kind: 'next' })
-    expect(finishedTerms(done)).toBe(1)
-    expect(maxMoreTerms(done, sampleRules.termLimit)).toBe(sampleRules.termLimit - 1)
+  // With leaveAtOrBelowTerms, rolls advancement 2 in term 3 and expects Finish career to muster out after 3 terms.
+  it('musters out when the advancement roll forces the character out', () => {
+    const rules: Rules = { ...sampleRules, advancement: { leaveAtOrBelowTerms: true } }
+    const result = build(
+      finishCareer(SEED, BASE, started({}, { ...surviving, 'term-3.advancement': 2 }), { careers: [sampleCareer()], rules }),
+      rules,
+    )
+    expect(result.terms).toHaveLength(3)
+    expect(result.finished).toBe(true)
   })
 
   // Uses aging from term 1 that takes STR from 7 to 0, and expects generation to stop at term 1's after-term choice.
@@ -681,7 +677,7 @@ describe('generateRest term count and review fixes', () => {
       ...sampleRules,
       aging: { ...sampleRules.aging, fromTerm: 1, table: [{ roll: 0, summary: 'Test', effects: [{ type: 'characteristic', characteristic: 'STR', change: -7 }] }] },
     }
-    const result = build(generateRest(SEED, BASE, started({}, surviving), { careers: [sampleCareer()], rules }, 5), rules)
+    const result = build(finishCareer(SEED, BASE, started({}, surviving), { careers: [sampleCareer()], rules }), rules)
     expect(result.terms).toHaveLength(1)
     expect(result.terms[0]?.ageingCrisis).toBe(true)
     expect(result.pending).toMatchObject({ kind: 'next', key: 'term-1.next' })

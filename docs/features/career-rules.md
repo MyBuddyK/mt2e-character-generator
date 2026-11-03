@@ -58,19 +58,17 @@ made with a full career pack follows the book without the players checking each 
 Choices inside events and mishaps ("accept or refuse", "roll Melee 8+: on a success …") stay as notes in
 part 2a.
 
-## Generate the rest term count
+## Finish career
 
-Requested by the owner on 2026-11-03.
+Requested by the owner on 2026-11-03, replacing Generate the rest and a short-lived "More terms" field.
 
-- Next to Generate the rest, a "More terms" number field sets how many more terms to finish. It starts at,
-  and is capped by, the rules' `termLimit` minus the terms already finished. A term counts as finished
-  once its after-term choice is showing.
-- Generation continues until that many more terms are finished, then leaves the career and musters out.
-  A rule that ends the career or forces it to continue still wins, so a forced stay can go past the
-  count.
-- When a term's aging causes an ageing crisis, generation stops at that term's after-term choice and a
-  notice says why, so the players can resolve it before going on.
-- The field is not shown at mustering out, where no terms remain.
+- The button is named Finish career. It makes the remaining choices with the policy in
+  `src/engine/policy.ts`: it continues term after term until the character is forced out (a mishap, a
+  `leave-career` effect or the advancement rule), then musters out. The rules' `termLimit` caps the
+  terms, for packs whose rules never force the character out.
+- When a term's aging causes an ageing crisis, it stops at that term's after-term choice and a notice
+  says why, so the players can resolve it before going on.
+- It is also offered when the career is forced to end, where it rolls the benefits.
 
 ## User flow
 
@@ -98,7 +96,7 @@ Requested by the owner on 2026-11-03.
   qualification gets optional `automatic`, `automaticAt` and `ageDM`; careers get optional `basicTraining`.
 - `src/engine/effects.ts`: `promote`, `stay-in-career` and `keep-benefit`.
 - `src/engine/terms.ts`: applies each rule in the table and records the reason on the step.
-- `src/engine/policy.ts`: Generate the rest follows a forced muster or a forced continue.
+- `src/engine/policy.ts`: Finish career follows a forced muster or a forced continue.
 - `e2e/fixtures/rules-enforced-pack.json`: an invented pack whose rules set the new fields.
 - README "Writing a career pack": lists the new fields.
 
@@ -132,7 +130,7 @@ browser.
 - [x] Aging that takes a characteristic to 0 shows an ageing crisis reason.
 - [x] A pack without the new fields builds the same career as before for the same seed and input, apart
       from the rank DM on cash rolls (the part 1 tests pass unchanged).
-- [x] Generate the rest follows the forced choices.
+- [x] Finish career follows the forced choices.
 
 ## Open questions
 

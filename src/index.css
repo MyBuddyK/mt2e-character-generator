@@ -399,15 +399,3 @@ input[type='number'] {
   flex-basis: 100%;
   margin: 0;
 }
-
-.generate {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.generate input {
-  width: 4.5rem;
-  margin-left: 0.5rem;
-}

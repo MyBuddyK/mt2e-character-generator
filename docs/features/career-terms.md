@@ -16,7 +16,7 @@ listed here only so part 1 doesn't block it.
 
 1. **Part 1 (this spec): one career, term by term.** Qualification, basic training, skill rolls, survival,
    events, mishaps, advancement and rank bonuses, aging, choosing to continue or leave, and mustering out.
-   Step-through, generate-the-rest, overrides for every roll and choice, and highlighted connection
+   Step-through, Finish career, overrides for every roll and choice, and highlighted connection
    opportunities.
 2. **Part 2: rule enforcement, then more than one career.** See
    [`career-rules.md`](career-rules.md). Part 2a (rule enforcement) is built; part 2b (leaving one career
@@ -32,7 +32,7 @@ players' browsers, so there is no group code and no server.
    in a career pack, checked by a new zod `RulesSchema`:
    - `startingAge` and `termLength`
    - `aging`: the term from which aging is rolled, and the aging table
-   - `termLimit`: the most terms generate-the-rest adds (decision 7)
+   - `termLimit`: the most terms Finish career plays (decision 7)
    - `basicTraining`: which skill table the first term trains in, and at what level
    - `benefitRolls`: how many benefit rolls a character gets per term and per rank
    - `cashRollLimit`: the most cash rolls one character can take
@@ -89,11 +89,11 @@ players' browsers, so there is no group code and no server.
 
 6. **Step-through pauses after every term.** After each term the app stops and shows a term summary: the
    rolls, the skills gained, the event or mishap, and a **Connection** marker on events whose data has
-   `connection: true`. The player then picks **Continue in career**, **Leave career**, or **Generate the
-   rest**. Generate the rest makes the remaining choices with a fixed, seeded policy (decision 7) and stops
-   only when the character musters out.
+   `connection: true`. The player then picks **Continue in career**, **Leave career**, or **Finish
+   career** (named Generate the rest before 2026-11-03). Finish career makes the remaining choices with a
+   fixed, seeded policy (decision 7) and stops when the character musters out, or at an ageing crisis.
 
-7. **Generate the rest uses a simple, visible policy.** It keeps the current career, picks the assignment
+7. **Finish career uses a simple, visible policy.** It keeps the current career, picks the assignment
    the player already chose, rolls on the skill table with the highest-numbered entry the character can
    use, continues until the character is forced out or reaches a term limit from `rules`, and takes cash
    for the first benefit roll and benefits after that. The policy is shown in a short note next to the
@@ -123,8 +123,8 @@ players' browsers, so there is no group code and no server.
 6. If the character survived, the app rolls advancement and applies any rank bonus.
 7. If the character has reached the age where aging applies, the app rolls aging and applies the result.
 8. The term summary appears, with connection markers. The player adds notes, changes anything, and picks
-   Continue in career, Leave career, or Generate the rest. After a mishap or a `leave-career` effect, the
-   only button is **Muster out**.
+   Continue in career, Leave career, or Finish career. After a mishap or a `leave-career` effect, the
+   buttons are **Muster out** and **Finish career**.
 9. Leave career and Muster out both go to mustering out, where the player rolls benefits.
 10. The finished character shows characteristics, age, skills, rank and title, cash, benefits and the
     term history.
@@ -153,7 +153,7 @@ States:
 - **No career started:** the career and assignment pickers and Start career.
 - **Term in progress:** the rolls so far, in order.
 - **Paused after a term:** the term summary with connection markers, and Continue in career, Leave career
-  and Generate the rest, with the generate-the-rest policy in a note under the buttons.
+  and Finish career, with the Finish career policy in a note under the buttons.
 - **Forced out** (the sketch above): after a mishap or a `leave-career` effect, only Muster out is offered,
   with a line saying why.
 - **Mustering out:** one row per benefit roll with a cash or benefit picker.
@@ -181,7 +181,7 @@ At 320px wide the term rows stack, as the characteristics table does now.
   path (decision 4).
 - `src/engine/terms.ts`: the term types (`Term`, `Step`, `Choice`, `Override`) and `buildCharacter`.
   Each step records its dice, modifiers, target and result as `Overridable` values.
-- `src/engine/policy.ts`: the generate-the-rest policy as a function that returns the next choice.
+- `src/engine/policy.ts`: the Finish career policy as a function that returns the next choice.
 - `src/engine/character.ts`: `Character` gains age, skills, career history, cash and benefits.
 - `src/storage/characters.ts`: saves choices, overrides, notes and the `?packs=` value per seed in
   localStorage, with the same failure handling as packs.
@@ -199,7 +199,7 @@ At 320px wide the term rows stack, as the characteristics table does now.
 - [x] An event with a `skill` effect adds that skill to the character.
 - [x] Reaching a rank with a `skill` effect adds that skill; a rank with only a `bonus` shows it as a note.
 - [x] The first term adds the skills from the `basicTraining` table at the level in `rules`.
-- [x] After a failed survival, the only button is Muster out.
+- [x] After a failed survival, Muster out is offered and Continue in career is not.
 - [x] A benefit roll whose total is above the table's highest roll uses the highest row and says so.
 - [x] With two packs that have different `rules`, the notice names the pack whose rules are used, and
       importing them in either order uses the same one.
@@ -214,7 +214,7 @@ At 320px wide the term rows stack, as the characteristics table does now.
       is empty with a short line when there are none.
 - [x] Continue in career adds a term, and the age goes up by the term length from `rules`.
 - [x] Aging is rolled once the age reaches the threshold in `rules`, and not before.
-- [x] Generate the rest finishes the character and stops at mustering out, and each choice it made can be
+- [x] Finish career finishes the character and stops at mustering out, and each choice it made can be
       changed.
 - [x] Leave career leads to mustering out with the number of benefit rolls given by `rules`.
 - [x] Each benefit roll can switch between cash and benefit, and the cash total stays within the limit in

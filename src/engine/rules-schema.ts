@@ -35,7 +35,7 @@ export const RulesSchema = z.strictObject({
   startingAge: z.int().min(0),
   /** Years in one term. */
   termLength: z.int().min(1),
-  /** The most terms that Generate the rest adds to a career. */
+  /** The most terms that Finish career plays in one career; it leaves the career after that many. */
   termLimit: z.int().min(1),
   /** How many skill table rolls a term gives, and how many more a successful advancement gives. */
   skillRolls: z.strictObject({ perTerm: z.int().min(0), onAdvancement: z.int().min(0) }),
