@@ -98,8 +98,6 @@ export interface Step {
   notes: string[]
   /** Rules the engine applied to this step, and gains a limit stopped, described for the player. */
   reasons: string[]
-  /** For an aging roll: the choice key that ignores it ("ignore"), and whether it is ignored. */
-  ignore?: { key: string; ignored: boolean }
 }
 
 /** One term. */
@@ -749,22 +747,15 @@ export function buildCareer(
   }
 
   /**
-   * Rolls aging under `key` with `dm`, adds `reasons` and the step to `steps`, and applies the row
-   * unless the player ignores it ("ignore" under `${key}.ignore`). An ageing crisis marks the term;
+   * Rolls aging under `key` with `dm`, adds `reasons` and the step to `steps`, and applies the row.
+   * An ageing crisis marks the term;
    * with rules.aging.crisis it asks whether to pay for medical care or let the character die.
    */
   const ageing = (key: string, label: string, dm: number, reasons: string[], term: TermResult, steps: Step[], atTermStart = false) => {
     const { step, row } = tableRoll(key, label, rules.aging.dice, dm, rules.aging.table)
     step.result = row?.summary ?? ''
     step.reasons.push(...reasons)
-    const ignoreKey = `${key}.ignore`
-    const ignored = choice(ignoreKey) === 'ignore'
-    step.ignore = { key: ignoreKey, ignored }
     steps.push(step)
-    if (ignored) {
-      step.reasons.push('Ignored: this aging result is not applied.')
-      return
-    }
     if (row && !row.effects) step.notes.push(row.summary)
     const beforeAging = { ...changes }
     if (row) applyEffects(row.effects, key, step, steps, term)
@@ -790,6 +781,13 @@ export function buildCareer(
     steps.push(costRoll(`${key}.crisis-cost`, 'Medical care', care.costDice, care.costPerDie))
     for (const c of crisis) changes[c] = 1 - base[c]
     qualificationFails = true
+  }
+
+  for (const [key, v] of Object.entries(input.choices)) {
+    if (key.endsWith('.ignore') && v === 'ignore') {
+      problems.push('A saved choice ignored an aging roll. The app no longer offers that, so the roll is now applied.')
+      break
+    }
   }
 
   try {
