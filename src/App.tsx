@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { newCharacter, overrideCharacteristic, randomSeed, type Character } from './engine/character'
 import {
   CHARACTERISTICS,
@@ -16,6 +16,7 @@ import { CareerData } from './CareerData'
 import { Career } from './Career'
 import { useCareerPacks } from './use-career-packs'
 import { FAIR_USE_DISCLAIMER } from './legal'
+import { SeedBar } from './SeedBar'
 
 /** Returns the trimmed ?seed= value from the page URL, or a new random seed when it is missing or empty. */
 function initialSeed(): string {
@@ -135,10 +136,11 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
 }
 
 /**
- * Renders the characteristics table, the Career section, the Career data section, the list of careers, any career file
+ * Renders the seed bar (the current seed with Copy seed and Clear seed), the characteristics table, the Career section, the Career data section, the list of careers, any career file
  * errors, and a footer with Mongoose Publishing's Fair Use disclaimer. The current seed is kept in
- * the URL's ?seed= value and the loaded packs in ?packs=. Reroll picks a new seed and rolls a new
- * character. When the page was opened with a ?packs= value that differs from the loaded packs, a
+ * the URL's ?seed= value and the loaded packs in ?packs=. Reroll and Clear seed each pick a new
+ * random seed and roll a new character, as opening the page without a ?seed= value does; career input
+ * saved for the old seed stays saved. When the page was opened with a ?packs= value that differs from the loaded packs, a
  * notice lists both and the address bar keeps the link's ?packs= value until they match; rolling
  * still works.
  */
@@ -146,6 +148,8 @@ export default function App() {
   const [character, setCharacter] = useState<Character>(() => newCharacter(initialSeed()))
   const [expectedPacks] = useState(initialPacksParam)
   const packs = useCareerPacks(bundledCareers)
+  // Reroll and Clear seed both start a new character from a new random seed.
+  const rollNewCharacter = useCallback(() => setCharacter(newCharacter(randomSeed())), [])
   const showingSample = packs.entries.length === 0
   const base = useMemo(
     () => ({
@@ -174,6 +178,7 @@ export default function App() {
         <header>
           <h1>Traveller Character Generator</h1>
           <p className="muted">Unofficial fan tool for Mongoose Traveller 2nd Edition.</p>
+          <SeedBar seed={character.seed} onClear={rollNewCharacter} />
         </header>
 
         {careerErrors.length > 0 && (
@@ -205,15 +210,12 @@ export default function App() {
         <section aria-labelledby="chars-heading">
           <div className="row">
             <h2 id="chars-heading">Characteristics</h2>
-            <button type="button" onClick={() => setCharacter(newCharacter(randomSeed()))}>
+            <button type="button" onClick={rollNewCharacter}>
               Reroll
             </button>
           </div>
           <p aria-live="polite">
-            UPP <strong data-testid="upp">{upp(character.characteristics)}</strong>{' '}
-            <span className="muted">
-              seed <span data-testid="seed">{character.seed}</span>
-            </span>
+            UPP <strong data-testid="upp">{upp(character.characteristics)}</strong>
           </p>
           <div className="table-wrap">
             <table>

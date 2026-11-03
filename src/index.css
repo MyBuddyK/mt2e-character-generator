@@ -438,3 +438,24 @@ input[type='number'] {
   font-weight: 400;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
 }
+
+.seed-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0 0;
+}
+
+.seed-bar p {
+  margin: 0;
+}
+
+.seed-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.seed-status {
+  flex-basis: 100%;
+}
