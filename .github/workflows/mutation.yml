@@ -1,0 +1,32 @@
+name: Mutation testing
+
+# Runs Stryker (npm run test:mutation) on src/engine when started by hand and on the first day of
+# each month at 06:00 UTC. Stryker changes the engine code one small edit at a time (a mutant) and
+# runs the unit tests against each; a mutant no test fails on is reported as survived. The HTML and
+# JSON reports are uploaded as the mutation-report artifact. No score threshold is set.
+on:
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stryker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mutation
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 30
