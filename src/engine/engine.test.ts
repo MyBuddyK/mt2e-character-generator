@@ -5,13 +5,13 @@ import { newCharacter, overrideCharacteristic, randomSeed, SEED_LENGTH } from '.
 import { current, isOverridden } from './overridable'
 import { loadCareers, parseCareer } from './career-schema'
 import { careerErrors, careers } from '../data/careers'
-import sampleCourier from '../data/careers/sample-courier.json'
+import sampleCareer from '../data/careers/sample-sanitation.json'
 import { FAIR_USE_DISCLAIMER } from '../legal'
 import readme from '../../README.md?raw'
 
 /** Returns a deep copy of the sample career, for tests that break one field at a time. */
 function sample(): Record<string, unknown> {
-  const copy: Record<string, unknown> = structuredClone(sampleCourier)
+  const copy: Record<string, unknown> = structuredClone(sampleCareer)
   return copy
 }
 
@@ -194,14 +194,14 @@ describe('career data', () => {
   // Sets every event roll to 99 and expects a message saying event rolls must cover 2 to 12.
   it('reports event rolls that do not cover 2 to 12', () => {
     const data = sample()
-    data['events'] = sampleCourier.events.map((e) => ({ ...e, roll: 99 }))
+    data['events'] = sampleCareer.events.map((e) => ({ ...e, roll: 99 }))
     expect(errorsFor(data)).toContainEqual(expect.stringMatching(/^events: roll values must be 2 to 12/))
   })
 
   // Sets every mishap roll to 1 and expects a message saying mishap rolls must cover 1 to 6.
   it('reports mishap rolls that do not cover 1 to 6', () => {
     const data = sample()
-    data['mishaps'] = sampleCourier.mishaps.map((e) => ({ ...e, roll: 1 }))
+    data['mishaps'] = sampleCareer.mishaps.map((e) => ({ ...e, roll: 1 }))
     expect(errorsFor(data)).toContainEqual(expect.stringMatching(/^mishaps: roll values must be 1 to 6/))
   })
 
@@ -217,9 +217,9 @@ describe('career data', () => {
   // Gives both assignments the same id and expects a duplicate id message.
   it('reports duplicate assignment ids', () => {
     const data = sample()
-    const [first] = sampleCourier.assignments
+    const [first] = sampleCareer.assignments
     data['assignments'] = [first, first]
-    expect(errorsFor(data)).toContainEqual('assignments: duplicate id "express"')
+    expect(errorsFor(data)).toContainEqual('assignments: duplicate id "debris-sweep"')
   })
 
   // Replaces the assignments with [null] and expects an error message instead of a thrown exception.
@@ -233,7 +233,7 @@ describe('career data', () => {
   // Removes the ranks from the first assignment and expects a message for that field.
   it('reports missing ranks', () => {
     const data = sample()
-    data['assignments'] = sampleCourier.assignments.map((a, i) => {
+    data['assignments'] = sampleCareer.assignments.map((a, i) => {
       if (i !== 0) return a
       const { ranks: _ranks, ...withoutRanks } = a
       return withoutRanks
@@ -246,7 +246,7 @@ describe('career data', () => {
     const data = sample()
     data['id'] = 5
     data['qualification'] = { characteristic: 'INT', target: 1e9 }
-    data['skillTables'] = { ...sampleCourier.skillTables, serviceSkills: ['', 'a', 'b', 'c', 'd', 'e'] }
+    data['skillTables'] = { ...sampleCareer.skillTables, serviceSkills: ['', 'a', 'b', 'c', 'd', 'e'] }
     const errors = errorsFor(data)
     expect(errors).toContainEqual(expect.stringMatching(/^id: /))
     expect(errors).toContainEqual(expect.stringMatching(/^qualification\.target: /))
@@ -255,17 +255,17 @@ describe('career data', () => {
 
   // Loads two files with the same career id and expects the second to be left out and reported.
   it('reports careers with the same id in different files', () => {
-    const result = loadCareers({ './a.json': sampleCourier, './b.json': sampleCourier })
+    const result = loadCareers({ './a.json': sampleCareer, './b.json': sampleCareer })
     expect(result.careers).toHaveLength(1)
-    expect(result.errors).toEqual(['./b.json: id "sample-courier" is already used by ./a.json'])
+    expect(result.errors).toEqual(['./b.json: id "sample-sanitation" is already used by ./a.json'])
   })
 
   // Loads one valid file and one without a name, and expects the valid one loaded and the other reported.
   it('keeps loading when one file is invalid', () => {
     const broken = sample()
     delete broken['name']
-    const result = loadCareers({ './good.json': sampleCourier, './broken.json': broken })
-    expect(result.careers.map((c) => c.id)).toEqual(['sample-courier'])
+    const result = loadCareers({ './good.json': sampleCareer, './broken.json': broken })
+    expect(result.careers.map((c) => c.id)).toEqual(['sample-sanitation'])
     expect(result.errors).toContainEqual(expect.stringMatching(/^\.\/broken\.json: name: /))
   })
 })
