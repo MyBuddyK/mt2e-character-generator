@@ -371,15 +371,35 @@ test.describe('aging and anagathics', () => {
     await expect(page.getByTestId('step-term-1.survival-2')).toBeVisible()
   })
 
-  // Taps the info button after Anagathics and expects a tooltip that explains them with the pack's SOC
-  // 10+ check; then presses Escape and expects the tooltip hidden.
+  // Clicks the info button after Anagathics and expects a tooltip that explains them with the pack's
+  // SOC 10+ check, inside the viewport; then presses Escape and expects it hidden.
   test('the anagathics info button explains anagathics', async ({ page }) => {
     await startWanderer(page)
     await page.getByTestId('term-1').getByRole('button', { name: 'About anagathics' }).click()
     const tip = page.getByRole('tooltip')
     await expect(tip).toContainText('Anagathics are drugs that slow ageing')
     await expect(tip).toContainText('SOC 10+')
+    const box = await tip.boundingBox()
+    const width = page.viewportSize()?.width ?? 0
+    expect(box?.x ?? -1).toBeGreaterThanOrEqual(0)
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width)
     await page.keyboard.press('Escape')
+    await expect(tip).toHaveCount(0)
+  })
+
+  // Clicks the info button to show the tooltip, clicks it again and expects it hidden; shows it again,
+  // clicks the term heading, and expects it hidden.
+  test('a second click or a click elsewhere hides the anagathics tooltip', async ({ page }) => {
+    await startWanderer(page)
+    const button = page.getByTestId('term-1').getByRole('button', { name: 'About anagathics' })
+    const tip = page.getByRole('tooltip')
+    await button.click()
+    await expect(tip).toBeVisible()
+    await button.click()
+    await expect(tip).toHaveCount(0)
+    await button.click()
+    await expect(tip).toBeVisible()
+    await page.getByTestId('term-1').getByRole('heading', { name: 'Term 1' }).click()
     await expect(tip).toHaveCount(0)
   })
 })

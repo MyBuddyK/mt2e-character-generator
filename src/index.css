@@ -296,6 +296,7 @@ input[type='number'] {
 }
 
 .term-head {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 0.75rem;
@@ -401,7 +402,6 @@ input[type='number'] {
 }
 
 .info-tip {
-  position: relative;
   display: inline-block;
   margin-left: 0.25rem;
 }
@@ -421,9 +421,10 @@ input[type='number'] {
 .info-tip-text {
   position: absolute;
   z-index: 10;
+  /* Placed under the term heading, across its full width, so it stays inside the page at any width. */
   top: calc(100% + 0.25rem);
+  left: 0;
   right: 0;
-  width: min(18rem, 80vw);
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: 6px;

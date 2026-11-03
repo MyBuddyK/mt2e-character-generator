@@ -783,6 +783,13 @@ export function buildCareer(
     qualificationFails = true
   }
 
+  for (const [key, v] of Object.entries(input.choices)) {
+    if (key.endsWith('.ignore') && v === 'ignore') {
+      problems.push('A saved choice ignored an aging roll. The app no longer offers that, so the roll is now applied.')
+      break
+    }
+  }
+
   try {
     let previous: CareerDefinition | undefined
     for (let k = 1; ; k += 1) {

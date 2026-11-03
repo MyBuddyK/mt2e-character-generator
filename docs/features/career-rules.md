@@ -233,6 +233,8 @@ crisis, not for points lost to ordinary aging.
 | `rules.anagathics` `{ "characteristic": "SOC", "target": 10, "costDice": 1, "costPerDie": 200000, "prisonOnNatural": 2 }` | Each term has an Anagathics checkbox. Starting needs the check; while taken, each term rolls the cost (taken from cash), rolls survival twice (either failure is a mishap), and adds the number of terms taken in a row to the aging roll. A term without them after a term with them rolls aging at once, with the DM for the terms served and no anagathics DM; a death in that roll gives the age at the start of the term. Dice at or below `prisonOnNatural` on the starting check add a note (the Prisoner career isn't built). |
 
 - Aging dice can be overridden like any roll.
+- A saved character whose choices ignored an aging roll (from before the checkbox was removed) gets the
+  roll applied, and the Career section lists a problem that says so.
 - Cash in the summary is mustering-out cash less anagathics and medical costs; below 0 it is shown as a debt.
 - Finish career picks characteristics to reduce at random, takes no anagathics, and stops at an ageing
   crisis for the player to decide.
