@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { newCharacter, overrideCharacteristic, randomSeed, type Character } from './engine/character'
 import {
   CHARACTERISTICS,
@@ -148,6 +148,8 @@ export default function App() {
   const [character, setCharacter] = useState<Character>(() => newCharacter(initialSeed()))
   const [expectedPacks] = useState(initialPacksParam)
   const packs = useCareerPacks(bundledCareers)
+  // Reroll and Clear seed both start a new character from a new random seed.
+  const rollNewCharacter = useCallback(() => setCharacter(newCharacter(randomSeed())), [])
   const showingSample = packs.entries.length === 0
   const base = useMemo(
     () => ({
@@ -176,7 +178,7 @@ export default function App() {
         <header>
           <h1>Traveller Character Generator</h1>
           <p className="muted">Unofficial fan tool for Mongoose Traveller 2nd Edition.</p>
-          <SeedBar seed={character.seed} onClear={() => setCharacter(newCharacter(randomSeed()))} />
+          <SeedBar seed={character.seed} onClear={rollNewCharacter} />
         </header>
 
         {careerErrors.length > 0 && (
@@ -208,7 +210,7 @@ export default function App() {
         <section aria-labelledby="chars-heading">
           <div className="row">
             <h2 id="chars-heading">Characteristics</h2>
-            <button type="button" onClick={() => setCharacter(newCharacter(randomSeed()))}>
+            <button type="button" onClick={rollNewCharacter}>
               Reroll
             </button>
           </div>
