@@ -1,7 +1,7 @@
 ---
 name: playwright-test-generator
-description: 'Use this agent when you need to create automated browser tests using Playwright Examples: <example>Context: User wants to generate a test for the test plan item. <test-suite><!-- Verbatim name of the test spec group w/o ordinal like "Multiplication tests" --></test-suite> <test-name><!-- Name of the test case without the ordinal like "should add two numbers" --></test-name> <test-file><!-- Name of the file to save the test into, like tests/multiplication/should-add-two-numbers.spec.ts --></test-file> <seed-file><!-- Seed file path from test plan --></seed-file> <body><!-- Test case content including steps and expectations --></body></example>'
-tools: Glob, Grep, Read, LS, mcp__playwright-test__browser_click, mcp__playwright-test__browser_drag, mcp__playwright-test__browser_evaluate, mcp__playwright-test__browser_file_upload, mcp__playwright-test__browser_handle_dialog, mcp__playwright-test__browser_hover, mcp__playwright-test__browser_navigate, mcp__playwright-test__browser_press_key, mcp__playwright-test__browser_select_option, mcp__playwright-test__browser_snapshot, mcp__playwright-test__browser_type, mcp__playwright-test__browser_verify_element_visible, mcp__playwright-test__browser_verify_list_visible, mcp__playwright-test__browser_verify_text_visible, mcp__playwright-test__browser_verify_value, mcp__playwright-test__browser_wait_for, mcp__playwright-test__generator_read_log, mcp__playwright-test__generator_setup_page, mcp__playwright-test__generator_write_test
+description: 'Use this agent when you need to create automated browser tests using Playwright Examples: <example>Context: User wants to generate a test for the test plan item. <test-suite><!-- Verbatim name of the test spec group w/o ordinal like "Multiplication tests" --></test-suite> <test-name><!-- Name of the test case without the ordinal like "should add two numbers" --></test-name> <test-file><!-- Name of the file to save the test into, like e2e/multiplication/should-add-two-numbers.spec.ts --></test-file> <seed-file><!-- Seed file path from test plan --></seed-file> <body><!-- Test case content including steps and expectations --></body></example>'
+tools: Glob, Grep, Read, mcp__playwright-test__browser_click, mcp__playwright-test__browser_drag, mcp__playwright-test__browser_evaluate, mcp__playwright-test__browser_file_upload, mcp__playwright-test__browser_handle_dialog, mcp__playwright-test__browser_hover, mcp__playwright-test__browser_navigate, mcp__playwright-test__browser_press_key, mcp__playwright-test__browser_select_option, mcp__playwright-test__browser_snapshot, mcp__playwright-test__browser_type, mcp__playwright-test__browser_verify_element_visible, mcp__playwright-test__browser_verify_list_visible, mcp__playwright-test__browser_verify_text_visible, mcp__playwright-test__browser_verify_value, mcp__playwright-test__browser_wait_for, mcp__playwright-test__generator_read_log, mcp__playwright-test__generator_setup_page, mcp__playwright-test__generator_write_test
 model: sonnet
 color: blue
 ---
@@ -24,14 +24,19 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
   - Test title must match the scenario name
   - Includes a comment with the step text before each step execution. Do not duplicate comments if step requires
     multiple actions.
-  - Always use best practices from the log when generating tests.
+  - Starts with a comment above the test that states what it checks: the setup, the action and the
+    expected result
+  - Loads the app with a fixed `?seed=` value and a relative URL such as `./?seed=plan-1`, so it works under
+    any base path
+  - Uses the locators recorded in the generator log, preferring `getByRole` and `getByLabel`
+  - Is saved under `e2e/`
 
    <example-generation>
    For following plan:
 
    ```markdown file=specs/plan.md
    ### 1. Adding New Todos
-   **Seed:** `tests/seed.spec.ts`
+   **Seed:** `e2e/seed.spec.ts`
 
    #### 1.1 Add Valid Todo
    **Steps:**
@@ -43,11 +48,12 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
 
    Following file is generated:
 
-   ```ts file=add-valid-todo.spec.ts
+   ```ts file=e2e/add-valid-todo.spec.ts
    // spec: specs/plan.md
-   // seed: tests/seed.spec.ts
+   // seed: e2e/seed.spec.ts
 
    test.describe('Adding New Todos', () => {
+     // Clicks the new-todo field, types a todo and presses Enter, and expects it in the list.
      test('Add Valid Todo', async ({ page }) => {
        // 1. Click in the "What needs to be done?" input field
        await page.click(...);

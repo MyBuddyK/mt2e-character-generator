@@ -2,10 +2,14 @@
   --bg: #f7f7f5;
   --surface: #ffffff;
   --text: #1d1d1f;
-  --muted: #6b6b70;
+  --muted: #5c5c61;
   --border: #dcdcd8;
   --accent: #b3261e;
+  --on-accent: #ffffff;
   --override: #fff3cd;
+  --badge-bg: #7a5a00;
+  --badge-text: #ffffff;
+  --error-bg: #fdecea;
   font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
 }
@@ -18,7 +22,11 @@
     --muted: #a0a0a8;
     --border: #34343a;
     --accent: #ff6b5e;
-    --override: #4a3d10;
+    --on-accent: #1d1d1f;
+    --override: #5a4710;
+    --badge-bg: #ffd666;
+    --badge-text: #1d1d1f;
+    --error-bg: #3d1a17;
   }
 }
 
@@ -32,10 +40,16 @@ body {
   color: var(--text);
 }
 
-main {
+main,
+footer {
   max-width: 48rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 1.5rem 1rem;
+}
+
+footer {
+  padding-top: 0;
+  font-size: 0.875rem;
 }
 
 h1 {
@@ -56,6 +70,10 @@ section {
   margin-top: 1rem;
 }
 
+section.errors {
+  background: var(--error-bg);
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -73,8 +91,20 @@ button {
   border-radius: 6px;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
 }
 
 table {
@@ -89,13 +119,66 @@ td {
   border-bottom: 1px solid var(--border);
 }
 
+div.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
 tr.overridden td,
 tr.overridden th {
   background: var(--override);
 }
 
+.badge {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 input[type='number'] {
-  width: 4.5rem;
+  width: 4rem;
   font: inherit;
   padding: 0.2rem 0.4rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+  main,
+  footer {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  section {
+    padding: 0.75rem;
+  }
+
+  th,
+  td {
+    padding: 0.3rem 0.2rem;
+  }
+
+  input[type='number'] {
+    width: 3rem;
+    padding: 0.2rem 0.25rem;
+  }
+
+  .badge {
+    font-size: 0.6875rem;
+    padding: 0 0.25rem;
+  }
 }

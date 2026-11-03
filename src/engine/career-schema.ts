@@ -1,110 +1,171 @@
-import { CHARACTERISTICS, type Characteristic } from './characteristics'
+import { z } from 'zod'
+import { CHARACTERISTICS } from './characteristics'
 
 /**
- * Types for the career data files in src/data/careers. Adding a career means adding a JSON file
- * in this shape; no code changes are needed.
+ * Schema and types for the career data files in src/data/careers. Adding a career means adding a
+ * JSON file that passes CareerSchema; no code changes are needed.
  *
  * Descriptions hold short summaries, not rulebook text (see the rules in CLAUDE.md).
  */
 
-/** A characteristic check that succeeds on 2D + DM >= target, e.g. END 7+. */
-export interface Check {
-  characteristic: Characteristic
-  target: number
-}
+const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
+
+/** A characteristic check that succeeds on 2D + DM >= target, e.g. END 7+. Targets are integers from 0 to 20. */
+export const CheckSchema = z.object({
+  characteristic: z.enum(CHARACTERISTICS),
+  target: z.int().min(0).max(20),
+})
+/** A characteristic check, as described by CheckSchema. */
+export type Check = z.infer<typeof CheckSchema>
 
 /** One entry in a D6 skill table: a skill or characteristic name, optionally with a level or speciality. */
-export type SkillTableEntry = string
+export const SkillTableEntrySchema = nonEmpty
+/** One skill table entry, as described by SkillTableEntrySchema. */
+export type SkillTableEntry = z.infer<typeof SkillTableEntrySchema>
 
-/** An event or mishap table entry. `connection: true` marks an entry as a possible link between two characters. */
-export interface EventEntry {
-  roll: number
-  summary: string
-  connection?: boolean
+/** A D6 skill table: exactly six entries, indexed by the D6 roll minus one. */
+export const SkillTableSchema = z.array(SkillTableEntrySchema).length(6, 'must have exactly 6 entries')
+
+/**
+ * An event or mishap table entry: the roll it answers to, a short summary, and an optional
+ * `connection` flag that marks the entry as a possible link between two characters.
+ */
+export const EventEntrySchema = z.object({
+  roll: z.int(),
+  summary: nonEmpty,
+  connection: z.boolean().optional(),
+})
+/** One event or mishap entry, as described by EventEntrySchema. */
+export type EventEntry = z.infer<typeof EventEntrySchema>
+
+/** A rank within an assignment: its number (0 to 6), optional title and optional bonus gained on reaching it. */
+export const RankSchema = z.object({
+  rank: z.int().min(0).max(6),
+  title: nonEmpty.optional(),
+  bonus: nonEmpty.optional(),
+})
+/** One rank, as described by RankSchema. */
+export type Rank = z.infer<typeof RankSchema>
+
+/**
+ * Returns a zod check that adds an issue when the `roll` values in an array are not exactly the
+ * integers from `min` to `max`, each appearing once.
+ */
+function coversRolls(min: number, max: number) {
+  return (entries: { roll: number }[], ctx: z.RefinementCtx) => {
+    const rolls = entries.map((e) => e.roll).sort((a, b) => a - b)
+    const expected = Array.from({ length: max - min + 1 }, (_, i) => min + i)
+    if (rolls.length !== expected.length || rolls.some((r, i) => r !== expected[i])) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `roll values must be ${min} to ${max}, each once; got [${rolls.join(', ')}]`,
+      })
+    }
+  }
 }
 
-/** A rank within an assignment: its number, optional title and optional bonus gained on reaching it. */
-export interface Rank {
-  rank: number
-  title?: string
-  bonus?: string
+/** Returns a zod check that adds an issue for each value of `key` that appears more than once in an array. */
+function uniqueBy<K extends string>(key: K) {
+  return (entries: Record<K, string | number>[], ctx: z.RefinementCtx) => {
+    const seen = new Set<string | number>()
+    for (const entry of entries) {
+      const value = entry[key]
+      if (seen.has(value)) ctx.addIssue({ code: 'custom', message: `duplicate ${key} "${value}"` })
+      seen.add(value)
+    }
+  }
 }
 
 /** One assignment within a career, with its own survival and advancement checks, skill table and ranks. */
-export interface Assignment {
-  id: string
-  name: string
-  survival: Check
-  advancement: Check
-  /** Six entries, indexed by D6 roll minus one. */
-  skills: SkillTableEntry[]
-  ranks: Rank[]
-}
+export const AssignmentSchema = z.object({
+  id: nonEmpty,
+  name: nonEmpty,
+  survival: CheckSchema,
+  advancement: CheckSchema,
+  skills: SkillTableSchema,
+  ranks: z.array(RankSchema).min(1, 'must have at least one rank').superRefine(uniqueBy('rank')),
+})
+/** One assignment, as described by AssignmentSchema. */
+export type Assignment = z.infer<typeof AssignmentSchema>
 
-/** One mustering-out row: the 1D roll, the cash amount and the benefit. */
-export interface MusterOutEntry {
-  roll: number
-  cash: number
-  benefit: string
-}
+/** One mustering-out row: the 1D roll (1 to 7), a non-negative whole cash amount and the benefit. */
+export const MusterOutEntrySchema = z.object({
+  roll: z.int(),
+  cash: z.int().min(0),
+  benefit: nonEmpty,
+})
+/** One mustering-out row, as described by MusterOutEntrySchema. */
+export type MusterOutEntry = z.infer<typeof MusterOutEntrySchema>
 
-/** The full contents of one career data file. */
-export interface CareerDefinition {
-  id: string
-  name: string
+/** The full contents of one career data file. Unknown keys are rejected. */
+export const CareerSchema = z.strictObject({
+  id: nonEmpty,
+  name: nonEmpty,
   /** Where the full rules for this career live, e.g. "Core Rulebook p.XX". */
-  source: string
-  summary: string
-  qualification: Check
-  /** Each skill table has six entries. */
-  skillTables: {
-    personalDevelopment: SkillTableEntry[]
-    serviceSkills: SkillTableEntry[]
-    advancedEducation?: SkillTableEntry[]
+  source: nonEmpty,
+  summary: nonEmpty,
+  qualification: CheckSchema,
+  skillTables: z.strictObject({
+    personalDevelopment: SkillTableSchema,
+    serviceSkills: SkillTableSchema,
+    advancedEducation: SkillTableSchema.optional(),
+  }),
+  assignments: z.array(AssignmentSchema).min(1, 'must have at least one assignment').superRefine(uniqueBy('id')),
+  /** 2D events: one entry for each roll from 2 to 12. */
+  events: z.array(EventEntrySchema).superRefine(coversRolls(2, 12)),
+  /** D6 mishaps: one entry for each roll from 1 to 6. */
+  mishaps: z.array(EventEntrySchema).superRefine(coversRolls(1, 6)),
+  /** Mustering-out table: one entry for each roll from 1 to 7. */
+  musteringOut: z.array(MusterOutEntrySchema).superRefine(coversRolls(1, 7)),
+})
+/** A validated career, as described by CareerSchema. */
+export type CareerDefinition = z.infer<typeof CareerSchema>
+
+/** The result of parseCareer: the typed career, or the list of problems found. */
+export type ParseResult = { ok: true; career: CareerDefinition } | { ok: false; errors: string[] }
+
+/**
+ * Checks parsed JSON against CareerSchema. Returns the typed career when it passes, otherwise one
+ * message per problem in the form "path: message". It does not throw for any input.
+ */
+export function parseCareer(data: unknown): ParseResult {
+  const result = CareerSchema.safeParse(data)
+  if (result.success) return { ok: true, career: result.data }
+  return {
+    ok: false,
+    errors: result.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`),
   }
-  assignments: Assignment[]
-  /** 2D events (2 to 12). */
-  events: EventEntry[]
-  /** D6 mishaps (1 to 6). */
-  mishaps: EventEntry[]
-  musteringOut: MusterOutEntry[]
+}
+
+/** The result of loadCareers: every career that passed, and one message per problem, prefixed with the file name. */
+export interface LoadResult {
+  careers: CareerDefinition[]
+  errors: string[]
 }
 
 /**
- * Checks a parsed career file against CareerDefinition and returns one message per problem found.
- * An empty array means every checked field is present and has the expected shape.
+ * Parses every file in `files` (file name → parsed JSON) with parseCareer. Files that fail are left
+ * out of `careers`, and their problems are added to `errors`. A career whose id was already used by
+ * an earlier file (in file-name order) is also left out and reported. Careers are sorted by name.
  */
-export function validateCareer(data: unknown): string[] {
+export function loadCareers(files: Record<string, unknown>): LoadResult {
+  const careers: CareerDefinition[] = []
   const errors: string[] = []
-  const c = data as Partial<CareerDefinition>
-  const isCheck = (v: unknown): v is Check =>
-    typeof v === 'object' &&
-    v !== null &&
-    CHARACTERISTICS.includes((v as Check).characteristic) &&
-    typeof (v as Check).target === 'number'
-  const isSixSkills = (v: unknown) => Array.isArray(v) && v.length === 6 && v.every((s) => typeof s === 'string')
-
-  if (typeof c !== 'object' || c === null) return ['career is not an object']
-  if (!c.id) errors.push('missing id')
-  if (!c.name) errors.push('missing name')
-  if (!isCheck(c.qualification)) errors.push('qualification must be a check like { characteristic: "INT", target: 6 }')
-  if (!c.skillTables) errors.push('missing skillTables')
-  else {
-    if (!isSixSkills(c.skillTables.personalDevelopment)) errors.push('personalDevelopment needs 6 entries')
-    if (!isSixSkills(c.skillTables.serviceSkills)) errors.push('serviceSkills needs 6 entries')
-    if (c.skillTables.advancedEducation && !isSixSkills(c.skillTables.advancedEducation))
-      errors.push('advancedEducation needs 6 entries')
+  const idOwners = new Map<string, string>()
+  for (const [file, data] of Object.entries(files).sort(([a], [b]) => a.localeCompare(b))) {
+    const result = parseCareer(data)
+    if (!result.ok) {
+      errors.push(...result.errors.map((e) => `${file}: ${e}`))
+      continue
+    }
+    const owner = idOwners.get(result.career.id)
+    if (owner) {
+      errors.push(`${file}: id "${result.career.id}" is already used by ${owner}`)
+      continue
+    }
+    idOwners.set(result.career.id, file)
+    careers.push(result.career)
   }
-  if (!Array.isArray(c.assignments) || c.assignments.length === 0) errors.push('needs at least one assignment')
-  else
-    c.assignments.forEach((a, i) => {
-      if (!a.id || !a.name) errors.push(`assignment ${i} missing id or name`)
-      if (!isCheck(a.survival)) errors.push(`assignment ${a.id ?? i} has an invalid survival check`)
-      if (!isCheck(a.advancement)) errors.push(`assignment ${a.id ?? i} has an invalid advancement check`)
-      if (!isSixSkills(a.skills)) errors.push(`assignment ${a.id ?? i} skills need 6 entries`)
-    })
-  if (!Array.isArray(c.events) || c.events.length !== 11) errors.push('events needs 11 entries (2 to 12)')
-  if (!Array.isArray(c.mishaps) || c.mishaps.length !== 6) errors.push('mishaps needs 6 entries (1 to 6)')
-  if (!Array.isArray(c.musteringOut) || c.musteringOut.length === 0) errors.push('musteringOut needs entries')
-  return errors
+  careers.sort((a, b) => a.name.localeCompare(b.name))
+  return { careers, errors }
 }

@@ -35,7 +35,7 @@ export function seedFromString(text: string): number {
 export interface Dice {
   /** Returns one six-sided die roll, from 1 to 6. */
   d6(): number
-  /** Returns the sum of `count` six-sided dice. */
+  /** Returns the sum of `count` six-sided dice. Throws a RangeError if `count` is not a non-negative integer. */
   roll(count: number): number
   /** Returns a D66 roll: the first die as the tens digit and the second as the units (11 to 66). */
   d66(): number
@@ -48,6 +48,7 @@ export function createDice(seed: number): Dice {
   return {
     d6,
     roll(count) {
+      if (!Number.isInteger(count) || count < 0) throw new RangeError(`dice count must be a non-negative integer, got ${count}`)
       let total = 0
       for (let i = 0; i < count; i++) total += d6()
       return total

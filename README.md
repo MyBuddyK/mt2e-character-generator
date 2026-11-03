@@ -3,7 +3,7 @@
 An unofficial fan-made web app for building Mongoose Traveller 2nd Edition characters as a group.
 
 Current state: the app rolls the six characteristics from a seed, and the player can override each value.
-It loads career data files but does not yet run careers.
+It loads and checks career data files but does not yet run careers.
 
 Planned: stepping through careers one term at a time, showing events that could connect characters,
 generating a whole character in one step, and exporting to Foundry VTT.
@@ -21,14 +21,19 @@ Add `?seed=anything` to the URL to get the same character every time.
 
 ## Adding career data
 
-Put a JSON file in `src/data/careers/` following `sample-courier.json`. The unit tests validate every career
-file, so `npm test` tells you what's missing. Use short summaries in your own words and cite the book and
+Put a JSON file in `src/data/careers/` following `sample-courier.json`. Each file is checked against
+`CareerSchema` in `src/engine/career-schema.ts`. `npm test` fails and lists each problem by file and field,
+and the app shows the same list above the characteristics. Use short summaries in your own words and cite the book and
 page in `source`; don't copy rulebook text into this repo.
 
 ## Tech
 
 TypeScript, React, Vite, Vitest, Playwright, GitHub Actions and GitHub Pages. Claude Code agents for feature
 design and Playwright testing live in `.claude/agents` (see `CLAUDE.md`).
+
+## License
+
+Code is released under the MIT License (see `LICENSE`). Career data files you add are your own.
 
 ## Legal
 

@@ -1,5 +1,10 @@
 import { createDice, seedFromString } from './dice'
-import { rollCharacteristics, type Characteristic, type Characteristics } from './characteristics'
+import {
+  normalizeCharacteristic,
+  rollCharacteristics,
+  type Characteristic,
+  type Characteristics,
+} from './characteristics'
 import { withOverride } from './overridable'
 
 /**
@@ -23,24 +28,35 @@ export function newCharacter(seed: string): Character {
 }
 
 /**
- * Returns a copy of `character` with one characteristic's override set to `value`. Passing undefined
- * removes the override.
+ * Returns a copy of `character` with one characteristic's override set to `value`, rounded and
+ * clamped by normalizeCharacteristic. Passing undefined or NaN removes the override. Setting the
+ * override equal to the rolled value also removes it.
  */
 export function overrideCharacteristic(
   character: Character,
   key: Characteristic,
   value: number | undefined,
 ): Character {
+  const normalized = value === undefined ? undefined : normalizeCharacteristic(value)
   return {
     ...character,
     characteristics: {
       ...character.characteristics,
-      [key]: withOverride(character.characteristics[key], value),
+      [key]: withOverride(character.characteristics[key], normalized),
     },
   }
 }
 
-/** Returns an 8-character base-36 string from Math.random(), for use as a new seed. */
+const SEED_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
+/** Number of characters in a seed returned by randomSeed. */
+export const SEED_LENGTH = 8
+
+/**
+ * Returns a new seed: SEED_LENGTH characters from 0-9 and a-z, picked with crypto.getRandomValues.
+ * This is the only randomness outside dice.ts; it picks the seed, and dice.ts makes every roll.
+ */
 export function randomSeed(): string {
-  return Math.random().toString(36).slice(2, 10)
+  const bytes = new Uint32Array(SEED_LENGTH)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => SEED_ALPHABET.charAt(b % SEED_ALPHABET.length)).join('')
 }

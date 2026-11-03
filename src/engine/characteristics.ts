@@ -9,6 +9,26 @@ export type Characteristic = (typeof CHARACTERISTICS)[number]
 /** A character's six characteristics, each with its rolled value and optional override. */
 export type Characteristics = Record<Characteristic, Overridable<number>>
 
+/** Lowest characteristic value the generator stores. */
+export const MIN_CHARACTERISTIC = 0
+/** Highest characteristic value the generator stores: 33, the largest single extended-hex digit (Z). */
+export const MAX_CHARACTERISTIC = 33
+
+/**
+ * Traveller extended hex digits, indexed by value from 0 to 33. The letters I and O are left out so
+ * they can't be mistaken for 1 and 0.
+ */
+const EHEX_DIGITS = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'
+
+/**
+ * Returns `value` rounded to the nearest integer and clamped to MIN_CHARACTERISTIC..MAX_CHARACTERISTIC.
+ * Returns undefined for NaN or infinite input.
+ */
+export function normalizeCharacteristic(value: number): number | undefined {
+  if (!Number.isFinite(value)) return undefined
+  return Math.min(MAX_CHARACTERISTIC, Math.max(MIN_CHARACTERISTIC, Math.round(value)))
+}
+
 /** Returns the dice modifier for a characteristic value: -3 at 0, rising to +3 at 15 or more. */
 export function characteristicDM(value: number): number {
   if (value <= 0) return -3
@@ -20,17 +40,24 @@ export function characteristicDM(value: number): number {
   return 3
 }
 
-/** Rolls 2D for each characteristic in the order STR, DEX, END, INT, EDU, SOC. */
+/** Rolls 2D for each characteristic, in the order STR, DEX, END, INT, EDU, SOC. */
 export function rollCharacteristics(dice: Dice): Characteristics {
-  const result = {} as Characteristics
-  for (const c of CHARACTERISTICS) result[c] = rolled(dice.roll(2))
-  return result
+  const STR = rolled(dice.roll(2))
+  const DEX = rolled(dice.roll(2))
+  const END = rolled(dice.roll(2))
+  const INT = rolled(dice.roll(2))
+  const EDU = rolled(dice.roll(2))
+  const SOC = rolled(dice.roll(2))
+  return { STR, DEX, END, INT, EDU, SOC }
 }
 
-/** Returns a value as one extended-hex digit: 0 to 9, then A for 10, B for 11, and so on. Negative values return '0'. */
+/**
+ * Returns `value` as one extended-hex digit (0-9, then A-H, J-N, P-Z, which covers 0 to 33). The value
+ * is first rounded and clamped with normalizeCharacteristic; NaN returns '0'.
+ */
 export function toHex(value: number): string {
-  if (value < 0) return '0'
-  return value < 10 ? String(value) : String.fromCharCode(55 + value)
+  const n = normalizeCharacteristic(value) ?? MIN_CHARACTERISTIC
+  return EHEX_DIGITS.charAt(n)
 }
 
 /** Returns the Universal Personality Profile: the six current characteristic values as hex digits, e.g. "7A86B5". */
