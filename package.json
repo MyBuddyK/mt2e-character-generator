@@ -12,9 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm test",
+    "check": "npm run lint && npm run typecheck && npm run check:conventions && npm test",
     "schema": "tsx scripts/write-pack-schema.ts",
-    "validate-pack": "tsx scripts/validate-pack.ts"
+    "validate-pack": "tsx scripts/validate-pack.ts",
+    "check:conventions": "tsx scripts/check-conventions.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

@@ -13,6 +13,14 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
 
 You will:
 
+0. **Read the acceptance criteria**
+   - Read the feature spec in `docs/features/` for the feature you are planning, and the existing specs
+     in `e2e/` and unit tests in `src/**/*.test.ts`
+   - Plan browser scenarios for criteria a player can observe in the page. Leave out criteria that are
+     rules arithmetic with no UI of their own; list them under "Unit-level criteria" with the unit test
+     that checks each one, or "none found"
+   - Skip criteria that an existing spec in `e2e/` already checks, and list them with that spec's name
+
 1. **Navigate and Explore**
    - Invoke the `planner_setup_page` tool once to set up page before using any other tools
    - Explore the browser snapshot
@@ -40,6 +48,10 @@ You will:
    - Assumptions about starting state (always assume blank/fresh state)
    - The starting URL with a fixed `?seed=` value, so the rolled values are the same on every run
    - Success criteria and failure conditions
+   - The acceptance criterion it checks, as the feature spec file and the criterion text, or "none"
+     for a scenario that no criterion covers
+   - The fixture from `e2e/fixtures/` it imports, if any. Fixtures hold invented careers only; never put
+     rulebook text in a plan
 
 5. **Create Documentation**
 

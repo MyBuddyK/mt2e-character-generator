@@ -15,7 +15,7 @@ Planned: more than one career per character, and exporting to Foundry VTT.
 ```sh
 npm install
 npm run dev        # http://localhost:5173
-npm run check      # lint, typecheck, unit tests
+npm run check      # lint, typecheck, conventions check, unit tests
 npm run test:e2e   # Playwright (run `npx playwright install chromium` once first)
 ```
 
