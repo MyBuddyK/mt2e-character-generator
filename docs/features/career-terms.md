@@ -191,9 +191,6 @@ Answered by the owner on 2026-11-03:
 
 1. **Event effects:** events carry a short list of structured effects that the app applies (decision 2).
 2. **Connections:** the app only highlights connection opportunities; players work them out themselves
-   (decision 9). No group code.
-
-## Open questions
-
-1. **Saving characters.** Should a character's choices also go in the URL, so a link restores the whole
-   character on another device? It makes links much longer.
+   (decision 9). No group code. Group codes are a possible future feature, tracked in a GitHub issue.
+3. **Saving characters:** links don't restore a character. The URL holds only the seed and `?packs=`;
+   choices, overrides and notes stay in the player's browser (decision 3).
