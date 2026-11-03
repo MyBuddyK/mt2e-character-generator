@@ -1,6 +1,6 @@
 # Career rules enforcement (step 2, part 2)
 
-Status: part 2a (rule enforcement in one career) is built. Part 2b (more than one career) is built.
+Status: part 2a (rule enforcement in one career) is built. Part 2b (more than one career) and aging are built.
 
 ## Problem
 
@@ -218,6 +218,31 @@ browser.
       skill table, and no advancement roll that term.
 - [x] An officer's benefit rank is the officer rank plus the enlisted rank at commission.
 - [x] Finish career tries for a commission and counts the term limit per career.
+
+## Aging
+
+Buddy asked for the aging rules to be applied, with the player told what to adjust and able to ignore or
+override aging or take anagathics. Medical care follows the book only (Buddy's call): it pays for an ageing
+crisis, not for points lost to ordinary aging.
+
+| Field | What the app does |
+| --- | --- |
+| effect `{ "type": "reduce", "characteristics": ["STR", "DEX", "END"], "amounts": [2, 1] }` | Reduces a different characteristic, picked by the player, by each amount. When every amount left is the same and as many characteristics are left, all of them are reduced without asking. |
+| `rules.aging.crisis` `{ "costDice": 1, "costPerDie": 10000 }` | When aging takes a characteristic to 0 or below, the player picks Pay for medical care (the cost is rolled and taken from cash, the characteristics go back to 1, and every later qualification roll fails) or The character dies (the character is finished, with no mustering out). Without this field the crisis is noted for the player to resolve by hand, as before. |
+| `rules.anagathics` `{ "characteristic": "SOC", "target": 10, "costDice": 1, "costPerDie": 200000, "prisonOnNatural": 2 }` | Each term has an Anagathics checkbox. Starting needs the check; while taken, each term rolls the cost (taken from cash), rolls survival twice (either failure is a mishap), and adds the number of terms taken in a row to the aging roll. A term without them after a term with them rolls aging at once. Dice at or below `prisonOnNatural` on the starting check add a note (the Prisoner career isn't built). |
+
+- Every aging roll has an Ignore this aging result checkbox. Its dice can be overridden like any roll.
+- Cash in the summary is mustering-out cash less anagathics and medical costs; below 0 it is shown as a debt.
+- Finish career picks characteristics to reduce at random, takes no anagathics, and stops at an ageing
+  crisis for the player to decide.
+
+### Acceptance criteria (aging)
+
+- [x] A reduce effect asks for a different characteristic for each amount, and doesn't ask when there is no choice.
+- [x] An ignored aging roll changes nothing.
+- [x] With `rules.aging.crisis`, a crisis asks for care or death; care restores the characteristics to 1,
+      adds the cost, and fails later qualification rolls; death finishes the character.
+- [x] A term on anagathics adds its cost, a second survival roll and the aging DM; stopping rolls aging at once.
 
 ## Open questions
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CHARACTERISTICS } from './characteristics'
 import { SKILL_TABLES, EffectsSchema } from './effects'
 
 /**
@@ -83,14 +84,33 @@ export const RulesSchema = z.strictObject({
   skillLimits: z.strictObject({ maxLevel: z.int().min(0).optional(), totalPerIntEdu: z.int().min(0).optional() }).optional(),
   /**
    * Aging: from which term it is rolled, how many dice, the DM added per term served (usually
-   * negative), and the table.
+   * negative), and the table. Optional `crisis`: when aging takes a characteristic to 0 or below, the
+   * player chooses between medical care costing `costDice` D × `costPerDie` credits (characteristics at
+   * 0 or below go back to 1, and every later qualification roll fails) and the character's death.
    */
   aging: z.strictObject({
     fromTerm: z.int().min(1),
     dice: z.int().min(1),
     dmPerTerm: z.int(),
     table: z.array(AgingEntrySchema).min(1, 'must have at least one row').superRefine(consecutiveRolls),
+    crisis: z.strictObject({ costDice: z.int().min(1), costPerDie: z.int().min(0) }).optional(),
   }),
+  /**
+   * Optional anagathics. The player can take them in any term: starting needs a 2D check of
+   * `characteristic` against `target`. While taken, each term costs `costDice` D × `costPerDie` credits
+   * (taken from cash), needs a second survival roll, and adds the number of terms taken in a row to the
+   * aging roll. A term without them after a term with them rolls aging at once. `prisonOnNatural`: dice at
+   * or below it on the starting check are flagged for the player to apply by hand.
+   */
+  anagathics: z
+    .strictObject({
+      characteristic: z.enum(CHARACTERISTICS),
+      target: z.int().min(0).max(20),
+      costDice: z.int().min(1),
+      costPerDie: z.int().min(0),
+      prisonOnNatural: z.int().min(2).optional(),
+    })
+    .optional(),
   /**
    * Mustering out: benefit rolls per term served, extra rolls for reaching a rank, a DM on cash and
    * benefit rolls from a rank, and the most cash rolls one character may take. Optional:

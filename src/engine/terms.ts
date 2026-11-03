@@ -61,6 +61,13 @@ export type PendingChoice =
   | { kind: 'next'; key: string; forced: 'muster' | 'continue' | undefined; reason: string | undefined }
   /** Benefit roll `index` (from 0) of `count` in this career: "cash" (when `cashAllowed`) or "benefit". */
   | { kind: 'benefit'; key: string; index: number; count: number; cashAllowed: boolean }
+  /** Which characteristic of `options` a `reduce` effect lowers by `amount`. */
+  | { kind: 'characteristic'; key: string; options: Characteristic[]; amount: number }
+  /**
+   * An ageing crisis took `characteristics` to 0 or below: "care" pays for medical care (`costDice` D ×
+   * `costPerDie` credits), "die" ends the character.
+   */
+  | { kind: 'ageing-crisis'; key: string; characteristics: Characteristic[]; costDice: number; costPerDie: number }
   /** How many benefit rolls to wager on a `wager` effect: a whole number from 0 to `max`, stored as text. */
   | { kind: 'wager'; key: string; max: number; skills: string[]; target: number }
 
@@ -91,10 +98,14 @@ export interface Step {
   notes: string[]
   /** Rules the engine applied to this step, and gains a limit stopped, described for the player. */
   reasons: string[]
+  /** For an aging roll: the choice key that ignores it ("ignore"), and whether it is ignored. */
+  ignore?: { key: string; ignored: boolean }
 }
 
 /** One term. */
 export interface TermResult {
+  /** The prefix of the term's keys, e.g. "term-2" or "career-2.term-1". */
+  key: string
   /** The term's number across the whole character, from 1. */
   number: number
   /** The term's number within its career, from 1. */
@@ -113,6 +124,8 @@ export interface TermResult {
   stayReason: string | undefined
   /** True when this term's aging took a characteristic to 0 or below (an ageing crisis). */
   ageingCrisis: boolean
+  /** True when the character took anagathics in this term. */
+  anagathics: boolean
 }
 
 /** One mustering-out roll. */
@@ -196,7 +209,12 @@ export interface CareerResult {
   lostBenefitTerms: number
   /** A DM from a dm-next effect for the next career's qualification roll (used by a later career). */
   qualificationDM: number
+  /** Cash from mustering out, less `costs`. Below 0 is a debt. */
   cash: number
+  /** Credits spent on anagathics and on medical care after an ageing crisis. */
+  costs: number
+  /** True when the character died in an ageing crisis. The character is then finished. */
+  dead: boolean
   connections: ConnectionOpportunity[]
   /** The next choice to make, or undefined once the character has mustered out of the last career entered. */
   pending: PendingChoice | undefined
@@ -218,6 +236,9 @@ export interface CareerData {
   careers: CareerDefinition[]
   rules: Rules
 }
+
+/** Thrown inside buildCareer when the character dies, to end the build. */
+class Died {}
 
 /** Thrown inside buildCareer to stop at the first choice that hasn't been made. */
 class Stop {
@@ -333,6 +354,9 @@ export function buildCareer(
   const nextDM = { advancement: 0, qualification: 0 }
   let benefitDM = 0
   let cashRolls = 0
+  let costs = 0
+  let dead = false
+  let qualificationFails = false
   let promoteThisTerm = false
   const skillLimits = rules.skillLimits
 
@@ -415,15 +439,19 @@ export function buildCareer(
   const earnedBenefits = () =>
     Math.max(0, Math.max(0, rs.terms.length - rs.lostBenefitTerms) * rules.benefits.perTerm + rs.extraBenefits)
 
-  /** A step that passes without a roll (automatic qualification or promotion), with `reason`. The outcome can still be overridden. */
-  const automaticPass = (key: string, label: string, reason: string): Step => {
-    const ruled = outcomeOverride(key, true)
-    const outcome: Overridable<boolean> = ruled === undefined ? { rolled: true } : { rolled: true, override: ruled }
+  /**
+   * A step that passes (or, with `auto` false, fails) without a roll, such as automatic qualification
+   * or promotion, with `reason`. The outcome can still be overridden.
+   */
+  const automaticPass = (key: string, label: string, reason: string, auto = true): Step => {
+    const ruled = outcomeOverride(key, auto)
+    const outcome: Overridable<boolean> = ruled === undefined ? { rolled: auto } : { rolled: auto, override: ruled }
     return { key, label, passed: outcome, result: current(outcome) ? 'pass' : 'fail', applied: [], notes: [], reasons: [reason] }
   }
 
   /** Rolls the qualification check for `q`, or passes it without a roll when `q` makes it automatic. */
   const qualify = (key: string, q: Qualification, ageStart: number, extraDM: number): Step => {
+    if (qualificationFails) return automaticPass(key, 'Qualification', 'Qualification fails after an ageing crisis.', false)
     if (q.automatic) return automaticPass(key, 'Qualification', 'Automatic qualification for this career.')
     const listed = typeof q.characteristic === 'string' ? [q.characteristic] : q.characteristic
     const high = q.automaticAt === undefined ? undefined : listed.find((c) => value(c) >= (q.automaticAt ?? 0))
@@ -434,6 +462,23 @@ export function buildCareer(
     const step = check(key, 'Qualification', q, extraDM + ageDM)
     if (ageDM !== 0) step.reasons.push(`DM ${signedText(ageDM)} for age ${q.ageDM?.fromAge ?? ageStart} or more.`)
     return step
+  }
+
+  /** Returns the characteristic of `options` stored under `key`, or the only option; stops to ask when there is a choice and none is stored. */
+  const pickCharacteristic = (key: string, options: Characteristic[], amount: number): Characteristic | undefined => {
+    if (options.length <= 1) return options[0]
+    const answer = choice(key)
+    const found = options.find((o) => o === answer)
+    if (found === undefined) throw new Stop({ kind: 'characteristic', key, options, amount })
+    return found
+  }
+
+  /** Rolls `count` dice for a cost of `count` D × `perDie` credits, adds it to `costs`, and returns the step. */
+  const costRoll = (key: string, label: string, count: number, perDie: number): Step => {
+    const d = dice(key, count)
+    const amount = current(d) * perDie
+    costs += amount
+    return { key, label, dice: d, diceCount: count, dm: 0, total: current(d), result: `Cr${amount}`, applied: [], notes: [], reasons: [] }
   }
 
   /** Rolls `count` dice + `dm` on a table, using the nearest row when the total is outside it. */
@@ -623,6 +668,24 @@ export function buildCareer(
         case 'keep-benefit':
           step.applied.push("Keeps this term's benefit roll")
           break
+        case 'reduce': {
+          const picked: Characteristic[] = []
+          const amounts = effect.amounts.slice(0, effect.characteristics.length)
+          amounts.forEach((amount, j) => {
+            const options = effect.characteristics.filter((c) => !picked.includes(c))
+            const remaining = amounts.slice(j)
+            // When every amount left is the same and as many characteristics are left, each of them is reduced: no choice.
+            const c =
+              remaining.every((a) => a === amount) && options.length === remaining.length
+                ? options[0]
+                : pickCharacteristic(`${effectKey}.pick-${j}`, options, amount)
+            if (c === undefined) return
+            picked.push(c)
+            changes[c] -= amount
+            step.applied.push(`${c} -${amount}`)
+          })
+          break
+        }
         case 'mishap':
           if (career && mishapDepth === 0) {
             mishapDepth += 1
@@ -681,6 +744,49 @@ export function buildCareer(
     if (info?.bonus && !info.effects) step.notes.push(info.bonus)
     termSteps.push(step)
     applyEffects(info?.effects, key, step, termSteps, term)
+  }
+
+  /**
+   * Rolls aging under `key` with `dm`, adds `reasons` and the step to `steps`, and applies the row
+   * unless the player ignores it ("ignore" under `${key}.ignore`). An ageing crisis marks the term;
+   * with rules.aging.crisis it asks whether to pay for medical care or let the character die.
+   */
+  const ageing = (key: string, label: string, dm: number, reasons: string[], term: TermResult, steps: Step[]) => {
+    const { step, row } = tableRoll(key, label, rules.aging.dice, dm, rules.aging.table)
+    step.result = row?.summary ?? ''
+    step.reasons.push(...reasons)
+    const ignoreKey = `${key}.ignore`
+    const ignored = choice(ignoreKey) === 'ignore'
+    step.ignore = { key: ignoreKey, ignored }
+    steps.push(step)
+    if (ignored) {
+      step.reasons.push('Ignored: this aging result is not applied.')
+      return
+    }
+    if (row && !row.effects) step.notes.push(row.summary)
+    const beforeAging = { ...changes }
+    if (row) applyEffects(row.effects, key, step, steps, term)
+    const crisis = CHARACTERISTICS.filter((c) => base[c] + changes[c] <= 0 && base[c] + beforeAging[c] > 0)
+    if (crisis.length === 0) return
+    term.ageingCrisis = true
+    const care = rules.aging.crisis
+    if (!care) {
+      for (const c of crisis) step.reasons.push(`Ageing crisis: ${c} is 0 or lower. Resolve it by hand.`)
+      return
+    }
+    const crisisKey = `${key}.crisis`
+    const answer = choice(crisisKey)
+    if (answer !== 'care' && answer !== 'die') {
+      throw new Stop({ kind: 'ageing-crisis', key: crisisKey, characteristics: crisis, costDice: care.costDice, costPerDie: care.costPerDie })
+    }
+    if (answer === 'die') {
+      step.reasons.push(`Ageing crisis: ${crisis.join(', ')} 0 or lower. The character dies.`)
+      throw new Died()
+    }
+    step.reasons.push(`Ageing crisis: ${crisis.join(', ')} 0 or lower. Medical care brings them back to 1; every later qualification roll fails.`)
+    steps.push(costRoll(`${key}.crisis-cost`, 'Medical care', care.costDice, care.costPerDie))
+    for (const c of CHARACTERISTICS) if (base[c] + changes[c] <= 0) changes[c] = 1 - base[c]
+    qualificationFails = true
   }
 
   try {
@@ -782,6 +888,7 @@ export function buildCareer(
         const number = terms.length + 1
         const ageStart = rules.startingAge + (number - 1) * rules.termLength
         const term: TermResult = {
+          key: termKey,
           number,
           careerTerm: n,
           ageStart,
@@ -793,7 +900,9 @@ export function buildCareer(
           endReason: undefined,
           stayReason: undefined,
           ageingCrisis: false,
+          anagathics: false,
         }
+        const wasOnAnagathics = terms[terms.length - 1]?.anagathics ?? false
         terms.push(term)
         rs.terms.push(term)
         const steps = term.steps
@@ -828,12 +937,37 @@ export function buildCareer(
           reachRank(0, steps, term, `${termKey}.rank-0`)
         }
 
+        const drugs = rules.anagathics
+        if (drugs) {
+          if (choice(`${termKey}.anagathics`) === 'take') {
+            if (wasOnAnagathics) term.anagathics = true
+            else {
+              const start = check(`${termKey}.anagathics`, 'Anagathics', { characteristic: drugs.characteristic, target: drugs.target }, 0)
+              const natural = start.dice === undefined ? 0 : current(start.dice)
+              if (drugs.prisonOnNatural !== undefined && natural <= drugs.prisonOnNatural) {
+                start.notes.push(`Natural ${natural} on the anagathics roll: the book sends the character to prison. Apply by hand.`)
+              }
+              steps.push(start)
+              term.anagathics = passed(start)
+            }
+            if (term.anagathics) steps.push(costRoll(`${termKey}.anagathics-cost`, 'Anagathics cost', drugs.costDice, drugs.costPerDie))
+          } else if (wasOnAnagathics) {
+            ageing(`${termKey}.anagathics-stop`, 'Aging (stopped anagathics)', rules.aging.dmPerTerm * (number - 1), ['Stopping anagathics: aging is rolled at once.'], term, steps)
+          }
+        }
+
         for (let i = 0; i < rules.skillRolls.perTerm; i += 1) skillRoll(`${termKey}.skill-${i}`, steps)
 
         promoteThisTerm = false
         const survival = check(`${termKey}.survival`, 'Survival', assignment.survival, 0, rules.survival?.failOnNatural)
         steps.push(survival)
-        const survived = passed(survival)
+        let survived = passed(survival)
+        if (term.anagathics) {
+          const second = check(`${termKey}.survival-2`, 'Survival (anagathics)', assignment.survival, 0, rules.survival?.failOnNatural)
+          second.reasons.push('Anagathics: a second survival roll this term.')
+          steps.push(second)
+          survived = survived && passed(second)
+        }
         if (survived) {
           const { step, row } = tableRoll(`${termKey}.event`, 'Event', 2, 0, career.events)
           step.result = row?.summary ?? ''
@@ -908,18 +1042,11 @@ export function buildCareer(
         }
 
         if (number >= rules.aging.fromTerm) {
-          const { step, row } = tableRoll(`${termKey}.aging`, 'Aging', rules.aging.dice, rules.aging.dmPerTerm * number, rules.aging.table)
-          step.result = row?.summary ?? ''
-          if (row && !row.effects) step.notes.push(row.summary)
-          steps.push(step)
-          const beforeAging = { ...changes }
-          if (row) applyEffects(row.effects, `${termKey}.aging`, step, steps, term)
-          for (const c of CHARACTERISTICS) {
-            if (base[c] + changes[c] <= 0 && base[c] + beforeAging[c] > 0) {
-              term.ageingCrisis = true
-              step.reasons.push(`Ageing crisis: ${c} is 0 or lower. Resolve it by hand.`)
-            }
-          }
+          // Anagathics add the number of terms taken in a row, up to this one, to the aging roll.
+          let streak = 0
+          for (let i = terms.length - 1; i >= 0 && terms[i]?.anagathics; i -= 1) streak += 1
+          const reasons = streak > 0 ? [`DM +${streak} from ${streak} term${streak === 1 ? '' : 's'} on anagathics.`] : []
+          ageing(`${termKey}.aging`, 'Aging', rules.aging.dmPerTerm * number + streak, reasons, term, steps)
         }
 
         for (const step of steps) {
@@ -977,8 +1104,14 @@ export function buildCareer(
       previous = career
     }
   } catch (error) {
-    if (!(error instanceof Stop)) throw error
-    pending = error.pending
+    if (error instanceof Died) {
+      dead = true
+      finished = true
+    } else if (error instanceof Stop) {
+      pending = error.pending
+    } else {
+      throw error
+    }
   }
 
   const last = runs[runs.length - 1]
@@ -999,7 +1132,9 @@ export function buildCareer(
     benefitCount: sum((r) => r.benefitCount),
     lostBenefitTerms: sum((r) => r.lostBenefitTerms),
     qualificationDM: nextDM.qualification,
-    cash: benefits.reduce((total, b) => total + b.cash, 0),
+    cash: benefits.reduce((total, b) => total + b.cash, 0) - costs,
+    costs,
+    dead,
     connections,
     pending,
     finished,

@@ -333,3 +333,39 @@ test.describe('more than one career', () => {
     await expect(page.getByRole('group', { name: 'Choose a skill' })).toBeVisible()
   })
 })
+
+// Browser tests for aging choices and anagathics (docs/features/career-rules.md, "Aging"), with the
+// invented multi-career-pack.json, whose aging starts in term 1.
+test.describe('aging and anagathics', () => {
+  /** Opens ?seed=terms, imports multi-career-pack.json, starts Test wanderer and picks Service skills. */
+  async function startWanderer(page: Page): Promise<void> {
+    await page.goto('./?seed=terms')
+    await importFixture(page, 'multi-career-pack.json')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Test wanderer' })
+    await page.getByRole('button', { name: 'Start career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+  }
+
+  // Sets the term 1 aging dice to 2 (reduce two physical characteristics by 2 and 1), expects the
+  // characteristic choice, then ticks Ignore and expects the choice gone and the after-term choice shown.
+  test('aging asks which characteristic to reduce, and can be ignored', async ({ page }) => {
+    await startWanderer(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Advancement', 2)
+    await setDice(page, 'Term 1 Aging', 2)
+    const pick = page.getByRole('group', { name: 'Choose a characteristic' })
+    await expect(pick).toContainText('Reduce which characteristic by 2?')
+    await page.getByRole('checkbox', { name: /Ignore this aging result/ }).check()
+    await expect(pick).toHaveCount(0)
+    await expect(page.getByRole('group', { name: 'After this term' })).toBeVisible()
+  })
+
+  // Ticks Anagathics for term 1, sets the SOC roll to 12, and expects the cost roll and a second survival roll.
+  test('anagathics add a cost and a second survival roll', async ({ page }) => {
+    await startWanderer(page)
+    await page.getByRole('checkbox', { name: 'Anagathics in term 1' }).check()
+    await setDice(page, 'Term 1 Anagathics', 12)
+    await expect(page.getByTestId('step-term-1.anagathics-cost')).toBeVisible()
+    await expect(page.getByTestId('step-term-1.survival-2')).toBeVisible()
+  })
+})

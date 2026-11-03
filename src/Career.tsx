@@ -139,6 +139,19 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
           </>
         )}
       </div>
+      {step.ignore && (
+        <label className="step-ignore">
+          <input
+            type="checkbox"
+            checked={step.ignore.ignored}
+            onChange={(e) => {
+              const key = step.ignore?.key
+              if (key !== undefined) onChange({ ...input, choices: setKey(input.choices, key, e.target.checked ? 'ignore' : undefined) })
+            }}
+          />{' '}
+          Ignore this aging result<span className="visually-hidden"> ({name})</span>
+        </label>
+      )}
       {step.applied.length > 0 && <div className="step-applied">Applied: {step.applied.join(', ')}</div>}
       {step.reasons.map((r, i) => (
         <div className="step-reason" key={`${i}-${r}`} data-testid="step-reason">
@@ -156,13 +169,19 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
 
 interface TermProps {
   term: TermResult
+  /** True when the rules allow anagathics, which adds the Anagathics checkbox. */
+  anagathics: boolean
   input: CareerInput
   onChange: (next: CareerInput) => void
 }
 
-/** Renders one term: its age range and rank, its steps, why the career ends (if it does), and a notes field. */
-function Term({ term, input, onChange }: TermProps) {
+/**
+ * Renders one term: its age range and rank, an Anagathics checkbox when the rules allow them, its
+ * steps, why the career ends (if it does), and a notes field.
+ */
+function Term({ term, anagathics, input, onChange }: TermProps) {
   const notesKey = `term-${term.number}`
+  const drugsKey = `${term.key}.anagathics`
   return (
     <li className="term" data-testid={`term-${term.number}`}>
       <div className="term-head">
@@ -174,6 +193,16 @@ function Term({ term, input, onChange }: TermProps) {
           {term.officer ? 'officer rank' : 'rank'} {term.rank}
           {term.title ? ` ${term.title}` : ''}
         </span>
+        {anagathics && (
+          <label className="term-anagathics">
+            <input
+              type="checkbox"
+              checked={input.choices[drugsKey] === 'take'}
+              onChange={(e) => onChange({ ...input, choices: setKey(input.choices, drugsKey, e.target.checked ? 'take' : undefined) })}
+            />{' '}
+            Anagathics<span className="visually-hidden"> in term {term.number}</span>
+          </label>
+        )}
       </div>
       <ul className="steps">
         {term.steps.map((step) => (
@@ -254,6 +283,34 @@ function Pending({ pending, input, onChange, onGenerate }: PendingProps) {
             Skip commission
           </button>
           {generate}
+        </div>
+      )
+    case 'characteristic':
+      return (
+        <div className="pending" role="group" aria-label="Choose a characteristic">
+          <p>Reduce which characteristic by {pending.amount}?</p>
+          {pending.options.map((c) => (
+            <button type="button" key={c} onClick={() => choose(pending.key, c)}>
+              {c}
+            </button>
+          ))}
+          {generate}
+        </div>
+      )
+    case 'ageing-crisis':
+      return (
+        <div className="pending" role="group" aria-label="Ageing crisis">
+          <p data-testid="ageing-crisis-notice">
+            Ageing crisis: {pending.characteristics.join(', ')} at 0 or below. Medical care costs {pending.costDice}D × Cr
+            {pending.costPerDie}, taken from cash (a debt if cash runs out); it brings them back to 1, and every later
+            qualification roll fails. Without it the character dies. You can also ignore or override the aging roll.
+          </p>
+          <button type="button" onClick={() => choose(pending.key, 'care')}>
+            Pay for medical care
+          </button>
+          <button type="button" onClick={() => choose(pending.key, 'die')}>
+            The character dies
+          </button>
         </div>
       )
     case 'skill-table':
@@ -405,6 +462,8 @@ function StartForm({ careers, prefix, exclude, input, onChange }: StartFormProps
 
 interface RunProps {
   run: CareerRun
+  /** True when the rules allow anagathics. */
+  anagathics: boolean
   input: CareerInput
   onChange: (next: CareerInput) => void
 }
@@ -413,7 +472,7 @@ interface RunProps {
  * Renders one career entered: its name and assignment (with a heading from the second career on),
  * the qualification roll, how a Draft or fallback career was entered, its terms and its mustering out.
  */
-function Run({ run, input, onChange }: RunProps) {
+function Run({ run, anagathics, input, onChange }: RunProps) {
   const context = run.index === 1 ? 'Career' : `Career ${run.index}`
   return (
     <div className="career-run" data-testid={`career-run-${run.index}`}>
@@ -435,7 +494,7 @@ function Run({ run, input, onChange }: RunProps) {
       {run.terms.length > 0 && (
         <ol className="terms">
           {run.terms.map((t) => (
-            <Term key={t.number} term={t} input={input} onChange={onChange} />
+            <Term key={t.number} term={t} anagathics={anagathics} input={input} onChange={onChange} />
           ))}
         </ol>
       )}
@@ -528,7 +587,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
             <StartForm careers={careers} prefix="" exclude={[]} input={input} onChange={update} />
           )}
           {result.runs.map((run) => (
-            <Run key={run.index} run={run} input={input} onChange={update} />
+            <Run key={run.index} run={run} anagathics={rules.rules.anagathics !== undefined} input={input} onChange={update} />
           ))}
           {pending?.kind === 'start' && (
             <>
@@ -563,6 +622,17 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
           {result.finished && (
             <div className="summary" data-testid="career-summary">
               <h3>Finished character</h3>
+              {result.dead && (
+                <p className="notice" data-testid="summary-dead">
+                  The character died in an ageing crisis.
+                </p>
+              )}
+              {result.costs > 0 && (
+                <p data-testid="summary-costs">
+                  Anagathics and medical care cost Cr{result.costs}, taken from cash
+                  {result.cash < 0 ? `, leaving a debt of Cr${-result.cash}` : ''}.
+                </p>
+              )}
               <p>
                 Age <strong data-testid="summary-age">{result.age}</strong>,{' '}
                 {result.runs[result.runs.length - 1]?.officerRank !== undefined ? 'officer rank' : 'rank'} {result.rank}
