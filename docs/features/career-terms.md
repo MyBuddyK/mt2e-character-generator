@@ -11,17 +11,18 @@ click, and to change any roll or choice the generator made.
 
 ## Scope and order
 
-Step 2 is split into three pull requests, each with its own part of this spec. This document covers part 1
-in full. Parts 2 and 3 are planned and are listed here only so part 1 doesn't block them.
+Step 2 is split into two pull requests. This document covers part 1 in full. Part 2 is planned and is
+listed here only so part 1 doesn't block it.
 
 1. **Part 1 (this spec): one career, term by term.** Qualification, basic training, skill rolls, survival,
    events, mishaps, advancement and rank bonuses, aging, choosing to continue or leave, and mustering out.
-   Step-through, generate-the-rest, and overrides for every roll and choice.
+   Step-through, generate-the-rest, overrides for every roll and choice, and highlighted connection
+   opportunities.
 2. **Part 2 (planned): more than one career.** Leaving one career and qualifying for the next, and the
    fallback when qualification fails. Commissions for careers that have them.
-3. **Part 3 (planned): connections between characters.** Linking an event on one character to another
-   character in the same group, and showing those links. How characters in a group find each other is an
-   open question (see the end of this spec).
+
+Connections between characters are only highlighted (decision 9). The app does not link characters across
+players' browsers, so there is no group code and no server.
 
 ## Decisions
 
@@ -44,7 +45,8 @@ in full. Parts 2 and 3 are planned and are listed here only so part 1 doesn't bl
    - `leave-career`: the character leaves the career at the end of this term
    - `mishap`: roll on the mishap table without leaving the career
 
-   An entry with no `effects`, or with effects that need judgement, is shown as a note. The player applies
+   The owner chose structured effects on 2026-11-03. An entry with no `effects`, or with effects that need
+   judgement, is shown as a note. The player applies
    it by hand with the override controls and can type what happened in a free-text field on that term.
    Older packs without `effects` still load.
 
@@ -81,6 +83,12 @@ in full. Parts 2 and 3 are planned and are listed here only so part 1 doesn't bl
 8. **Mustering out happens once, at the end.** The player rolls each benefit, picking the cash or benefit
    table for each one. Rank bonuses and benefit DMs from events are applied. The result is a list of cash
    and benefit entries, each overridable.
+
+9. **Connections are highlighted, and the players work them out.** Events and mishaps whose data has
+   `connection: true` get a Connection marker in the term summary. The finished character also has a
+   **Connection opportunities** list with every marked event, its term and its summary, so players can go
+   through them together at the table. The app does not record who a connection is with beyond the term's
+   free-text notes.
 
 ## User flow
 
@@ -163,6 +171,8 @@ At 320px wide the term rows stack, as the characteristics table does now.
 - [ ] An event with no `effects` shows its summary and a notes field, and the character is unchanged until
       the player edits it.
 - [ ] Events with `connection: true` show a Connection marker in the term summary.
+- [ ] The finished character's Connection opportunities list shows each marked event with its term, and
+      is empty with a short line when there are none.
 - [ ] Continue in career adds a term, and the age goes up by the term length from `rules`.
 - [ ] Aging is rolled once the age reaches the threshold in `rules`, and not before.
 - [ ] Generate the rest finishes the character and stops at mustering out, and each choice it made can be
@@ -175,12 +185,15 @@ At 320px wide the term rows stack, as the characteristics table does now.
 - [ ] At 320px wide the page does not scroll sideways with three terms shown.
 - [ ] The Career section can be used with the keyboard alone.
 
+## Resolved questions
+
+Answered by the owner on 2026-11-03:
+
+1. **Event effects:** events carry a short list of structured effects that the app applies (decision 2).
+2. **Connections:** the app only highlights connection opportunities; players work them out themselves
+   (decision 9). No group code.
+
 ## Open questions
 
-1. **Structured effects (decision 2).** Is the short list of effects enough to start with, with the rest
-   as notes? Or would you rather every event be a note for now, so the packs stay simpler to write?
-2. **Connections across players (part 3).** Each player uses their own browser. Should characters find
-   each other through a shared group code that only links notes (for example "linked to Kai's term 2
-   event"), or should the referee collect everyone's exported characters and link them in one place?
-3. **Saving characters.** Should a character's choices also go in the URL, so a link restores the whole
+1. **Saving characters.** Should a character's choices also go in the URL, so a link restores the whole
    character on another device? It makes links much longer.
