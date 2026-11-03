@@ -5,7 +5,7 @@ Status: proposed. Nothing in this spec is built yet.
 ## Problem
 
 The public site can only include the invented sample career. Under item 3 of Mongoose Publishing's Fair Use
-Policy, the real career tables must stay out of the public repo. The referee builds a career file from their own
+Policy (FAQ dated May 1, 2025), the real career tables must stay out of the public repo. The referee builds a career file from their own
 books and shares it privately with their players. Each player needs a way to load that file into the public site,
 either from their device or from a link, and keep it between visits.
 
@@ -36,13 +36,22 @@ either from their device or from a link, and keep it between visits.
 
 2. **Validation matches the bundled careers.** The app checks a pack with a new zod `CareerPackSchema`, then
    checks each career with `CareerSchema`. Invalid careers are skipped and listed by pack name, career index and
-   field, and the valid ones still load. This is the same rule `loadCareers` uses for bundled files. A career id
-   used by more than one loaded pack, or by the sample, is reported, and only the first one loaded is kept.
+   field, and the valid ones still load. This differs from `loadCareers` for bundled files, which leaves out a
+   whole file when any field in it fails.
+   - **Duplicate career ids.** A career id used by more than one loaded pack is reported. The career kept is the
+     one from the pack whose `id` sorts first, so the result doesn't depend on the order the player imported the
+     packs in, and two players with the same `?packs=` set get the same careers.
+   - The sample career takes no part in this check while any pack is loaded, because it is hidden then
+     (decision 4). A pack career may reuse the sample's id.
 
 3. **Storage stays in the player's browser.** Packs are saved in `localStorage` under one key,
    `mt2e.careerPacks.v1`, as the raw pack JSON plus the time it was imported. The app never uploads a pack to
-   any server; URL loading only downloads one. Every read and write is wrapped in try/catch. If storage is unavailable (private browsing,
-   blocked site data), packs stay loaded for that visit only, and the app says so.
+   any server; URL loading only downloads one. Every read and write is wrapped in try/catch.
+   - If storage is unavailable (private browsing, blocked site data), packs stay loaded for that visit only, and
+     the app says so.
+   - If a write fails after storage has worked, for example with `QuotaExceededError`, the value already saved
+     under the key is left as it was, the new pack stays loaded for that visit only, and the app says the pack
+     could not be saved and names it.
 
 4. **The sample career is hidden once a pack is loaded.** With nothing loaded, the site lists the invented
    sample career (`sample-sanitation.json`, an orbital sanitation job), marked "Sample", so it can be used
@@ -54,7 +63,9 @@ either from their device or from a link, and keep it between visits.
    - **URL:** the player pastes an `https://` link. The app fetches it with `fetch(url)` and checks the
      response the same way as a file. Plain `http://` links and other schemes are refused.
    - A pack loaded from a URL is saved with its URL. A **Check for update** button fetches it again and, if
-     the `revision` is higher, offers to replace the saved copy.
+     its fingerprint differs from the saved copy, offers to replace it, showing both revisions and
+     fingerprints. If the fingerprint changed but the `revision` did not go up, the offer also says the
+     referee may have forgotten to raise it.
    - A browser can only read a file from another site when that site's server allows it, through the CORS
      `Access-Control-Allow-Origin` header. Some file hosts send that header for raw file links and some
      don't. When the request is blocked, the app says the host doesn't allow loading from other sites, and
@@ -72,10 +83,14 @@ either from their device or from a link, and keep it between visits.
 
 7. **Authoring help for the referee.**
    - A JSON Schema generated from the zod schemas with `z.toJSONSchema`, published with the site as
-     `career-pack.schema.json`. Editors such as VS Code then show completions and errors while typing a pack.
+     `career-pack.schema.json`. Editors that read JSON Schema, such as VS Code, can use it for field names,
+     types and required fields. The checks written as `superRefine` (each roll in a table covered once,
+     unique assignment ids and rank values) are not in the JSON Schema; only the app and `validate-pack` run
+     them.
    - `npm run validate-pack <file>`, which prints the same messages the app would show.
-   - A git-ignored `careers-private/` folder in the repo for the referee's own packs, so they can't be committed
-     by accident.
+   - A `careers-private/` folder in the repo for the referee's own packs, listed in `.gitignore` so that
+     `git add .` and `git status` skip it. `git add -f` still commits files there, so the folder lowers the
+     chance of committing a pack by accident but does not prevent it.
 
 ## User flow
 
@@ -165,6 +180,13 @@ part of this spec.
 - [ ] Entering an `http://` URL shows an alert saying only `https://` links are accepted, and no request is made.
 - [ ] Check for update on a URL pack whose route now serves a higher revision asks to replace it, and shows
       both revisions.
+- [ ] Check for update on a URL pack whose route serves changed content with the same revision asks to
+      replace it and says the revision was not raised.
+- [ ] Two packs that define the same career id, imported in either order, keep the career from the pack whose
+      `id` sorts first and report the duplicate.
+- [ ] A pack career with the id `sample-sanitation` is listed after import.
+- [ ] With an import's storage write made to throw `QuotaExceededError`, the pack loads for the visit, the
+      not-saved notice names it, and the packs saved before it are still listed after a reload.
 - [ ] A shared link with `?packs=` that doesn't match the loaded packs shows the mismatch notice, and Reroll
       still works.
 - [ ] The import control can be reached and used with the keyboard alone.

@@ -214,7 +214,8 @@ describe('career data', () => {
     expect(errors).toContainEqual(expect.stringMatching(/^musteringOut\.0\.benefit: /))
   })
 
-  // Gives both assignments the same id and expects a duplicate id message.
+  // Replaces the sample's assignments with two copies of its first assignment and expects a duplicate id
+  // message naming that id.
   it('reports duplicate assignment ids', () => {
     const data = sample()
     const [first] = sampleCareer.assignments
