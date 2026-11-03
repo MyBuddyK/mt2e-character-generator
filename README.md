@@ -33,7 +33,9 @@ design and Playwright testing live in `.claude/agents` (see `CLAUDE.md`).
 
 ## License
 
-Code is released under the MIT License (see `LICENSE`). Career data files you add are your own.
+Code is released under the PolyForm Noncommercial License 1.0.0 (see `LICENSE.md`). You may use, change and
+share it for any noncommercial purpose; commercial use is not permitted. This matches the non-commercial
+terms of Mongoose Publishing's Fair Use Policy, which covers the game material this tool works with.
 
 ## Legal
 
