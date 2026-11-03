@@ -24,7 +24,9 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
    `/opt/pw-browsers`), set `PW_CHROMIUM_PATH` to its `chrome` binary instead of running
    `playwright install`.
 2. For CI, read the latest GitHub Actions run for the branch and download the `playwright-report` artifact
-   if one exists.
+   if one exists. The weekly "Flakiness check" workflow (`.github/workflows/flaky.yml`) runs every test
+   three times with no retries; read its `flakiness-report` artifact for tests that failed in some
+   repeats only.
 3. To check whether a failure is flaky, rerun only that test several times:
    `npx playwright test <file>:<line> --repeat-each=5`.
 4. Classify each failure:
@@ -57,9 +59,9 @@ To clean them up:
    can't name one, keep the test.
 2. Before removing a duplicate, move any assertion it has that the kept test lacks into the kept test, and
    update the kept test's comment so it still states the setup, action and expected result.
-3. If the removed test's name or comment matches an acceptance criterion in `docs/features/`, the kept
-   test's name or comment must match that criterion too. If you can't tell which criterion a test checks,
-   keep it.
+3. If the removed test's `// Criteria:` comment names an id, the kept test's comment must name it too,
+   so `npm run check:conventions` still finds a test for every ticked criterion. If you can't tell which
+   criterion a test checks, keep it.
 4. Run `npm run check` and `npm run test:e2e` after the changes. Both must pass.
 5. Make the cleanup its own commit, separate from any fix. In the commit message, list each removed test
    and the test that replaces it, or the spec line that removed the behavior. Report the test counts the

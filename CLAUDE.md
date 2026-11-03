@@ -9,6 +9,13 @@ also the owner's portfolio project.
 - `npm run dev`: local dev server
 - `npm run check`: lint (oxlint), typecheck (tsc), the conventions check (`npm run check:conventions`) and unit
   tests (Vitest). Run before every commit.
+- `npm run test:coverage`: the unit tests with a v8 coverage report of `src/engine`, `src/storage` and
+  `scripts` in `coverage/` (git-ignored). CI runs it and shows the totals on the run's summary page. No
+  threshold is set.
+- `npm run test:mutation`: Stryker mutation testing of `src/engine` (`stryker.config.json`, with
+  `vitest.stryker.config.ts`, which leaves out the seed sweeps). Reports go to the git-ignored
+  `reports/mutation/`. `.github/workflows/mutation.yml` runs it monthly and by hand;
+  `.github/workflows/flaky.yml` runs the browser suite three times with no retries every week.
 - `npm run test:e2e`: Playwright against a production build. In a sandbox with a preinstalled browser,
   set `PW_CHROMIUM_PATH` to its `chrome` binary.
 
@@ -30,11 +37,11 @@ also the owner's portfolio project.
   `rules` values. `src/data/rules/sample-rules.json`: invented rules. `src/use-career.ts` and
   `src/Career.tsx`: the Career section; `src/storage/characters.ts` saves career input per seed.
 - `scripts/`: `validate-pack`, `schema` (writes the git-ignored `public/career-pack.schema.json`) and
-  `check-conventions` (see Documentation rules), run with tsx and typechecked by `tsconfig.scripts.json`.
+  `check-conventions` (see Documentation rules) and `coverage-summary` (the CI coverage table), run with tsx and typechecked by `tsconfig.scripts.json`.
 - `src/engine/invariants.test.ts`: seed sweeps that run the same check on a fixed list of seeds, for rules
   that should hold for any seed (repeatability, characteristic ranges, how Finish career ends).
 - `src/App.tsx`: UI.
-- `e2e/`: Playwright specs. `e2e/fixtures/` holds invented career packs used by the specs and unit tests. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
+- `e2e/`: Playwright specs. `e2e/accessibility.spec.ts` runs axe-core (WCAG A and AA rules) on five page states. `e2e/fixtures/` holds invented career packs used by the specs and unit tests. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
   relative URLs (`./?seed=x`) so they run under any `BASE_PATH`; CI runs them at `/` and at the Pages path.
 - `specs/`: test plans from the planner agent. `docs/features/`: feature specs from `feature-designer`.
 
@@ -75,8 +82,15 @@ plans.
 
 `npm run check:conventions` (`scripts/check-conventions.ts`) checks the parts a script can find: an
 exported declaration or a test block with no comment above it, a skipped, focused or todo test, and
-phrases from its `BANNED_PHRASES` list. Whether a comment is
-accurate is left to review.
+phrases from its `BANNED_PHRASES` list. Whether a comment is accurate is left to review.
+
+## Acceptance criteria and tests
+
+Each acceptance criterion in `docs/features/` starts with an id: `PK-n` (career-import), `CT-n`
+(career-terms) or `CR-n` (career-rules). A test that checks a criterion names it on the last line of its
+comment, `// Criteria: CT-4, CT-6.` `npm run check:conventions` fails when a criterion has no id, an id is
+used twice, a test names an id that doesn't exist, or a ticked (`[x]`) criterion is named by no test.
+Don't renumber ids; add new ones after the last.
 
 ## Other rules
 

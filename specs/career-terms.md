@@ -15,34 +15,35 @@ length of 4, aging from term 3, one benefit roll per term and a cash roll limit 
 ## Criteria coverage
 
 Each acceptance criterion in the feature spec, and the test that checks it. "Plan" rows are the scenarios
-below.
+below. Each test also names its criteria in a `// Criteria: CT-n.` comment, which `npm run check:conventions`
+checks.
 
-| # | Criterion (shortened) | Checked by |
+| Id | Criterion (shortened) | Checked by |
 | - | --- | --- |
-| 1 | Same seed, same first term | e2e: "the same seed gives the same first term" |
-| 2 | Failing survival gives a mishap, no advancement | e2e: "a failing survival roll gives a mishap; reset brings back the event" |
-| 3 | Resetting the override brings the event back | e2e: same test as 2 |
-| 4 | Advancement override does not change the term 2 skill roll | Plan 1.4 |
-| 5 | Event `skill` effect adds the skill | e2e: "an event with a skill effect adds the chosen skill" |
-| 6 | Rank `skill` effect adds the skill; `bonus` only is a note | Plan 1.2 and 1.3 |
-| 7 | First term adds basic training skills | Plan 1.1 |
-| 8 | After failed survival, Muster out and no Continue | e2e: same test as 2 |
-| 9 | Benefit total above the table uses the highest row | Unit-level: `terms.test.ts` "a benefit total above the table uses the highest row and says so". The sample career's benefit total reaches 8 only at rank 3 with an event DM, which takes several terms of set-up in the browser. |
-| 10 | Two packs with different `rules` | e2e: "with two packs that have different rules, the first by id is used" |
-| 11 | Saved seed with other packs, Start over | e2e: "saved choices made with other packs ask before applying" |
-| 12 | Version 1 pack with `effects` is rejected | e2e: "a version 1 pack that uses effects is rejected" |
-| 13 | Event without `effects` is a note | e2e: "an event without effects is shown as a note" |
-| 14 | Connection marker | e2e: "a connection event shows the Connection marker" |
-| 15 | Connection opportunities list, and its empty line | e2e: "the finished character lists connection opportunities"; empty line: Plan 1.6 |
-| 16 | Continue in career adds a term, age goes up | e2e: "continue in career adds a term four years later" |
-| 17 | Aging from the threshold, not before | Plan 1.5 |
-| 18 | Finish career finishes, choices can change | e2e: "finish career finishes the character and its choices can still be changed" |
-| 19 | Leave career gives the benefit rolls in `rules` | e2e: "leaving gives the benefit rolls set in the rules" |
-| 20 | Cash or benefit per roll, cash within the limit | Plan 1.7; switching a roll after it is made: unit-level, `terms.test.ts` "stops offering cash once the cash roll limit is reached" |
-| 21 | Choices, overrides and notes kept after reload | e2e: "choices, overrides and notes are kept after a reload" |
-| 22 | Sample rules notice | e2e: "the sample rules notice is shown with only bundled data" |
-| 23 | No sideways scroll at 320px with three terms | e2e: "the Career section fits at 320px with three terms" |
-| 24 | Keyboard only | e2e: "the Career section works with the keyboard" |
+| CT-1 | Same seed, same first term | e2e: "the same seed gives the same first term" |
+| CT-2 | Failing survival gives a mishap, no advancement | e2e: "a failing survival roll gives a mishap; reset brings back the event" |
+| CT-3 | Resetting the override brings the event back | e2e: same test as 2 |
+| CT-4 | Advancement override does not change the term 2 skill roll | Plan 1.4 |
+| CT-5 | Event `skill` effect adds the skill | e2e: "an event with a skill effect adds the chosen skill" |
+| CT-6 | Rank `skill` effect adds the skill; `bonus` only is a note | Plan 1.2 and 1.3 |
+| CT-7 | First term adds basic training skills | Plan 1.1 |
+| CT-8 | After failed survival, Muster out and no Continue | e2e: same test as 2 |
+| CT-9 | Benefit total above the table uses the highest row | Unit-level: `terms.test.ts` "a benefit total above the table uses the highest row and says so". The sample career's benefit total reaches 8 only at rank 3 with an event DM, which takes several terms of set-up in the browser. |
+| CT-10 | Two packs with different `rules` | e2e: "with two packs that have different rules, the first by id is used" |
+| CT-11 | Saved seed with other packs, Start over | e2e: "saved choices made with other packs ask before applying" |
+| CT-12 | Version 1 pack with `effects` is rejected | e2e: "a version 1 pack that uses effects is rejected" |
+| CT-13 | Event without `effects` is a note | e2e: "an event without effects is shown as a note" |
+| CT-14 | Connection marker | e2e: "a connection event shows the Connection marker" |
+| CT-15 | Connection opportunities list, and its empty line | e2e: "the finished character lists connection opportunities"; empty line: Plan 1.6 |
+| CT-16 | Continue in career adds a term, age goes up | e2e: "continue in career adds a term four years later" |
+| CT-17 | Aging from the threshold, not before | Plan 1.5 |
+| CT-18 | Finish career finishes, choices can change | e2e: "finish career finishes the character and its choices can still be changed" |
+| CT-19 | Leave career gives the benefit rolls in `rules` | e2e: "leaving gives the benefit rolls set in the rules" |
+| CT-20 | Cash or benefit per roll, cash within the limit | Plan 1.7; switching a roll after it is made: unit-level, `terms.test.ts` "stops offering cash once the cash roll limit is reached" |
+| CT-21 | Choices, overrides and notes kept after reload | e2e: "choices, overrides and notes are kept after a reload" |
+| CT-22 | Sample rules notice | e2e: "the sample rules notice is shown with only bundled data" |
+| CT-23 | No sideways scroll at 320px with three terms | e2e: "the Career section fits at 320px with three terms" |
+| CT-24 | Keyboard only | e2e: "the Career section works with the keyboard" |
 
 ## 1. Career terms plan
 
@@ -50,7 +51,7 @@ below.
 
 ### 1.1 Basic training applies in the first term only
 
-**Criterion:** career-terms.md #7, "The first term adds the skills from the `basicTraining` table at the
+**Criterion:** CT-7, "The first term adds the skills from the `basicTraining` table at the
 level in `rules`."
 
 **Steps:**
@@ -67,7 +68,7 @@ level in `rules`."
 
 ### 1.2 A rank with a skill effect applies the skill
 
-**Criterion:** career-terms.md #6, first half.
+**Criterion:** CT-6, first half.
 
 **Steps:**
 1. Open `./?seed=terms`, click **Start career**, then **Service skills**.
@@ -79,7 +80,7 @@ level in `rules`."
 
 ### 1.3 A rank with only a bonus is shown as a note
 
-**Criterion:** career-terms.md #6, second half.
+**Criterion:** CT-6, second half.
 
 **Fixture:** `e2e/fixtures/valid-pack.json` (format version 1, ranks with `bonus` and no `effects`).
 
@@ -94,7 +95,7 @@ level in `rules`."
 
 ### 1.4 Overriding term 1 advancement does not move the term 2 skill roll
 
-**Criterion:** career-terms.md #4.
+**Criterion:** CT-4.
 
 **Steps:**
 1. Open `./?seed=terms`, click **Start career**, then **Service skills**.
@@ -110,7 +111,7 @@ level in `rules`."
 
 ### 1.5 Aging is rolled from term 3, not before
 
-**Criterion:** career-terms.md #17.
+**Criterion:** CT-17.
 
 **Steps:**
 1. Open `./?seed=terms`, click **Start career**, then **Service skills**.
@@ -124,7 +125,7 @@ field.
 
 ### 1.6 A character with no connection events shows the empty line
 
-**Criterion:** career-terms.md #15, second half ("is empty with a short line when there are none").
+**Criterion:** CT-15, second half ("is empty with a short line when there are none").
 
 **Steps:**
 1. Open `./?seed=terms`, click **Start career**, then **Service skills**.
@@ -139,7 +140,7 @@ opportunities." and no connections list.
 
 ### 1.7 The cash roll limit disables Cash and the cash total adds up
 
-**Criterion:** career-terms.md #20, "the cash total stays within the limit in `rules`".
+**Criterion:** CT-20, "the cash total stays within the limit in `rules`".
 
 **Steps:**
 1. Open `./?seed=terms`, click **Start career**, then **Service skills**.

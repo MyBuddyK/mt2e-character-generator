@@ -85,6 +85,7 @@ describe('parseCareerPack', () => {
 
   // Parses the partly invalid fixture and expects the valid career to load and the other to be
   // reported by index, id and field.
+  // Criteria: PK-8.
   it('skips an invalid career and reports it by index and field', () => {
     const result = parseCareerPack(partlyInvalidPack)
     expect(result.ok && result.careers.map((c) => c.id)).toEqual(['test-courier'])
@@ -106,6 +107,7 @@ describe('parseCareerPack', () => {
   })
 
   // Parses the later-version fixture (formatVersion 3) and expects a message naming versions 1 and 2.
+  // Criteria: PK-7.
   it('rejects a later format version and names the supported version', () => {
     expect(parseCareerPack(laterVersionPack)).toMatchObject({
       ok: false,
@@ -203,6 +205,7 @@ describe('combineCareers', () => {
   const bundled = [renamed(validCareers()[0] ?? fail(), 'sample-sanitation', 'Sample')]
 
   // Passes no packs and expects the bundled careers back with no problems.
+  // Criteria: PK-1.
   it('returns the bundled careers when no pack is loaded', () => {
     expect(combineCareers(bundled, [])).toEqual({ careers: bundled, problems: [] })
   })
@@ -217,6 +220,7 @@ describe('combineCareers', () => {
 
   // Builds packs "a-pack" and "b-pack" that share a career id, passes them in both orders, and expects
   // the career from "a-pack" each time, with the duplicate reported.
+  // Criteria: PK-17.
   it('keeps the career from the pack whose id sorts first, whatever the import order', () => {
     const [career] = validCareers()
     if (!career) fail()
@@ -345,6 +349,7 @@ describe('fetchCareerPack', () => {
   }
 
   // Passes http, ftp and non-URL text, and expects "not-https" with no request made.
+  // Criteria: PK-14.
   it('refuses links that are not https without making a request', async () => {
     const { fetchFn, calls } = stub(() => Promise.resolve(new Response('{}')))
     for (const url of ['http://packs.test/a.json', 'ftp://packs.test/a.json', 'packs.test/a.json']) {

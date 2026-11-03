@@ -1,0 +1,32 @@
+name: Flakiness check
+
+# Runs the Playwright suite with every test repeated three times and no retries, every Monday at
+# 06:00 UTC and when started by hand. A test that fails in some repeats and passes in others shows
+# up as a failure here even though the CI workflow's retries would pass it. The HTML report is
+# uploaded for the playwright-test-monitor agent to read. This workflow does not deploy.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --repeat-each=3 --retries=0
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: flakiness-report
+          path: playwright-report/
+          retention-days: 30

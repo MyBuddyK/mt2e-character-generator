@@ -19,7 +19,8 @@ You will:
    - Plan browser scenarios for criteria a player can observe in the page. Leave out criteria that are
      rules arithmetic with no UI of their own; list them under "Unit-level criteria" with the unit test
      that checks each one, or "none found"
-   - Skip criteria that an existing spec in `e2e/` already checks, and list them with that spec's name
+   - Skip criteria that an existing test already checks (its `// Criteria:` comment names the id), and
+     list them with that test's name in a "Criteria coverage" table, as in `specs/career-terms.md`
 
 1. **Navigate and Explore**
    - Invoke the `planner_setup_page` tool once to set up page before using any other tools
@@ -48,8 +49,8 @@ You will:
    - Assumptions about starting state (always assume blank/fresh state)
    - The starting URL with a fixed `?seed=` value, so the rolled values are the same on every run
    - Success criteria and failure conditions
-   - The acceptance criterion it checks, as the feature spec file and the criterion text, or "none"
-     for a scenario that no criterion covers
+   - The acceptance criterion it checks, by its id (for example `CT-4`), or "none" for a scenario that
+     no criterion covers
    - The fixture from `e2e/fixtures/` it imports, if any. Fixtures hold invented careers only; never put
      rulebook text in a plan
 

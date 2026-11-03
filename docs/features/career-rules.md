@@ -120,35 +120,35 @@ Requested by the owner on 2026-11-03, for events where the character bets benefi
 
 ## Acceptance criteria (part 2a)
 
-Unit tests in `src/engine/terms.test.ts` ("buildCareer rule enforcement") check each criterion; the e2e
-specs in `e2e/career.spec.ts` ("career rule enforcement") check the natural 2 and natural 12 cases in the
-browser.
+Most of these are checked by unit tests in `src/engine/terms.test.ts` ("buildCareer rule enforcement");
+the e2e specs in `e2e/career.spec.ts` ("career rule enforcement") check the natural 2 and natural 12 cases
+in the browser. Each test names the criteria it checks in a `// Criteria:` comment.
 
-- [x] With `rules.survival.failOnNatural` set, survival dice of 2 fail even when the DM would make the total
+- [x] **CR-1** With `rules.survival.failOnNatural` set, survival dice of 2 fail even when the DM would make the total
       pass, and the step shows the reason.
-- [x] With `rules.benefits.mishapLosesTerm` true, leaving after a term-2 mishap gives benefit rolls for
+- [x] **CR-2** With `rules.benefits.mishapLosesTerm` true, leaving after a term-2 mishap gives benefit rolls for
       term 1 only (plus rank extras).
-- [x] With `rules.advancement.leaveAtOrBelowTerms` true, an advancement total at or below the terms served
+- [x] **CR-3** With `rules.advancement.leaveAtOrBelowTerms` true, an advancement total at or below the terms served
       offers only Muster out, with the reason.
-- [x] With `rules.advancement.stayOnNatural` set to 12, advancement dice of 12 offer only Continue in career,
+- [x] **CR-4** With `rules.advancement.stayOnNatural` set to 12, advancement dice of 12 offer only Continue in career,
       with the reason.
-- [x] Overriding the outcome of a survival roll that a natural 2 failed makes it pass.
-- [x] A skill gain above `rules.skillLimits.maxLevel` is lost and the step says so.
-- [x] A skill gain that would take the total above `totalPerIntEdu` × (INT + EDU) is lost and the step says
+- [x] **CR-5** Overriding the outcome of a survival roll that a natural 2 failed makes it pass.
+- [x] **CR-6** A skill gain above `rules.skillLimits.maxLevel` is lost and the step says so.
+- [x] **CR-7** A skill gain that would take the total above `totalPerIntEdu` × (INT + EDU) is lost and the step says
       so.
-- [x] The rank benefit DM applies to cash rolls and benefit-table rolls.
-- [x] With `cashSkillDM` set to Gambler, a character with Gambler gets the DM on cash rolls only.
-- [x] A career with `qualification.automatic` starts without a qualification roll.
-- [x] A qualification check with two characteristics uses the higher DM.
-- [x] A career with `basicTraining: "assignment"` trains in the assignment's skills.
-- [x] A skill table entry "A or B" asks the player to pick A or B.
-- [x] An event with `promote` passes the advancement roll without rolling.
-- [x] A mishap with `stay-in-career` lets the career continue; one with `keep-benefit` keeps the term's
+- [x] **CR-8** The rank benefit DM applies to cash rolls and benefit-table rolls.
+- [x] **CR-9** With `cashSkillDM` set to Gambler, a character with Gambler gets the DM on cash rolls only.
+- [x] **CR-10** A career with `qualification.automatic` starts without a qualification roll.
+- [x] **CR-11** A qualification check with two characteristics uses the higher DM.
+- [x] **CR-12** A career with `basicTraining: "assignment"` trains in the assignment's skills.
+- [x] **CR-13** A skill table entry "A or B" asks the player to pick A or B.
+- [x] **CR-14** An event with `promote` passes the advancement roll without rolling.
+- [x] **CR-15** A mishap with `stay-in-career` lets the career continue; one with `keep-benefit` keeps the term's
       benefit roll.
-- [x] Aging that takes a characteristic to 0 shows an ageing crisis reason.
-- [x] A pack without the new fields builds the same career as before for the same seed and input, apart
+- [x] **CR-16** Aging that takes a characteristic to 0 shows an ageing crisis reason.
+- [x] **CR-17** A pack without the new fields builds the same career as before for the same seed and input, apart
       from the rank DM on cash rolls (the part 1 tests pass unchanged).
-- [x] Finish career follows the forced choices.
+- [x] **CR-18** Finish career follows the forced choices.
 
 ## Part 2b: more than one career
 
@@ -204,20 +204,20 @@ browser.
 
 ### Acceptance criteria (part 2b)
 
-- [x] After mustering out the character is finished, and a next career can be started that isn't the
+- [x] **CR-19** After mustering out the character is finished, and a next career can be started that isn't the
       career just left. Its terms continue the term numbers and the age.
-- [x] `dmPerPreviousCareer` applies to each later qualification roll, and the step says why.
-- [x] A later career's basic training asks for one skill.
-- [x] The cash roll limit counts every career.
-- [x] A failed qualification offers the Draft (once per character) and the fallback career. The Draft row
+- [x] **CR-20** `dmPerPreviousCareer` applies to each later qualification roll, and the step says why.
+- [x] **CR-21** A later career's basic training asks for one skill.
+- [x] **CR-22** The cash roll limit counts every career.
+- [x] **CR-23** A failed qualification offers the Draft (once per character) and the fallback career. The Draft row
       sets the career, and its assignment when it names one.
-- [x] A rules file without `draft` or `fallbackCareer` asks for a career again after a failed
+- [x] **CR-24** A rules file without `draft` or `fallbackCareer` asks for a career again after a failed
       qualification, as before.
-- [x] A commission is offered in a career's first term, and in later terms only with SOC at or above
+- [x] **CR-25** A commission is offered in a career's first term, and in later terms only with SOC at or above
       `anyTermFromSOC`, with `dmPerLaterTerm` per later term. Passing it gives officer rank 1, the officer
       skill table, and no advancement roll that term.
-- [x] An officer's benefit rank is the officer rank plus the enlisted rank at commission.
-- [x] Finish career tries for a commission and counts the term limit per career.
+- [x] **CR-26** An officer's benefit rank is the officer rank plus the enlisted rank at commission.
+- [x] **CR-27** Finish career tries for a commission and counts the term limit per career.
 
 ## Aging
 
@@ -241,10 +241,10 @@ crisis, not for points lost to ordinary aging.
 
 ### Acceptance criteria (aging)
 
-- [x] A reduce effect asks for a different characteristic for each amount, and doesn't ask when there is no choice.
-- [x] With `rules.aging.crisis`, a crisis asks for care or death; care restores the characteristics to 1,
+- [x] **CR-28** A reduce effect asks for a different characteristic for each amount, and doesn't ask when there is no choice.
+- [x] **CR-29** With `rules.aging.crisis`, a crisis asks for care or death; care restores the characteristics to 1,
       adds the cost, and fails later qualification rolls; death finishes the character.
-- [x] A term on anagathics adds its cost, a second survival roll and the aging DM; stopping rolls aging at once.
+- [x] **CR-30** A term on anagathics adds its cost, a second survival roll and the aging DM; stopping rolls aging at once.
 
 ## Open questions
 

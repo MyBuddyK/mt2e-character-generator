@@ -288,7 +288,7 @@ function Term({ term, anagathics, input, onChange }: TermProps) {
           </span>
         )}
       </div>
-      <ul className="steps">
+      <ul className="steps" data-testid="term-steps">
         {term.steps.map((step) => (
           <StepRow key={step.key} step={step} context={`Term ${term.number}`} input={input} onChange={onChange} />
         ))}

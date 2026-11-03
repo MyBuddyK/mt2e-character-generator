@@ -27,8 +27,9 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
   - Includes a comment with the step text before each step execution. Do not duplicate comments if step requires
     multiple actions.
   - Starts with a comment above the test that states what it checks: the setup, the action and the
-    expected result. When the plan names the acceptance criterion in `docs/features/` that the
-    scenario checks, quote that criterion's file and text in the comment too
+    expected result, followed by a `// Criteria: CT-4.` line that lists the ids of the acceptance
+    criteria the plan says the scenario checks. Leave the line out when the plan says "none"
+  - Starts the test title with the plan's scenario number, such as `1.4`
   - Loads the app with a fixed `?seed=` value and a relative URL such as `./?seed=plan-1`, so it works under
     any base path
   - Uses the locators recorded in the generator log, preferring `getByRole` and `getByLabel`, then

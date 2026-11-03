@@ -167,37 +167,37 @@ part of this spec.
 
 ## Acceptance criteria
 
-- [x] With nothing imported, the Career data section lists no packs and the career list shows the sample career.
-- [x] After a pack is imported, the sample career is no longer in the career list. After the last pack is
+- [x] **PK-1** With nothing imported, the Career data section lists no packs and the career list shows the sample career.
+- [x] **PK-2** After a pack is imported, the sample career is no longer in the career list. After the last pack is
       removed, it is listed again.
-- [x] Importing `e2e/fixtures/valid-pack.json` adds its careers to the career list and shows its name, revision,
+- [x] **PK-3** Importing `e2e/fixtures/valid-pack.json` adds its careers to the career list and shows its name, revision,
       fingerprint and career count.
-- [x] After a reload, the imported pack is still listed.
-- [x] Clicking Remove on a pack removes its careers from the list, and they stay removed after a reload.
-- [x] Importing a file that isn't JSON shows an alert naming the file, and nothing is saved.
-- [x] Importing a pack with a later `formatVersion` than the app reads shows an alert naming the versions it supports. (Written for version 2 at first; the app reads versions 1 and 2 since the career terms work.)
-- [x] Importing a pack with one invalid career loads the others and lists the invalid one by index and field.
-- [x] Importing a pack with an `id` that's already loaded asks for confirmation and shows both revisions.
+- [x] **PK-4** After a reload, the imported pack is still listed.
+- [x] **PK-5** Clicking Remove on a pack removes its careers from the list, and they stay removed after a reload.
+- [x] **PK-6** Importing a file that isn't JSON shows an alert naming the file, and nothing is saved.
+- [x] **PK-7** Importing a pack with a later `formatVersion` than the app reads shows an alert naming the versions it supports. (Written for version 2 at first; the app reads versions 1 and 2 since the career terms work.)
+- [x] **PK-8** Importing a pack with one invalid career loads the others and lists the invalid one by index and field.
+- [x] **PK-9** Importing a pack with an `id` that's already loaded asks for confirmation and shows both revisions.
       Cancelling keeps the old pack.
-- [x] With `localStorage` blocked, an import still loads the pack for the visit and shows the storage notice.
-- [x] Loading `https://packs.test/valid-pack.json` (served by `page.route`) adds its careers and shows the pack's
+- [x] **PK-10** With `localStorage` blocked, an import still loads the pack for the visit and shows the storage notice.
+- [x] **PK-11** Loading `https://packs.test/valid-pack.json` (served by `page.route`) adds its careers and shows the pack's
       source as URL.
-- [x] Loading a URL whose route responds with status 404 shows an alert that includes the status.
-- [x] Loading a URL whose route is aborted shows the alert for a blocked or unreachable link.
-- [x] Entering an `http://` URL shows an alert saying only `https://` links are accepted, and no request is made.
-- [x] Check for update on a URL pack whose route now serves a higher revision asks to replace it, and shows
+- [x] **PK-12** Loading a URL whose route responds with status 404 shows an alert that includes the status.
+- [x] **PK-13** Loading a URL whose route is aborted shows the alert for a blocked or unreachable link.
+- [x] **PK-14** Entering an `http://` URL shows an alert saying only `https://` links are accepted, and no request is made.
+- [x] **PK-15** Check for update on a URL pack whose route now serves a higher revision asks to replace it, and shows
       both revisions.
-- [x] Check for update on a URL pack whose route serves changed content with the same revision asks to
+- [x] **PK-16** Check for update on a URL pack whose route serves changed content with the same revision asks to
       replace it and says the revision was not raised.
-- [x] Two packs that define the same career id, imported in either order, keep the career from the pack whose
+- [x] **PK-17** Two packs that define the same career id, imported in either order, keep the career from the pack whose
       `id` sorts first and report the duplicate.
-- [x] A pack career with the id `sample-sanitation` is listed after import.
-- [x] With an import's storage write made to throw `QuotaExceededError`, the pack loads for the visit, the
+- [x] **PK-18** A pack career with the id `sample-sanitation` is listed after import.
+- [x] **PK-19** With an import's storage write made to throw `QuotaExceededError`, the pack loads for the visit, the
       not-saved notice names it, and the packs saved before it are still listed after a reload.
-- [x] A shared link with `?packs=` that doesn't match the loaded packs shows the mismatch notice, and Reroll
+- [x] **PK-20** A shared link with `?packs=` that doesn't match the loaded packs shows the mismatch notice, and Reroll
       still works.
-- [x] The import control can be reached and used with the keyboard alone.
-- [x] `npm run validate-pack e2e/fixtures/partly-invalid-pack.json` prints the same messages the app shows and
+- [x] **PK-21** The import control can be reached and used with the keyboard alone.
+- [x] **PK-22** `npm run validate-pack e2e/fixtures/partly-invalid-pack.json` prints the same messages the app shows and
       exits with code 1. For the valid fixture it exits with code 0.
 
 ## Resolved questions
