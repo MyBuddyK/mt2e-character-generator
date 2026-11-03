@@ -27,7 +27,9 @@ made with a full career pack follows the book without the players checking each 
    The one change for packs without the new fields is that the rank benefit DM now applies to cash rolls
    too, as the book says.
 2. **The rule sets the default, and an override still wins.** Every value a rule decides is shown with the
-   reason, and the player can override it like any other roll or outcome (product principle 3).
+   reason. An outcome override replaces a pass or fail (so it beats a natural 2 on survival). The forced
+   leave and forced stay rules read the advancement dice and total, so the player changes them by
+   overriding the advancement dice (product principle 3).
 3. **Natural rolls use the dice, not the total.** "Natural 2" and "natural 12" compare the dice before
    DMs. A dice override counts as the natural roll.
 
@@ -51,10 +53,24 @@ made with a full career pack follows the book without the players checking each 
 | Automatic promotion | new effect `{ "type": "promote" }` | The advancement roll is skipped and passes. |
 | Mishap that doesn't end the career | new effect `{ "type": "stay-in-career" }` on a mishap | The career continues after the mishap. |
 | Mishap that keeps the benefit roll | new effect `{ "type": "keep-benefit" }` on a mishap | The term still gives its benefit roll. |
-| Ageing crisis | none (always on) | When aging takes a characteristic to 0 or below, the step shows an ageing crisis notice for the players to resolve by hand. |
+| Ageing crisis | none (always on) | When a term's aging effects take a characteristic from above 0 to 0 or below, the aging step shows an ageing crisis reason for the players to resolve by hand. Aging rows without `effects` are notes, so they never cause one. |
 
 Choices inside events and mishaps ("accept or refuse", "roll Melee 8+: on a success …") stay as notes in
 part 2a.
+
+## Generate the rest term count
+
+Requested by the owner on 2026-11-03.
+
+- Next to Generate the rest, a "More terms" number field sets how many more terms to finish. It starts at,
+  and is capped by, the rules' `termLimit` minus the terms already finished. A term counts as finished
+  once its after-term choice is showing.
+- Generation continues until that many more terms are finished, then leaves the career and musters out.
+  A rule that ends the career or forces it to continue still wins, so a forced stay can go past the
+  count.
+- When a term's aging causes an ageing crisis, generation stops at that term's after-term choice and a
+  notice says why, so the players can resolve it before going on.
+- The field is not shown at mustering out, where no terms remain.
 
 ## User flow
 
@@ -70,7 +86,7 @@ part 2a.
 
 - A rule reason is a short line under the step (`data-testid="step-reason"`), in the same style as the
   "Applied:" line. Benefit rolls list the DMs they use (rank, event, cash skill) the same way.
-- A lost skill gain shows "Lost: Gun Combat 5 is above the limit of 4" in the step.
+- A lost skill gain shows "Lost: Gun Combat 5 is above the skill limit of 4." in the step.
 - The Next step with a forced choice shows only the allowed button and the reason, as part 1 does after a
   mishap.
 

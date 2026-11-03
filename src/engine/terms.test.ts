@@ -3,7 +3,7 @@ import { parseCareer, type CareerDefinition } from './career-schema'
 import { parseCareerPack, selectRules } from './career-pack'
 import { RulesSchema, type Rules } from './rules-schema'
 import { diceFor } from './dice'
-import { generateRest, policyChoice } from './policy'
+import { finishedTerms, generateRest, maxMoreTerms, policyChoice } from './policy'
 import { asCharacteristic, buildCareer, EMPTY_INPUT, entryOptions, pruneInput, type CareerInput, type CareerResult } from './terms'
 import { sampleRules } from '../data/rules'
 import { readSavedCharacter, writeSavedCharacter } from '../storage/characters'
@@ -640,5 +640,104 @@ describe('buildCareer rule enforcement', () => {
     }
     const result = build(started(SERVICE, PASSING), rules)
     expect(step(result, 1, 'aging').reasons).toContain('Ageing crisis: STR is 0 or lower. Resolve it by hand.')
+  })
+})
+
+// Tests for the review fixes and the Generate the rest term count.
+describe('generateRest term count and review fixes', () => {
+  const data = { careers: [sampleCareer()], rules: sampleRules }
+  /** Rolls that pass qualification and survival in terms 1 to 5 and keep advancement at 3. */
+  const surviving: Record<string, number> = { qualification: 12 }
+  for (let n = 1; n <= 5; n += 1) {
+    surviving[`term-${n}.survival`] = 12
+    surviving[`term-${n}.advancement`] = 3
+  }
+
+  // Generates 2 more terms from the start of term 1 and expects 2 terms and a finished character.
+  it('plays the number of terms asked for', () => {
+    const result = build(generateRest(SEED, BASE, started({}, surviving), data, 2))
+    expect(result.terms).toHaveLength(2)
+    expect(result.finished).toBe(true)
+  })
+
+  // Asks for 50 more terms and expects the sample termLimit (5) instead.
+  it('caps the terms at the rules termLimit', () => {
+    expect(build(generateRest(SEED, BASE, started({}, surviving), data, 50)).terms).toHaveLength(sampleRules.termLimit)
+  })
+
+  // Finishes term 1, then expects 1 finished term and termLimit - 1 more terms allowed.
+  it('finishedTerms counts a term once its after-term choice is pending', () => {
+    const inProgress = build(started({}, surviving))
+    expect(finishedTerms(inProgress)).toBe(0)
+    const done = build(started({ ...SERVICE }, { ...surviving, 'term-1.event': 9 }))
+    expect(done.pending).toMatchObject({ kind: 'next' })
+    expect(finishedTerms(done)).toBe(1)
+    expect(maxMoreTerms(done, sampleRules.termLimit)).toBe(sampleRules.termLimit - 1)
+  })
+
+  // Uses aging from term 1 that takes STR from 7 to 0, and expects generation to stop at term 1's after-term choice.
+  it('stops at an ageing crisis', () => {
+    const rules: Rules = {
+      ...sampleRules,
+      aging: { ...sampleRules.aging, fromTerm: 1, table: [{ roll: 0, summary: 'Test', effects: [{ type: 'characteristic', characteristic: 'STR', change: -7 }] }] },
+    }
+    const result = build(generateRest(SEED, BASE, started({}, surviving), { careers: [sampleCareer()], rules }, 5), rules)
+    expect(result.terms).toHaveLength(1)
+    expect(result.terms[0]?.ageingCrisis).toBe(true)
+    expect(result.pending).toMatchObject({ kind: 'next', key: 'term-1.next' })
+  })
+
+  // Starts with STR 0 and an aging row with no effects, and expects no ageing crisis.
+  it('a characteristic already at 0 before aging is not an ageing crisis', () => {
+    const rules: Rules = { ...sampleRules, aging: { ...sampleRules.aging, fromTerm: 1, table: [{ roll: 0, summary: 'Test', effects: [] }] } }
+    const result = buildCareer(SEED, { ...BASE, STR: 0 }, started(SERVICE, PASSING), { careers: [sampleCareer()], rules })
+    expect(result.terms[0]?.ageingCrisis).toBe(false)
+  })
+
+  // Qualifies on DEX or INT with automaticAt 10, DEX 9 and INT 10 (both DM +1), and expects automatic qualification.
+  it('automaticAt passes when any listed characteristic reaches it', () => {
+    const career = { ...sampleCareer(), qualification: { characteristic: ['DEX' as const, 'INT' as const], target: 12, automaticAt: 10 } }
+    const result = buildCareer(SEED, { ...BASE, DEX: 9, INT: 10 }, started(SERVICE, { qualification: 2 }), { careers: [career], rules: sampleRules })
+    expect(result.qualification?.dice).toBeUndefined()
+    expect(result.qualification?.result).toBe('pass')
+  })
+
+  // With INT 1, EDU 1 and totalPerIntEdu 1, gains Vacc Suit 1 in term 1, then term 1 aging takes INT
+  // and EDU to 0 (limit 0). A term 2 event that sets Vacc Suit to at least 0 adds no levels, so it
+  // gives no Lost reason.
+  it('the total skill limit does not stop gains that add no levels', () => {
+    const rules: Rules = {
+      ...sampleRules,
+      skillLimits: { totalPerIntEdu: 1 },
+      aging: {
+        ...sampleRules.aging,
+        fromTerm: 1,
+        table: [{ roll: 0, summary: 'Test', effects: [{ type: 'characteristic', characteristic: 'INT', change: -1 }, { type: 'characteristic', characteristic: 'EDU', change: -1 }] }],
+      },
+    }
+    const career = sampleCareer()
+    const withEvent: CareerDefinition = {
+      ...career,
+      events: career.events.map((e) => (e.roll === 7 ? { roll: 7, summary: 'Test', effects: [{ type: 'skill', options: ['Vacc Suit'], level: 0 }] } : e)),
+    }
+    const input = started(
+      { ...SERVICE, 'term-1.next': 'continue', 'term-2.skill-0.table': 'serviceSkills' },
+      { ...PASSING, 'term-1.skill-0': 1, 'term-1.event': 9, 'term-1.advancement': 3, 'term-2.skill-0': 1, 'term-2.survival': 12, 'term-2.event': 7 },
+    )
+    const result = buildCareer(SEED, { ...BASE, INT: 1, EDU: 1 }, input, { careers: [withEvent], rules })
+    expect(result.skills['Vacc Suit']).toBe(1)
+    expect(step(result, 2, 'event').reasons).toEqual([])
+  })
+
+  // Replaces a service skill with "STR or Athletics" and expects basic training to give Athletics 0 without asking.
+  it('basic training does not offer characteristic options', () => {
+    const career = sampleCareer()
+    const changed: CareerDefinition = {
+      ...career,
+      skillTables: { ...career.skillTables, serviceSkills: career.skillTables.serviceSkills.map((e, i) => (i === 1 ? 'STR or Athletics' : e)) },
+    }
+    const result = build(started(SERVICE, PASSING), sampleRules, changed)
+    expect(result.skills['Athletics']).toBe(0)
+    expect(result.pending?.kind).not.toBe('skill-option')
   })
 })

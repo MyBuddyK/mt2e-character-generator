@@ -86,6 +86,8 @@ export interface TermResult {
   endReason: string | undefined
   /** Why the character must continue after this term, or undefined when they may leave. */
   stayReason: string | undefined
+  /** True when this term's aging took a characteristic to 0 or below (an ageing crisis). */
+  ageingCrisis: boolean
 }
 
 /** One mustering-out roll. */
@@ -307,9 +309,10 @@ export function buildCareer(
   /** Rolls the qualification check for `q`, or passes it without a roll when `q` makes it automatic. */
   const qualify = (key: string, q: Qualification, ageStart: number, extraDM: number): Step => {
     if (q.automatic) return automaticPass(key, 'Qualification', 'Automatic qualification for this career.')
-    const c = bestCharacteristic(q, value)
-    if (q.automaticAt !== undefined && value(c) >= q.automaticAt) {
-      return automaticPass(key, 'Qualification', `Automatic qualification with ${c} ${q.automaticAt} or higher.`)
+    const listed = typeof q.characteristic === 'string' ? [q.characteristic] : q.characteristic
+    const high = q.automaticAt === undefined ? undefined : listed.find((c) => value(c) >= (q.automaticAt ?? 0))
+    if (high !== undefined) {
+      return automaticPass(key, 'Qualification', `Automatic qualification with ${high} ${q.automaticAt ?? 0} or higher.`)
     }
     const ageDM = q.ageDM !== undefined && ageStart >= q.ageDM.fromAge ? q.ageDM.dm : 0
     const step = check(key, 'Qualification', q, extraDM + ageDM)
@@ -345,7 +348,7 @@ export function buildCareer(
       step.reasons.push(`Lost: ${skill} ${after} is above the skill limit of ${skillLimits.maxLevel}.`)
       return
     }
-    if (skillLimits?.totalPerIntEdu !== undefined) {
+    if (skillLimits?.totalPerIntEdu !== undefined && after > (before ?? 0)) {
       const limit = skillLimits.totalPerIntEdu * (value('INT') + value('EDU'))
       const total = Object.values(skills).reduce((sum, v) => sum + v, 0) - (before ?? 0) + after
       if (total > limit) {
@@ -371,7 +374,10 @@ export function buildCareer(
    * raised to at least that level and characteristic entries are skipped (basic training).
    */
   const applyTableEntry = (entry: string, step: Step, level?: number, pickKey = `${step.key}.pick`) => {
-    const options = entryOptions(entry)
+    // In basic training (level set) characteristic options give nothing, so they are not offered.
+    const all = entryOptions(entry)
+    const options = level === undefined ? all : all.filter((o) => asCharacteristic(o) === undefined)
+    if (options.length === 0) return
     let picked = options[0] ?? entry
     if (options.length > 1) {
       const answer = choice(pickKey)
@@ -444,13 +450,13 @@ export function buildCareer(
           nextDM[effect.roll] += effect.dm
           step.applied.push(
             effect.roll === 'qualification'
-              ? `DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next qualification roll (kept for a later career)`
-              : `DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next advancement roll`,
+              ? `DM ${signedText(effect.dm)} on the next qualification roll (kept for a later career)`
+              : `DM ${signedText(effect.dm)} on the next advancement roll`,
           )
           break
         case 'benefit-dm':
           benefitDM += effect.dm
-          step.applied.push(`DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next roll on the benefit table`)
+          step.applied.push(`DM ${signedText(effect.dm)} on the next roll on the benefit table`)
           break
         case 'extra-benefit': {
           const count = effect.count ?? 1
@@ -460,7 +466,7 @@ export function buildCareer(
         }
         case 'characteristic':
           changes[effect.characteristic] += effect.change
-          step.applied.push(`${effect.characteristic} ${effect.change > 0 ? '+' : ''}${effect.change}`)
+          step.applied.push(`${effect.characteristic} ${signedText(effect.change)}`)
           break
         case 'leave-career':
           if (term) term.endReason = 'An event ends the career after this term.'
@@ -556,6 +562,7 @@ export function buildCareer(
         title,
         endReason: undefined,
         stayReason: undefined,
+        ageingCrisis: false,
       }
       terms.push(term)
       const steps = term.steps
@@ -570,11 +577,12 @@ export function buildCareer(
           notes: [],
           reasons: [],
         }
+        // The step is shown before its entries are applied, so a pick asked for here appears under it.
+        steps.push(training)
         tableEntries(trainingTable).forEach((entry, i) => {
           applyTableEntry(entry, training, rules.basicTraining.level, `${termKey}.training.pick-${i}`)
+          training.result = training.applied.join(', ')
         })
-        training.result = training.applied.join(', ')
-        steps.push(training)
         reachRank(0, steps, term, `${termKey}.rank-0`)
       }
 
@@ -626,9 +634,11 @@ export function buildCareer(
         step.result = row?.summary ?? ''
         if (row && !row.effects) step.notes.push(row.summary)
         steps.push(step)
+        const beforeAging = { ...changes }
         if (row) applyEffects(row.effects, `${termKey}.aging`, step, steps, term)
         for (const c of CHARACTERISTICS) {
-          if (base[c] + changes[c] <= 0) {
+          if (base[c] + changes[c] <= 0 && base[c] + beforeAging[c] > 0) {
+            term.ageingCrisis = true
             step.reasons.push(`Ageing crisis: ${c} is 0 or lower. Resolve it by hand.`)
           }
         }

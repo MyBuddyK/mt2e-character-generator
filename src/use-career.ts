@@ -19,8 +19,8 @@ export interface CareerState {
   saveFailed: boolean
   /** Replaces the input, removes keys the new build doesn't read, and saves it. */
   update: (next: CareerInput) => void
-  /** Makes every remaining choice with the Generate the rest policy, and saves the result. */
-  generate: () => void
+  /** Makes the remaining choices with the Generate the rest policy for `moreTerms` more terms, and saves the result. */
+  generate: (moreTerms: number) => void
   /** Applies savedFromOtherPacks to this character. */
   applySaved: () => void
   /** Deletes savedFromOtherPacks and starts this character over. */
@@ -106,7 +106,7 @@ export function useCareer(
     removedCount: active.removedCount,
     saveFailed: active.saveFailed,
     update: (next) => commit(next),
-    generate: () => commit(generateRest(seed, base, active.input, data)),
+    generate: (moreTerms) => commit(generateRest(seed, base, active.input, data, moreTerms)),
     applySaved: () => {
       if (active.savedFromOtherPacks) commit(active.savedFromOtherPacks.input, { savedFromOtherPacks: undefined })
     },

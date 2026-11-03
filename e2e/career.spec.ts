@@ -95,6 +95,20 @@ test.describe('career terms', () => {
     await expect(page.getByTestId('career-summary')).toBeVisible()
   })
 
+  // Finishes term 1 (survival 12, event 9, advancement 2), sets More terms to 1, clicks Generate the
+  // rest, and expects a finished character with terms 1 and 2 only.
+  test('generate the rest plays the number of terms asked for', async ({ page }) => {
+    await startTerm1(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Event', 9)
+    await setDice(page, 'Term 1 Advancement', 2)
+    await page.getByLabel('More terms').fill('1')
+    await page.getByRole('button', { name: 'Generate the rest' }).click()
+    await expect(page.getByTestId('career-summary')).toBeVisible()
+    await expect(page.getByTestId('term-2')).toBeVisible()
+    await expect(page.getByTestId('term-3')).toHaveCount(0)
+  })
+
   // Sets the term 1 event to 3 (a connection event that also offers Medic or Vacc Suit), picks
   // Medic, leaves, takes a benefit, and expects the event in the Connection opportunities list.
   test('the finished character lists connection opportunities', async ({ page }) => {
