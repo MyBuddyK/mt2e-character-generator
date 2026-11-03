@@ -335,12 +335,12 @@ test.describe('more than one career', () => {
 })
 
 // Browser tests for aging choices and anagathics (docs/features/career-rules.md, "Aging"), with the
-// invented multi-career-pack.json, whose aging starts in term 1.
+// invented aging-pack.json, whose aging starts in term 1.
 test.describe('aging and anagathics', () => {
-  /** Opens ?seed=terms, imports multi-career-pack.json, starts Test wanderer and picks Service skills. */
+  /** Opens ?seed=terms, imports aging-pack.json, starts Test wanderer and picks Service skills. */
   async function startWanderer(page: Page): Promise<void> {
     await page.goto('./?seed=terms')
-    await importFixture(page, 'multi-career-pack.json')
+    await importFixture(page, 'aging-pack.json')
     await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Test wanderer' })
     await page.getByRole('button', { name: 'Start career' }).click()
     await page.getByRole('button', { name: 'Service skills' }).click()

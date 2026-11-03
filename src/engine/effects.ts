@@ -31,7 +31,7 @@ const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
  * - `promote`: this term's advancement roll passes without being rolled.
  * - `stay-in-career`: on a mishap, the career does not end because of the mishap.
  * - `keep-benefit`: on a mishap, the term still gives its benefit roll.
- * - `reduce`: reduce characteristics picked by the player from `characteristics`, a different one for
+ * - `reduce`: reduce characteristics picked by the player from `characteristics` (each listed once), a different one for
  *   each value in `amounts` (for example three physical characteristics by 2, 2 and 1). Values beyond
  *   the number of characteristics listed are not applied.
  * - `wager`: the player may wager benefit rolls earned so far in this career (at most `maxWager`, when
@@ -57,7 +57,10 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('keep-benefit') }),
   z.strictObject({
     type: z.literal('reduce'),
-    characteristics: z.array(z.enum(CHARACTERISTICS)).min(1, 'must list at least one characteristic'),
+    characteristics: z
+      .array(z.enum(CHARACTERISTICS))
+      .min(1, 'must list at least one characteristic')
+      .refine((list) => new Set(list).size === list.length, 'must not list a characteristic twice'),
     amounts: z.array(z.int().min(1)).min(1, 'must list at least one amount'),
   }),
   z.strictObject({

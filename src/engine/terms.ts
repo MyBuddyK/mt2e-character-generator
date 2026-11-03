@@ -343,7 +343,6 @@ export function buildCareer(
   const skills: Record<string, number> = {}
   const terms: TermResult[] = []
   const runs: CareerRun[] = []
-  const connections: ConnectionOpportunity[] = []
   const problems: string[] = []
   let career: CareerDefinition | undefined
   let assignment: Assignment | undefined
@@ -356,8 +355,12 @@ export function buildCareer(
   let cashRolls = 0
   let costs = 0
   let dead = false
+  /** The age at death: the start of the term when the character dies before serving it. */
+  let deathAge: number | undefined
   let qualificationFails = false
   let promoteThisTerm = false
+  /** Terms on anagathics in a row, up to the current term. */
+  let anagathicsStreak = 0
   const skillLimits = rules.skillLimits
 
   const value = (c: Characteristic) => normalizeCharacteristic(base[c] + changes[c]) ?? 0
@@ -422,14 +425,22 @@ export function buildCareer(
     return step
   }
 
-  /** Returns the option of `options` stored under `key`, or the only option; stops to ask when there is a choice and none is stored. */
-  const pickOption = (key: string, options: string[]): string => {
-    if (options.length === 1) return options[0] ?? ''
+  /**
+   * Returns the option of `options` stored under `key`, the only option when there is one, or
+   * undefined when there are none. When there is a choice and no stored answer matches, it throws
+   * the Stop that `ask` returns.
+   */
+  const pickFrom = <T extends string>(key: string, options: T[], ask: () => PendingChoice): T | undefined => {
+    if (options.length <= 1) return options[0]
     const answer = choice(key)
     const found = options.find((o) => o === answer)
-    if (found === undefined) throw new Stop({ kind: 'skill-option', key, options })
+    if (found === undefined) throw new Stop(ask())
     return found
   }
+
+  /** Returns the skill option of `options` picked under `key` (see pickFrom), or '' when there are none. */
+  const pickOption = (key: string, options: string[]): string =>
+    pickFrom(key, options, () => ({ kind: 'skill-option', key, options })) ?? ''
 
   /**
    * Returns the benefit rolls earned so far in the current career: terms that give a benefit roll
@@ -443,7 +454,7 @@ export function buildCareer(
    * A step that passes (or, with `auto` false, fails) without a roll, such as automatic qualification
    * or promotion, with `reason`. The outcome can still be overridden.
    */
-  const automaticPass = (key: string, label: string, reason: string, auto = true): Step => {
+  const automaticOutcome = (key: string, label: string, reason: string, auto = true): Step => {
     const ruled = outcomeOverride(key, auto)
     const outcome: Overridable<boolean> = ruled === undefined ? { rolled: auto } : { rolled: auto, override: ruled }
     return { key, label, passed: outcome, result: current(outcome) ? 'pass' : 'fail', applied: [], notes: [], reasons: [reason] }
@@ -451,26 +462,17 @@ export function buildCareer(
 
   /** Rolls the qualification check for `q`, or passes it without a roll when `q` makes it automatic. */
   const qualify = (key: string, q: Qualification, ageStart: number, extraDM: number): Step => {
-    if (qualificationFails) return automaticPass(key, 'Qualification', 'Qualification fails after an ageing crisis.', false)
-    if (q.automatic) return automaticPass(key, 'Qualification', 'Automatic qualification for this career.')
+    if (qualificationFails) return automaticOutcome(key, 'Qualification', 'Qualification fails after an ageing crisis.', false)
+    if (q.automatic) return automaticOutcome(key, 'Qualification', 'Automatic qualification for this career.')
     const listed = typeof q.characteristic === 'string' ? [q.characteristic] : q.characteristic
     const high = q.automaticAt === undefined ? undefined : listed.find((c) => value(c) >= (q.automaticAt ?? 0))
     if (high !== undefined) {
-      return automaticPass(key, 'Qualification', `Automatic qualification with ${high} ${q.automaticAt ?? 0} or higher.`)
+      return automaticOutcome(key, 'Qualification', `Automatic qualification with ${high} ${q.automaticAt ?? 0} or higher.`)
     }
     const ageDM = q.ageDM !== undefined && ageStart >= q.ageDM.fromAge ? q.ageDM.dm : 0
     const step = check(key, 'Qualification', q, extraDM + ageDM)
     if (ageDM !== 0) step.reasons.push(`DM ${signedText(ageDM)} for age ${q.ageDM?.fromAge ?? ageStart} or more.`)
     return step
-  }
-
-  /** Returns the characteristic of `options` stored under `key`, or the only option; stops to ask when there is a choice and none is stored. */
-  const pickCharacteristic = (key: string, options: Characteristic[], amount: number): Characteristic | undefined => {
-    if (options.length <= 1) return options[0]
-    const answer = choice(key)
-    const found = options.find((o) => o === answer)
-    if (found === undefined) throw new Stop({ kind: 'characteristic', key, options, amount })
-    return found
   }
 
   /** Rolls `count` dice for a cost of `count` D × `perDie` credits, adds it to `costs`, and returns the step. */
@@ -678,7 +680,7 @@ export function buildCareer(
             const c =
               remaining.every((a) => a === amount) && options.length === remaining.length
                 ? options[0]
-                : pickCharacteristic(`${effectKey}.pick-${j}`, options, amount)
+                : pickFrom(`${effectKey}.pick-${j}`, options, () => ({ kind: 'characteristic', key: `${effectKey}.pick-${j}`, options, amount }))
             if (c === undefined) return
             picked.push(c)
             changes[c] -= amount
@@ -751,7 +753,7 @@ export function buildCareer(
    * unless the player ignores it ("ignore" under `${key}.ignore`). An ageing crisis marks the term;
    * with rules.aging.crisis it asks whether to pay for medical care or let the character die.
    */
-  const ageing = (key: string, label: string, dm: number, reasons: string[], term: TermResult, steps: Step[]) => {
+  const ageing = (key: string, label: string, dm: number, reasons: string[], term: TermResult, steps: Step[], atTermStart = false) => {
     const { step, row } = tableRoll(key, label, rules.aging.dice, dm, rules.aging.table)
     step.result = row?.summary ?? ''
     step.reasons.push(...reasons)
@@ -781,11 +783,12 @@ export function buildCareer(
     }
     if (answer === 'die') {
       step.reasons.push(`Ageing crisis: ${crisis.join(', ')} 0 or lower. The character dies.`)
+      deathAge = atTermStart ? term.ageStart : term.ageEnd
       throw new Died()
     }
     step.reasons.push(`Ageing crisis: ${crisis.join(', ')} 0 or lower. Medical care brings them back to 1; every later qualification roll fails.`)
     steps.push(costRoll(`${key}.crisis-cost`, 'Medical care', care.costDice, care.costPerDie))
-    for (const c of CHARACTERISTICS) if (base[c] + changes[c] <= 0) changes[c] = 1 - base[c]
+    for (const c of crisis) changes[c] = 1 - base[c]
     qualificationFails = true
   }
 
@@ -952,9 +955,21 @@ export function buildCareer(
             }
             if (term.anagathics) steps.push(costRoll(`${termKey}.anagathics-cost`, 'Anagathics cost', drugs.costDice, drugs.costPerDie))
           } else if (wasOnAnagathics) {
-            ageing(`${termKey}.anagathics-stop`, 'Aging (stopped anagathics)', rules.aging.dmPerTerm * (number - 1), ['Stopping anagathics: aging is rolled at once.'], term, steps)
+            // The anagathics DM ends with the drugs, so this roll has only the DM for the terms served so far.
+            const served = number - 1
+            ageing(
+              `${termKey}.anagathics-stop`,
+              'Aging (stopped anagathics)',
+              rules.aging.dmPerTerm * served,
+              [`Stopping anagathics: aging is rolled at once, with DM ${signedText(rules.aging.dmPerTerm * served)} for ${served} term${served === 1 ? '' : 's'} served and no anagathics DM.`],
+              term,
+              steps,
+              true,
+            )
           }
         }
+
+        anagathicsStreak = term.anagathics ? anagathicsStreak + 1 : 0
 
         for (let i = 0; i < rules.skillRolls.perTerm; i += 1) skillRoll(`${termKey}.skill-${i}`, steps)
 
@@ -1014,7 +1029,7 @@ export function buildCareer(
           const advancementKey = `${termKey}.advancement`
           let advancement: Step
           if (promoteThisTerm) {
-            advancement = automaticPass(advancementKey, 'Advancement', 'Automatic promotion from an event this term.')
+            advancement = automaticOutcome(advancementKey, 'Advancement', 'Automatic promotion from an event this term.')
           } else {
             advancement = check(advancementKey, 'Advancement', assignment.advancement, nextDM.advancement)
             nextDM.advancement = 0
@@ -1043,14 +1058,9 @@ export function buildCareer(
 
         if (number >= rules.aging.fromTerm) {
           // Anagathics add the number of terms taken in a row, up to this one, to the aging roll.
-          let streak = 0
-          for (let i = terms.length - 1; i >= 0 && terms[i]?.anagathics; i -= 1) streak += 1
+          const streak = anagathicsStreak
           const reasons = streak > 0 ? [`DM +${streak} from ${streak} term${streak === 1 ? '' : 's'} on anagathics.`] : []
           ageing(`${termKey}.aging`, 'Aging', rules.aging.dmPerTerm * number + streak, reasons, term, steps)
-        }
-
-        for (const step of steps) {
-          if (step.connection) connections.push({ term: number, label: step.label, summary: step.result })
         }
 
         const nextKey = `${termKey}.next`
@@ -1114,6 +1124,10 @@ export function buildCareer(
     }
   }
 
+  // Connections come from every term built, so a term that ends in death or a pending choice keeps its own.
+  const connections: ConnectionOpportunity[] = terms.flatMap((t) =>
+    t.steps.flatMap((step) => (step.connection ? [{ term: t.number, label: step.label, summary: step.result }] : [])),
+  )
   const last = runs[runs.length - 1]
   const benefits = runs.flatMap((r) => r.benefits)
   const sum = (f: (r: CareerRun) => number) => runs.reduce((total, r) => total + f(r), 0)
@@ -1127,7 +1141,7 @@ export function buildCareer(
     characteristicChanges: changes,
     rank: last ? (last.officerRank ?? last.rank) : 0,
     title: last?.title,
-    age: rules.startingAge + terms.length * rules.termLength,
+    age: deathAge ?? rules.startingAge + terms.length * rules.termLength,
     benefits,
     benefitCount: sum((r) => r.benefitCount),
     lostBenefitTerms: sum((r) => r.lostBenefitTerms),

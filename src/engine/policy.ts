@@ -34,7 +34,6 @@ export function policyChoice(pending: PendingChoice, result: CareerResult, termL
     case 'skill-table':
       return pending.options[pending.options.length - 1]
     case 'skill-option':
-      return pending.options[diceFor(seed, `finish:${pending.key}`).pick(pending.options.length)]
     case 'characteristic':
       return pending.options[diceFor(seed, `finish:${pending.key}`).pick(pending.options.length)]
     case 'next':

@@ -687,7 +687,7 @@
     },
     "advancedEducationMinEDU": 9,
     "aging": {
-      "fromTerm": 1,
+      "fromTerm": 3,
       "dice": 2,
       "dmPerTerm": -1,
       "table": [
@@ -709,19 +709,12 @@
         },
         {
           "roll": 1,
-          "summary": "Invented: reduce two physical characteristics by 2 and 1.",
+          "summary": "Years of hauling show. END -1.",
           "effects": [
             {
-              "type": "reduce",
-              "characteristics": [
-                "STR",
-                "DEX",
-                "END"
-              ],
-              "amounts": [
-                2,
-                1
-              ]
+              "type": "characteristic",
+              "characteristic": "END",
+              "change": -1
             }
           ]
         },
@@ -740,11 +733,7 @@
           "roll": 3,
           "summary": "No effect."
         }
-      ],
-      "crisis": {
-        "costDice": 1,
-        "costPerDie": 10000
-      }
+      ]
     },
     "benefits": {
       "perTerm": 1,
@@ -795,13 +784,6 @@
     "commission": {
       "anyTermFromSOC": 9,
       "dmPerLaterTerm": -1
-    },
-    "anagathics": {
-      "characteristic": "SOC",
-      "target": 10,
-      "costDice": 1,
-      "costPerDie": 200000,
-      "prisonOnNatural": 2
     }
   }
 }

@@ -149,6 +149,20 @@ describe('the ageing crisis', () => {
     expect(result.nextCareer).toBeUndefined()
   })
 
+  // Dies at the end of term 1, whose event 9 is marked as a connection, and expects the connection kept.
+  it('a character who dies keeps the connections of the last term', () => {
+    const result = build(term1({ 'term-1.aging.crisis': 'die' }), CRISIS_RULES, WEAK)
+    expect(result.connections.map((c) => c.term)).toEqual([1])
+  })
+
+  // Starts with SOC 0 (not from aging), pays for care after aging takes STR to 0, and expects STR back
+  // to 1 and SOC left at 0.
+  it('medical care restores only the characteristics in the crisis', () => {
+    const result = build(term1({ 'term-1.aging.crisis': 'care' }), CRISIS_RULES, { ...WEAK, SOC: 0 })
+    expect(result.characteristicChanges['STR']).toBe(0)
+    expect(result.characteristicChanges['SOC']).toBe(0)
+  })
+
   // Asks the policy about the crisis choice and expects no answer: the player decides.
   it('Finish career leaves the crisis to the player', () => {
     const result = build(term1(), CRISIS_RULES, WEAK)
@@ -197,8 +211,28 @@ describe('anagathics', () => {
     )
     const result = build(input, DRUG_RULES)
     const stop = step(result, 2, 'term-2.anagathics-stop')
-    expect(stop.reasons).toContain('Stopping anagathics: aging is rolled at once.')
+    expect(stop.reasons).toContain(
+      `Stopping anagathics: aging is rolled at once, with DM ${sampleRules.aging.dmPerTerm} for 1 term served and no anagathics DM.`,
+    )
     expect(stop.dm).toBe(sampleRules.aging.dmPerTerm * 1)
+  })
+
+  // Takes anagathics in term 1, stops in term 2 with a character at STR 1 whose stop roll causes a
+  // crisis, lets them die, and expects the age at the start of term 2.
+  it('a death in the stop roll gives the age at the start of that term', () => {
+    const rules: Rules = { ...CRISIS_RULES, anagathics: DRUG_RULES.anagathics }
+    const input = term1(
+      { 'term-1.anagathics': 'take', 'term-1.aging.ignore': 'ignore', 'term-1.next': 'continue', 'term-2.anagathics-stop.crisis': 'die' },
+      { 'term-1.anagathics': 12, 'term-1.survival-2': 12 },
+    )
+    const result = build(input, rules, WEAK)
+    expect(result.dead).toBe(true)
+    expect(result.age).toBe(sampleRules.startingAge + sampleRules.termLength)
+  })
+
+  // Parses rules whose aging row reduces STR twice and expects the schema to reject it.
+  it('a reduce effect cannot list a characteristic twice', () => {
+    expect(RulesSchema.safeParse(agingRules([{ type: 'reduce', characteristics: ['STR', 'STR'], amounts: [1, 1] }])).success).toBe(false)
   })
 
   // Parses DRUG_RULES and CRISIS_RULES and expects both to pass the rules schema.
