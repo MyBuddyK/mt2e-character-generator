@@ -9,7 +9,7 @@ import { buildCareer, type CareerData, type CareerInput, type CareerResult, type
 
 /** A one-line description of what policyChoice picks, shown next to the Finish career button. */
 export const POLICY_SUMMARY =
-  'Finish career keeps this career and assignment, rolls on the last skill table the character can use, picks at random (from the seed) when an event, mishap or table entry offers a choice of skills and how many benefit rolls to wager, and continues term after term until the character is forced out (by a mishap, an event or the advancement roll) or reaches the term limit in the rules. It stops at an ageing crisis. When the career ends it takes cash for the first benefit roll and benefits after that.'
+  'Finish career keeps this career and assignment, rolls on the last skill table the character can use, picks at random (from the seed) when an event, mishap, rank or table entry offers a choice of skills and how many benefit rolls to wager, and continues term after term until the character is forced out (by a mishap, an event or the advancement roll) or reaches the term limit in the rules. It stops at an ageing crisis. When the career ends it takes cash for the first benefit roll and benefits after that.'
 
 /**
  * Returns the answer the policy gives to `pending`, given the career so far, the term limit and the

@@ -179,8 +179,10 @@ test.describe('career packs from files', () => {
     await expect(careerList(page)).toHaveText([/Test Sanitation Rewrite/])
   })
 
-  // Moves focus to the Import from file control with Tab, presses Space, picks valid-pack.json in the
-  // file chooser, and expects the pack to load.
+  // Moves focus to the Import from file control with Tab, waits two animation frames, presses Space,
+  // picks valid-pack.json in the file chooser, and expects the pack to load. The wait lets the browser
+  // finish scrolling the focused control into view: on the mobile project, a Space pressed in the same
+  // frame sometimes opened no file chooser (3 of 40 runs without the wait, 0 of 120 with it).
   test('the import control works from the keyboard', async ({ page }) => {
     await page.goto('./?seed=packs')
     const input = page.getByLabel('Import from file')
@@ -189,6 +191,7 @@ test.describe('career packs from files', () => {
       if (await input.evaluate((el) => el === document.activeElement)) break
     }
     await expect(input).toBeFocused()
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     const chooser = page.waitForEvent('filechooser')
     await page.keyboard.press('Space')
     await (await chooser).setFiles(`${FIXTURES}/valid-pack.json`)

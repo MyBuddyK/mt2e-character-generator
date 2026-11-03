@@ -799,12 +799,29 @@ describe('buildCareer wager effect', () => {
     expect(build(input, sampleRules, wagerCareer({ gainUsedSkill: true })).skills['Broker']).toBe(1)
   })
 
-  // Expects the Finish career policy to pick a wager from 0 to 1, the same one each time for the same seed.
+  // Asks the policy for a wager of 0 to 3 under 40 seeds and expects only those values, more than one of
+  // them, and the same pick each time for the same seed.
   it('Finish career picks a wager at random from the seed', () => {
     const result = build(started(SERVICE, rolls), sampleRules, wagerCareer())
-    const pick = result.pending && policyChoice(result.pending, result, 5, SEED)
-    expect(['0', '1']).toContain(pick)
-    expect(result.pending && policyChoice(result.pending, result, 5, SEED)).toBe(pick)
+    const pending = { kind: 'wager' as const, key: 'k', max: 3, skills: ['Gambler'], target: 8 }
+    const picks = Array.from({ length: 40 }, (_, i) => policyChoice(pending, result, 5, `seed-${i}`))
+    expect(new Set(picks).size).toBeGreaterThan(1)
+    for (const p of picks) expect(['0', '1', '2', '3']).toContain(p)
+    expect(policyChoice(pending, result, 5, 'seed-0')).toBe(picks[0])
+  })
+
+  // Puts a wager on mishap 1 with mishapLosesTerm, fails term 1 survival, and expects no wager choice
+  // because the mishap already took the term's only benefit roll.
+  it('a wager on a career-ending mishap cannot bet the term the mishap loses', () => {
+    const career = sampleCareer()
+    const withWager: CareerDefinition = {
+      ...career,
+      mishaps: career.mishaps.map((m) => (m.roll === 1 ? { roll: 1, summary: 'Wager', effects: [{ type: 'wager', skills: ['Gambler'], target: 8 }] } : m)),
+    }
+    const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, mishapLosesTerm: true } }
+    const result = build(started(SERVICE, { qualification: 12, 'term-1.survival': 2, 'term-1.mishap': 1 }), rules, withWager)
+    expect(result.pending?.kind).not.toBe('wager')
+    expect(step(result, 1, 'mishap').applied).toContain('No benefit rolls to wager yet')
   })
 
   // Asks the policy for a six-option skill choice under 40 seeds and expects more than one option picked.

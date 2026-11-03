@@ -264,7 +264,7 @@ test.describe('career rule enforcement', () => {
     await startEnforced(page)
     await setDice(page, 'Term 1 Survival', 12)
     await setDice(page, 'Term 1 Event', 7)
-    await page.getByRole('group', { name: 'Wager benefit rolls' }).getByRole('button', { name: 'Wager 1' }).click()
+    await page.getByRole('group', { name: 'Wager benefit rolls' }).getByRole('button', { name: 'Wager 1', exact: true }).click()
     await page.getByRole('group', { name: 'Choose a skill' }).getByRole('button', { name: 'Broker' }).click()
     await setDice(page, 'Term 1 Wager: Broker', 12)
     const wager = page.getByTestId('step-term-1.event.effect-0')
