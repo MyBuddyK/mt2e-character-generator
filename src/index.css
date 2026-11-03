@@ -345,6 +345,7 @@ input[type='number'] {
 }
 
 .step-applied,
+.step-reason,
 .step-note {
   font-size: 0.875rem;
   color: var(--muted);

@@ -11,13 +11,31 @@ import { EffectsSchema } from './effects'
 
 const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
 
-/** A characteristic check that succeeds on 2D + DM >= target, e.g. END 7+. Targets are integers from 0 to 20. */
+/**
+ * A characteristic check that succeeds on 2D + DM >= target, e.g. END 7+. Targets are integers from 0
+ * to 20. `characteristic` is one characteristic, or a list of them, in which case the check uses the
+ * highest DM among them (for example "DEX or INT 5+").
+ */
 export const CheckSchema = z.object({
-  characteristic: z.enum(CHARACTERISTICS),
+  characteristic: z.union([z.enum(CHARACTERISTICS), z.array(z.enum(CHARACTERISTICS)).min(1, 'must list at least one characteristic')]),
   target: z.int().min(0).max(20),
 })
 /** A characteristic check, as described by CheckSchema. */
 export type Check = z.infer<typeof CheckSchema>
+
+/**
+ * A career's qualification check: a CheckSchema check, plus optional rules.
+ * - `automatic`: true skips the roll and always qualifies.
+ * - `automaticAt`: qualifies without a roll when the checked characteristic is at least this value.
+ * - `ageDM`: a DM on the roll when the character is at least `fromAge` years old at the start of the term.
+ */
+export const QualificationSchema = CheckSchema.extend({
+  automatic: z.boolean().optional(),
+  automaticAt: z.int().min(0).optional(),
+  ageDM: z.strictObject({ fromAge: z.int().min(0), dm: z.int() }).optional(),
+})
+/** A qualification check, as described by QualificationSchema. */
+export type Qualification = z.infer<typeof QualificationSchema>
 
 /**
  * One entry in a D6 skill table: a skill name, optionally with a level or speciality, or a characteristic
@@ -114,7 +132,12 @@ export const CareerSchema = z.strictObject({
   /** Where the full rules for this career live, e.g. "Core Rulebook p.XX". */
   source: nonEmpty,
   summary: nonEmpty,
-  qualification: CheckSchema,
+  qualification: QualificationSchema,
+  /**
+   * Optional. "assignment" makes basic training use the assignment's skill table instead of the table
+   * named in the rules (the book does this for some careers).
+   */
+  basicTraining: z.literal('assignment').optional(),
   skillTables: z.strictObject({
     personalDevelopment: SkillTableSchema,
     serviceSkills: SkillTableSchema,

@@ -4,7 +4,7 @@ import { parseCareerPack, selectRules } from './career-pack'
 import { RulesSchema, type Rules } from './rules-schema'
 import { diceFor } from './dice'
 import { generateRest, policyChoice } from './policy'
-import { asCharacteristic, buildCareer, EMPTY_INPUT, pruneInput, type CareerInput, type CareerResult } from './terms'
+import { asCharacteristic, buildCareer, EMPTY_INPUT, entryOptions, pruneInput, type CareerInput, type CareerResult } from './terms'
 import { sampleRules } from '../data/rules'
 import { readSavedCharacter, writeSavedCharacter } from '../storage/characters'
 import sampleCareerJson from '../data/careers/sample-sanitation.json'
@@ -109,7 +109,7 @@ describe('buildCareer terms', () => {
     expect(keys).toContain('term-1.mishap')
     expect(keys).not.toContain('term-1.event')
     expect(keys).not.toContain('term-1.advancement')
-    expect(failed.pending).toMatchObject({ kind: 'next', forced: true })
+    expect(failed.pending).toMatchObject({ kind: 'next', forced: 'muster' })
 
     const reset = build(started(SERVICE, PASSING))
     const resetKeys = reset.terms[0]?.steps.map((s) => s.key) ?? []
@@ -307,12 +307,14 @@ describe('generateRest', () => {
     expect(generateRest(SEED, BASE, EMPTY_INPUT, { careers: [sampleCareer()], rules: sampleRules })).toEqual(EMPTY_INPUT)
   })
 
-  // Asks the policy about a forced end and about a term past the limit, and expects muster and leave.
-  it('musters out when forced and leaves at the term limit', () => {
+  // Asks the policy about a forced end, a forced stay past the limit, and a term past the limit, and
+  // expects muster, continue and leave.
+  it('follows a forced muster or continue, and leaves at the term limit', () => {
     const result = build(started(SERVICE, PASSING))
-    expect(policyChoice({ kind: 'next', key: 'k', forced: true, reason: 'x' }, result, 5)).toBe('muster')
-    expect(policyChoice({ kind: 'next', key: 'k', forced: false, reason: undefined }, result, 1)).toBe('leave')
-    expect(policyChoice({ kind: 'next', key: 'k', forced: false, reason: undefined }, result, 2)).toBe('continue')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: 'muster', reason: 'x' }, result, 5)).toBe('muster')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: 'continue', reason: 'x' }, result, 1)).toBe('continue')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: undefined, reason: undefined }, result, 1)).toBe('leave')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: undefined, reason: undefined }, result, 2)).toBe('continue')
   })
 })
 
@@ -426,5 +428,217 @@ describe('asCharacteristic', () => {
     expect(asCharacteristic('ABC +1')).toBeUndefined()
     expect(asCharacteristic('DEX or INT')).toBeUndefined()
     expect(asCharacteristic('dex')).toBeUndefined()
+  })
+})
+
+// Tests for the part 2a rules (docs/features/career-rules.md): each is switched on by a rules or career
+// field and is off without it.
+describe('buildCareer rule enforcement', () => {
+  /** Returns the sample career with its first assignment changed by `change`. */
+  function withAssignment(change: Partial<CareerDefinition['assignments'][number]>): CareerDefinition {
+    const career = sampleCareer()
+    return { ...career, assignments: career.assignments.map((a, i) => (i === 0 ? { ...a, ...change } : a)) }
+  }
+  /** Returns the sample career with its mishap for roll 1 given `effects`. */
+  function withMishap1(effects: CareerDefinition['mishaps'][number]['effects']): CareerDefinition {
+    const career = sampleCareer()
+    return { ...career, mishaps: career.mishaps.map((m) => (m.roll === 1 ? { roll: 1, summary: 'Test mishap', effects } : m)) }
+  }
+  /** Choices and rolls for a term 1 that passes and continues, and a term 2 that fails survival with mishap 1. */
+  const mishapInTerm2 = {
+    choices: { ...SERVICE, 'term-1.next': 'continue', 'term-2.skill-0.table': 'serviceSkills', 'term-2.next': 'muster' },
+    rolls: { ...PASSING, 'term-1.event': 9, 'term-1.advancement': 3, 'term-2.survival': 2, 'term-2.mishap': 1 },
+  }
+  const losesTerm: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, mishapLosesTerm: true } }
+
+  // Sets survival target 2 and survival dice 2: without the rule it passes; with failOnNatural 2 it
+  // fails and the step gives the reason.
+  it('a natural 2 fails survival when rules.survival.failOnNatural is 2', () => {
+    const career = withAssignment({ survival: { characteristic: 'DEX', target: 2 } })
+    const input = started(SERVICE, { qualification: 12, 'term-1.survival': 2 })
+    expect(step(build(input, sampleRules, career), 1, 'survival').result).toBe('pass')
+    const ruled = step(build(input, { ...sampleRules, survival: { failOnNatural: 2 } }, career), 1, 'survival')
+    expect(ruled.result).toBe('fail')
+    expect(ruled.reasons[0]).toContain('Natural 2')
+  })
+
+  // Overrides the outcome of that natural-2 survival to Pass and expects it to pass.
+  it('an outcome override beats the natural-fail rule', () => {
+    const career = withAssignment({ survival: { characteristic: 'DEX', target: 2 } })
+    const input = started(SERVICE, { qualification: 12, 'term-1.survival': 2 }, { 'term-1.survival': 'pass' })
+    expect(step(build(input, { ...sampleRules, survival: { failOnNatural: 2 } }, career), 1, 'survival').result).toBe('pass')
+  })
+
+  // Fails survival in term 2 and expects 2 benefit rolls without mishapLosesTerm and 1 with it.
+  it('a mishap that ends the career loses that term benefit roll when mishapLosesTerm is true', () => {
+    const input = started(mishapInTerm2.choices, mishapInTerm2.rolls)
+    expect(build(input).benefitCount).toBe(2)
+    const ruled = build(input, losesTerm)
+    expect(ruled.benefitCount).toBe(1)
+    expect(ruled.lostBenefitTerms).toBe(1)
+  })
+
+  // Gives mishap 1 keep-benefit and expects 2 benefit rolls with mishapLosesTerm true.
+  it('a mishap with keep-benefit keeps the term benefit roll', () => {
+    const input = started(mishapInTerm2.choices, mishapInTerm2.rolls)
+    expect(build(input, losesTerm, withMishap1([{ type: 'keep-benefit' }])).benefitCount).toBe(2)
+  })
+
+  // Gives mishap 1 stay-in-career and expects the term-2 next choice not to be forced.
+  it('a mishap with stay-in-career lets the career continue', () => {
+    const { 'term-2.next': _ignored, ...choices } = mishapInTerm2.choices
+    const result = build(started(choices, mishapInTerm2.rolls), sampleRules, withMishap1([{ type: 'stay-in-career' }]))
+    expect(result.pending).toEqual({ kind: 'next', key: 'term-2.next', forced: undefined, reason: undefined })
+  })
+
+  // Passes term 1, then rolls advancement 2 in term 2 (total 2, at or below 2 terms) and expects a forced muster with the reason.
+  it('an advancement total at or below the terms served forces leaving when leaveAtOrBelowTerms is true', () => {
+    const rules: Rules = { ...sampleRules, advancement: { leaveAtOrBelowTerms: true } }
+    const input = started(
+      { ...SERVICE, 'term-1.next': 'continue', 'term-2.skill-0.table': 'serviceSkills' },
+      { ...PASSING, 'term-1.event': 9, 'term-1.advancement': 3, 'term-2.survival': 12, 'term-2.event': 9, 'term-2.advancement': 2 },
+    )
+    expect(build(input).pending).toMatchObject({ kind: 'next', forced: undefined })
+    const ruled = build(input, rules)
+    expect(ruled.pending).toMatchObject({ kind: 'next', key: 'term-2.next', forced: 'muster' })
+    expect(step(ruled, 2, 'advancement').reasons[0]).toContain('at or below 2 terms')
+  })
+
+  // Rolls advancement 12 in term 1 with stayOnNatural 12, stores "leave", and expects a forced continue.
+  it('natural 12 on advancement forces staying when stayOnNatural is 12', () => {
+    const rules: Rules = { ...sampleRules, advancement: { stayOnNatural: 12 } }
+    const input = started(
+      { ...SERVICE, 'term-1.advancement-skill-0.table': 'serviceSkills', 'term-1.next': 'leave' },
+      { ...PASSING, 'term-1.advancement': 12 },
+    )
+    expect(build(input).finished).toBe(false)
+    expect(build(input).pending).toMatchObject({ kind: 'benefit' })
+    expect(build(input, rules).pending).toMatchObject({ kind: 'next', key: 'term-1.next', forced: 'continue' })
+  })
+
+  // With maxLevel 1, rolls Vacc Suit twice in term 1 (after Vacc Suit 0 from basic training) and
+  // expects Vacc Suit 1 and a Lost reason on the second roll.
+  it('a skill gain above skillLimits.maxLevel is lost', () => {
+    const rules: Rules = { ...sampleRules, skillLimits: { maxLevel: 1 } }
+    const result = build(
+      started({ ...SERVICE, 'term-1.advancement-skill-0.table': 'serviceSkills' }, { ...PASSING, 'term-1.skill-0': 1, 'term-1.advancement': 12, 'term-1.advancement-skill-0': 1 }),
+      rules,
+    )
+    expect(result.skills['Vacc Suit']).toBe(1)
+    expect(step(result, 1, 'advancement-skill-0').reasons[0]).toContain('Lost: Vacc Suit 2')
+  })
+
+  // With totalPerIntEdu 0 the limit is 0 levels, so the first skill roll (Vacc Suit 1) is lost.
+  it('a skill gain above totalPerIntEdu × (INT + EDU) is lost', () => {
+    const rules: Rules = { ...sampleRules, skillLimits: { totalPerIntEdu: 0 } }
+    const result = build(started(SERVICE, { ...PASSING, 'term-1.skill-0': 1 }), rules)
+    expect(result.skills['Vacc Suit']).toBe(0)
+    expect(step(result, 1, 'skill-0').reasons[0]).toContain('above 0 × (INT + EDU) = 0')
+  })
+
+  // With a +2 rank DM from rank 0, a cash roll of 1 totals 3.
+  it('the rank benefit DM applies to cash rolls', () => {
+    const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, rankBenefitDM: [{ minRank: 0, dm: 2 }] } }
+    const result = build(started({ ...SERVICE, 'term-1.next': 'leave', 'benefit-0': 'cash' }, { ...PASSING, 'term-1.advancement': 2, 'benefit-0': 1 }), rules)
+    expect(result.benefits[0]?.step.total).toBe(3)
+  })
+
+  // With cashSkillDM Vacc Suit +1 (Vacc Suit 0 from basic training), a cash roll of 1 totals 2 and a benefit roll of 1 totals 1.
+  it('cashSkillDM applies to cash rolls only, for a skill at any level', () => {
+    const rules: Rules = {
+      ...sampleRules,
+      benefits: { ...sampleRules.benefits, perTerm: 2, rankBenefitDM: [], cashSkillDM: { skill: 'Vacc Suit', dm: 1 } },
+    }
+    const result = build(
+      started({ ...SERVICE, 'term-1.next': 'leave', 'benefit-0': 'cash', 'benefit-1': 'benefit' }, { ...PASSING, 'term-1.event': 9, 'term-1.advancement': 2, 'benefit-0': 1, 'benefit-1': 1 }),
+      rules,
+    )
+    expect(result.benefits.map((b) => b.step.total)).toEqual([2, 1])
+  })
+
+  // Marks qualification automatic and sets its dice to 2; expects a pass with no dice.
+  it('automatic qualification passes without a roll', () => {
+    const career = { ...sampleCareer(), qualification: { characteristic: 'END' as const, target: 12, automatic: true } }
+    const result = build(started(SERVICE, { qualification: 2, 'term-1.survival': 12 }), sampleRules, career)
+    expect(result.qualification?.result).toBe('pass')
+    expect(result.qualification?.dice).toBeUndefined()
+  })
+
+  // Sets automaticAt 7 with END 7 and expects no roll; sets automaticAt 8 and expects a roll.
+  it('automaticAt qualifies without a roll when the characteristic is high enough', () => {
+    const at = (automaticAt: number) => ({ ...sampleCareer(), qualification: { characteristic: 'END' as const, target: 5, automaticAt } })
+    expect(build(started(SERVICE, PASSING), sampleRules, at(7)).qualification?.dice).toBeUndefined()
+    expect(build(started(SERVICE, PASSING), sampleRules, at(8)).qualification?.dice).toBeDefined()
+  })
+
+  // Uses a qualification on STR or INT with INT 12 (DM +2) and expects INT used and dice 6 to reach 8.
+  it('a check on a list of characteristics uses the highest DM', () => {
+    const career = { ...sampleCareer(), qualification: { characteristic: ['STR' as const, 'INT' as const], target: 8 } }
+    const result = buildCareer(SEED, { ...BASE, INT: 12 }, started(SERVICE, { qualification: 6 }), { careers: [career], rules: sampleRules })
+    expect(result.qualification?.characteristic).toBe('INT')
+    expect(result.qualification?.total).toBe(8)
+  })
+
+  // Sets an age DM of -2 from age 18 (the sample starting age) and expects qualification DM -2.
+  it('a qualification age DM applies from fromAge', () => {
+    const career = { ...sampleCareer(), qualification: { characteristic: 'END' as const, target: 5, ageDM: { fromAge: 18, dm: -2 } } }
+    expect(build(started(SERVICE, PASSING), sampleRules, career).qualification?.dm).toBe(-2)
+  })
+
+  // Sets basicTraining "assignment" and expects basic training to give the assignment's Gunner, not the service skill Broker.
+  it('basicTraining "assignment" trains in the assignment skills', () => {
+    const career: CareerDefinition = { ...sampleCareer(), basicTraining: 'assignment' }
+    const result = build(started(SERVICE, PASSING), sampleRules, career)
+    expect(result.skills['Gunner']).toBe(0)
+    expect(Object.keys(result.skills)).not.toContain('Broker')
+  })
+
+  // Replaces a service skill with "Drive or Flyer" and expects basic training to ask for a pick, then gives Drive 0.
+  it('an "A or B" table entry asks the player to pick one', () => {
+    const career = sampleCareer()
+    const changed: CareerDefinition = {
+      ...career,
+      skillTables: { ...career.skillTables, serviceSkills: career.skillTables.serviceSkills.map((e, i) => (i === 1 ? 'Drive or Flyer' : e)) },
+    }
+    expect(build(started(SERVICE, PASSING), sampleRules, changed).pending).toEqual({
+      kind: 'skill-option',
+      key: 'term-1.training.pick-1',
+      options: ['Drive', 'Flyer'],
+    })
+    const picked = build(started({ ...SERVICE, 'term-1.training.pick-1': 'Drive' }, PASSING), sampleRules, changed)
+    expect(picked.skills['Drive']).toBe(0)
+  })
+
+  // Splits entries on " or " outside parentheses only.
+  it('entryOptions splits on " or " outside parentheses', () => {
+    expect(entryOptions('Drive or Vacc Suit')).toEqual(['Drive', 'Vacc Suit'])
+    expect(entryOptions('Pilot (small craft or spacecraft)')).toEqual(['Pilot (small craft or spacecraft)'])
+    expect(entryOptions('Gun Combat')).toEqual(['Gun Combat'])
+  })
+
+  // Gives event 7 a promote effect and expects advancement to pass without dice and rank 1.
+  it('a promote effect passes advancement without a roll', () => {
+    const career = sampleCareer()
+    const promoted: CareerDefinition = {
+      ...career,
+      events: career.events.map((e) => (e.roll === 7 ? { roll: 7, summary: 'Promoted', effects: [{ type: 'promote' }] } : e)),
+    }
+    const result = build(
+      started({ ...SERVICE, 'term-1.advancement-skill-0.table': 'serviceSkills' }, { ...PASSING, 'term-1.event': 7, 'term-1.advancement': 2 }),
+      sampleRules,
+      promoted,
+    )
+    expect(step(result, 1, 'advancement').dice).toBeUndefined()
+    expect(result.rank).toBe(1)
+  })
+
+  // Uses aging from term 1 with a row that takes STR 7 down by 7, and expects an ageing crisis reason.
+  it('aging that takes a characteristic to 0 shows an ageing crisis', () => {
+    const rules: Rules = {
+      ...sampleRules,
+      aging: { ...sampleRules.aging, fromTerm: 1, table: [{ roll: 0, summary: 'Test', effects: [{ type: 'characteristic', characteristic: 'STR', change: -7 }] }] },
+    }
+    const result = build(started(SERVICE, PASSING), rules)
+    expect(step(result, 1, 'aging').reasons).toContain('Ageing crisis: STR is 0 or lower. Resolve it by hand.')
   })
 })

@@ -13,7 +13,7 @@ export const POLICY_SUMMARY =
 /**
  * Returns the answer the policy gives to `pending`, given the career so far and the term limit:
  * the last skill table offered, the first skill option, "continue" until `termLimit` terms are done
- * ("leave" after that, "muster" when the career is forced to end), and "cash" for the first benefit
+ * ("leave" after that; "muster" or "continue" when a rule forces it), and "cash" for the first benefit
  * roll when cash is allowed ("benefit" otherwise). Returns undefined for the start choice, which the
  * player must make.
  */
@@ -26,7 +26,7 @@ export function policyChoice(pending: PendingChoice, result: CareerResult, termL
     case 'skill-option':
       return pending.options[0]
     case 'next':
-      if (pending.forced) return 'muster'
+      if (pending.forced !== undefined) return pending.forced
       return result.terms.length >= termLimit ? 'leave' : 'continue'
     case 'benefit':
       return pending.index === 0 && pending.cashAllowed ? 'cash' : 'benefit'

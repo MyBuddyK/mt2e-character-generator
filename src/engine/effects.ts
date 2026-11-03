@@ -25,6 +25,9 @@ const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
  * - `characteristic`: add `change` (which may be negative) to one characteristic.
  * - `leave-career`: the character leaves the career at the end of the term.
  * - `mishap`: roll on the mishap table without leaving the career.
+ * - `promote`: this term's advancement roll passes without being rolled.
+ * - `stay-in-career`: on a mishap, the career does not end because of the mishap.
+ * - `keep-benefit`: on a mishap, the term still gives its benefit roll.
  */
 export const EffectSchema = z.discriminatedUnion('type', [
   z.strictObject({
@@ -39,6 +42,9 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('characteristic'), characteristic: z.enum(CHARACTERISTICS), change: z.int() }),
   z.strictObject({ type: z.literal('leave-career') }),
   z.strictObject({ type: z.literal('mishap') }),
+  z.strictObject({ type: z.literal('promote') }),
+  z.strictObject({ type: z.literal('stay-in-career') }),
+  z.strictObject({ type: z.literal('keep-benefit') }),
 ])
 /** One effect, as described by EffectSchema. */
 export type Effect = z.infer<typeof EffectSchema>

@@ -132,6 +132,11 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
         )}
       </div>
       {step.applied.length > 0 && <div className="step-applied">Applied: {step.applied.join(', ')}</div>}
+      {step.reasons.map((r) => (
+        <div className="step-reason" key={r} data-testid="step-reason">
+          {r}
+        </div>
+      ))}
       {step.notes.map((n) => (
         <div className="step-note" key={n}>
           Apply by hand: {n}
@@ -229,14 +234,28 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
         </div>
       )
     case 'next':
-      return pending.forced ? (
-        <div className="pending" role="group" aria-label="End of career">
-          <p>{pending.reason}</p>
-          <button type="button" onClick={() => choose(pending.key, 'muster')}>
-            Muster out
-          </button>
-        </div>
-      ) : (
+      if (pending.forced === 'muster') {
+        return (
+          <div className="pending" role="group" aria-label="End of career">
+            <p>{pending.reason}</p>
+            <button type="button" onClick={() => choose(pending.key, 'muster')}>
+              Muster out
+            </button>
+          </div>
+        )
+      }
+      if (pending.forced === 'continue') {
+        return (
+          <div className="pending" role="group" aria-label="After this term">
+            <p>{pending.reason}</p>
+            <button type="button" onClick={() => choose(pending.key, 'continue')}>
+              Continue in career
+            </button>
+            {generate}
+          </div>
+        )
+      }
+      return (
         <div className="pending" role="group" aria-label="After this term">
           <button type="button" onClick={() => choose(pending.key, 'continue')}>
             Continue in career

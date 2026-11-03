@@ -211,3 +211,40 @@ test.describe('career terms with packs', () => {
     )
   })
 })
+
+// Browser tests for the rules that a pack's rules values switch on (docs/features/career-rules.md).
+test.describe('career rule enforcement', () => {
+  /** Opens ?seed=terms, imports rules-enforced-pack.json, starts its career and picks Service skills. */
+  async function startEnforced(page: Page): Promise<void> {
+    await page.goto('./?seed=terms')
+    await importFixture(page, 'rules-enforced-pack.json')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Enforced career' })
+    await page.getByRole('button', { name: 'Start career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await expect(page.getByTestId('step-term-1.survival')).toBeVisible()
+  }
+
+  // Sets the survival dice to 2 against a 2+ target and expects Fail with the natural-2 reason and a mishap.
+  test('a natural 2 fails survival and says why', async ({ page }) => {
+    await startEnforced(page)
+    await setDice(page, 'Term 1 Survival', 2)
+    const survival = page.getByTestId('step-term-1.survival')
+    await expect(survival.getByTestId('step-result')).toHaveText('Fail')
+    await expect(survival.getByTestId('step-reason')).toContainText('Natural 2')
+    await expect(page.getByTestId('step-term-1.mishap')).toBeVisible()
+  })
+
+  // Passes survival with event 9, rolls advancement 12, picks Service skills for the extra roll, and
+  // expects the natural-12 reason with Continue in career and no Leave career button.
+  test('a natural 12 on advancement offers only Continue in career', async ({ page }) => {
+    await startEnforced(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Event', 9)
+    await setDice(page, 'Term 1 Advancement', 12)
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    const next = page.getByRole('group', { name: 'After this term' })
+    await expect(next).toContainText('Natural 12 on advancement')
+    await expect(next.getByRole('button', { name: 'Continue in career' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Leave career' })).toHaveCount(0)
+  })
+})

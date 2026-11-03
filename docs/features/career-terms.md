@@ -18,8 +18,9 @@ listed here only so part 1 doesn't block it.
    events, mishaps, advancement and rank bonuses, aging, choosing to continue or leave, and mustering out.
    Step-through, generate-the-rest, overrides for every roll and choice, and highlighted connection
    opportunities.
-2. **Part 2 (planned): more than one career.** Leaving one career and qualifying for the next, and the
-   fallback when qualification fails. Commissions for careers that have them.
+2. **Part 2: rule enforcement, then more than one career.** See
+   [`career-rules.md`](career-rules.md). Part 2a (rule enforcement) is built; part 2b (leaving one career
+   and qualifying for the next, the fallback when qualification fails, and commissions) is planned.
 
 Connections between characters are only highlighted (decision 9). The app does not link characters across
 players' browsers, so there is no group code and no server.

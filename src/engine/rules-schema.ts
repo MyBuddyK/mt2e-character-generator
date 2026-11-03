@@ -43,6 +43,22 @@ export const RulesSchema = z.strictObject({
   basicTraining: z.strictObject({ table: z.enum(SKILL_TABLES), level: z.int().min(0) }),
   /** The lowest EDU that allows rolls on the advancedEducation table. */
   advancedEducationMinEDU: z.int().min(0),
+  /** Optional. `failOnNatural`: survival fails when the dice (before DMs) are at or below this value. */
+  survival: z.strictObject({ failOnNatural: z.int().min(0).optional() }).optional(),
+  /**
+   * Optional advancement rules. `leaveAtOrBelowTerms`: an advancement total at or below the number of
+   * terms served in the career ends the career after the term. `stayOnNatural`: dice (before DMs) at
+   * or above this value mean the character must continue.
+   */
+  advancement: z
+    .strictObject({ leaveAtOrBelowTerms: z.boolean().optional(), stayOnNatural: z.int().min(2).optional() })
+    .optional(),
+  /**
+   * Optional skill limits. `maxLevel`: a gain that would take a skill above this level is lost.
+   * `totalPerIntEdu`: a gain that would take the sum of all skill levels above this value times
+   * (INT + EDU) is lost.
+   */
+  skillLimits: z.strictObject({ maxLevel: z.int().min(0).optional(), totalPerIntEdu: z.int().min(0).optional() }).optional(),
   /**
    * Aging: from which term it is rolled, how many dice, the DM added per term served (usually
    * negative), and the table.
@@ -54,14 +70,18 @@ export const RulesSchema = z.strictObject({
     table: z.array(AgingEntrySchema).min(1, 'must have at least one row').superRefine(consecutiveRolls),
   }),
   /**
-   * Mustering out: benefit rolls per term served, extra rolls for reaching a rank, a DM on benefit
-   * rolls (not cash rolls) from a rank, and the most cash rolls one character may take.
+   * Mustering out: benefit rolls per term served, extra rolls for reaching a rank, a DM on cash and
+   * benefit rolls from a rank, and the most cash rolls one character may take. Optional:
+   * `mishapLosesTerm` true means a term that ends the career with a mishap gives no benefit roll, and
+   * `cashSkillDM` gives a DM on cash rolls to a character who has `skill` at any level.
    */
   benefits: z.strictObject({
     perTerm: z.int().min(0),
     rankExtra: z.array(z.strictObject({ minRank: z.int().min(0), extra: z.int().min(0) })),
     rankBenefitDM: z.array(z.strictObject({ minRank: z.int().min(0), dm: z.int() })),
     cashRollLimit: z.int().min(0),
+    mishapLosesTerm: z.boolean().optional(),
+    cashSkillDM: z.strictObject({ skill: z.string().trim().min(1, 'must be a non-empty string'), dm: z.int() }).optional(),
   }),
 })
 /** A validated rules object, as described by RulesSchema. */
