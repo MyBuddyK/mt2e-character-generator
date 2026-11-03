@@ -162,8 +162,10 @@ export default function App() {
             <table>
               <thead>
                 <tr>
-                  <th scope="col">Char</th>
-                  <th scope="col">Rolled</th>
+                  <th scope="col">
+                    <abbr title="Characteristic">Char</abbr>
+                  </th>
+                  <th scope="col">Roll</th>
                   <th scope="col">Value</th>
                   <th scope="col">DM</th>
                   <th scope="col">
