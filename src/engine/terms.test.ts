@@ -4,7 +4,7 @@ import { parseCareerPack, selectRules } from './career-pack'
 import { RulesSchema, type Rules } from './rules-schema'
 import { diceFor } from './dice'
 import { generateRest, policyChoice } from './policy'
-import { buildCareer, EMPTY_INPUT, pruneInput, type CareerInput, type CareerResult } from './terms'
+import { asCharacteristic, buildCareer, EMPTY_INPUT, pruneInput, type CareerInput, type CareerResult } from './terms'
 import { sampleRules } from '../data/rules'
 import { readSavedCharacter, writeSavedCharacter } from '../storage/characters'
 import sampleCareerJson from '../data/careers/sample-sanitation.json'
@@ -407,5 +407,24 @@ describe('saved characters', () => {
     writeSavedCharacter(storage, 'a', undefined)
     expect(readSavedCharacter(storage, 'a')).toBeUndefined()
     expect(readSavedCharacter(storage, 'b')).toEqual({ packs: '', input: EMPTY_INPUT })
+  })
+})
+
+// Checks which skill table entries asCharacteristic reads as characteristic changes.
+describe('asCharacteristic', () => {
+  // A bare name and the book's "+1" form both give +1; a signed number gives that change.
+  it('reads "DEX", "DEX +1", "END+2" and "SOC -1" as characteristic changes', () => {
+    expect(asCharacteristic('DEX')).toEqual({ characteristic: 'DEX', change: 1 })
+    expect(asCharacteristic('DEX +1')).toEqual({ characteristic: 'DEX', change: 1 })
+    expect(asCharacteristic('END+2')).toEqual({ characteristic: 'END', change: 2 })
+    expect(asCharacteristic('SOC -1')).toEqual({ characteristic: 'SOC', change: -1 })
+  })
+
+  // Skill names, unknown three-letter names and other text return undefined.
+  it('returns undefined for skills and other text', () => {
+    expect(asCharacteristic('Gun Combat')).toBeUndefined()
+    expect(asCharacteristic('ABC +1')).toBeUndefined()
+    expect(asCharacteristic('DEX or INT')).toBeUndefined()
+    expect(asCharacteristic('dex')).toBeUndefined()
   })
 })

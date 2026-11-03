@@ -76,6 +76,8 @@ The top level of a pack:
 - Each career has a qualification check, skill tables, assignments with survival and advancement checks and
   ranks, an events table covering 2 to 12, a mishaps table covering 1 to 6, and a mustering-out table
   covering 1 to 7.
+- A skill table entry that is a characteristic name changes that characteristic instead of giving a skill:
+  `"DEX"` or `"DEX +1"` adds 1, and `"SOC -1"` subtracts 1. Basic training skips these entries.
 - `effects` lists what the app applies for an entry. The types are `skill`, `roll-table`, `dm-next`,
   `benefit-dm`, `extra-benefit`, `characteristic`, `leave-career` and `mishap`; see
   [`src/engine/effects.ts`](src/engine/effects.ts). Anything else goes in the entry's summary, which the app

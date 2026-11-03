@@ -152,9 +152,17 @@ export function skillTableName(table: SkillTableKey): string {
   }
 }
 
-/** Returns true when `entry` names a characteristic (a skill table entry that raises it by one). */
-function asCharacteristic(entry: string): Characteristic | undefined {
-  return CHARACTERISTICS.find((c) => c === entry)
+/**
+ * Reads a skill table entry that changes a characteristic: a characteristic name alone ("DEX"), which
+ * means +1, or a name followed by a signed whole number ("DEX +1", "SOC -1"). Returns the
+ * characteristic and the change, or undefined when the entry is anything else (a skill).
+ */
+export function asCharacteristic(entry: string): { characteristic: Characteristic; change: number } | undefined {
+  const match = /^([A-Z]{3})(?:\s*([+-]\d+))?$/.exec(entry.trim())
+  if (!match) return undefined
+  const characteristic = CHARACTERISTICS.find((c) => c === match[1])
+  if (!characteristic) return undefined
+  return { characteristic, change: match[2] === undefined ? 1 : Number(match[2]) }
 }
 
 /**
@@ -268,8 +276,8 @@ export function buildCareer(
   const applyTableEntry = (entry: string, step: Step) => {
     const c = asCharacteristic(entry)
     if (c) {
-      changes[c] += 1
-      step.applied.push(`${c} +1`)
+      changes[c.characteristic] += c.change
+      step.applied.push(`${c.characteristic} ${c.change >= 0 ? '+' : ''}${c.change}`)
     } else {
       gainSkill(entry, step)
     }
