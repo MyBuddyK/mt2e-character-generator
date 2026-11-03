@@ -368,4 +368,16 @@ test.describe('aging and anagathics', () => {
     await expect(page.getByTestId('step-term-1.anagathics-cost')).toBeVisible()
     await expect(page.getByTestId('step-term-1.survival-2')).toBeVisible()
   })
+
+  // Taps the info button after Anagathics and expects a tooltip that explains them with the pack's SOC
+  // 10+ check; then presses Escape and expects the tooltip hidden.
+  test('the anagathics info button explains anagathics', async ({ page }) => {
+    await startWanderer(page)
+    await page.getByTestId('term-1').getByRole('button', { name: 'About anagathics' }).click()
+    const tip = page.getByRole('tooltip')
+    await expect(tip).toContainText('Anagathics are drugs that slow ageing')
+    await expect(tip).toContainText('SOC 10+')
+    await page.keyboard.press('Escape')
+    await expect(tip).toHaveCount(0)
+  })
 })

@@ -399,3 +399,37 @@ input[type='number'] {
   flex-basis: 100%;
   margin: 0;
 }
+
+.info-tip {
+  position: relative;
+  display: inline-block;
+  margin-left: 0.25rem;
+}
+
+.info-tip-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: italic 600 0.8rem/1 Georgia, serif;
+  cursor: help;
+}
+
+.info-tip-text {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  width: min(18rem, 80vw);
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 400;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}

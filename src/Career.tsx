@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { Characteristic } from './engine/characteristics'
 import type { CareerDefinition } from './engine/career-schema'
 import type { SelectedRules } from './engine/career-pack'
+import type { Rules } from './engine/rules-schema'
 import { current } from './engine/overridable'
 import { POLICY_SUMMARY } from './engine/policy'
 import {
@@ -167,10 +168,66 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
   )
 }
 
+/**
+ * Returns the text of the anagathics info tip, built from the pack's `anagathics` rules: what the
+ * drugs are and what the app does while a term takes them.
+ */
+function anagathicsInfo(drugs: NonNullable<Rules['anagathics']>): string {
+  return (
+    `Anagathics are drugs that slow ageing. Tick the box to take them in this term. Starting needs ${drugs.characteristic} ${drugs.target}+. ` +
+    `Each term on them costs ${drugs.costDice}D × Cr${drugs.costPerDie}, taken from cash (a debt if cash runs out), ` +
+    'needs a second survival roll (either failure is a mishap), and adds +1 to the aging roll for each term taken in a row. ' +
+    'A term without them after a term with them rolls aging at once.'
+  )
+}
+
+interface InfoTipProps {
+  /** The accessible name of the button, e.g. "About anagathics". */
+  label: string
+  text: string
+}
+
+/**
+ * Renders an "i" button that shows `text` in a tooltip while the pointer is over it, and toggles it on
+ * click or tap. Leaving the button by keyboard or pressing Escape hides it.
+ */
+function InfoTip({ label, text }: InfoTipProps) {
+  const [open, setOpen] = useState(false)
+  const [hover, setHover] = useState(false)
+  const id = useId()
+  const shown = open || hover
+  return (
+    <span className="info-tip" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <button
+        type="button"
+        className="info-tip-button"
+        aria-label={label}
+        aria-expanded={shown}
+        aria-describedby={shown ? id : undefined}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            setOpen(false)
+            setHover(false)
+          }
+        }}
+      >
+        i
+      </button>
+      {shown && (
+        <span role="tooltip" id={id} className="info-tip-text">
+          {text}
+        </span>
+      )}
+    </span>
+  )
+}
+
 interface TermProps {
   term: TermResult
-  /** True when the rules allow anagathics, which adds the Anagathics checkbox. */
-  anagathics: boolean
+  /** The rules' anagathics values, which add the Anagathics checkbox and its info tip, or undefined. */
+  anagathics: Rules['anagathics']
   input: CareerInput
   onChange: (next: CareerInput) => void
 }
@@ -194,14 +251,17 @@ function Term({ term, anagathics, input, onChange }: TermProps) {
           {term.title ? ` ${term.title}` : ''}
         </span>
         {anagathics && (
-          <label className="term-anagathics">
-            <input
-              type="checkbox"
-              checked={input.choices[drugsKey] === 'take'}
-              onChange={(e) => onChange({ ...input, choices: setKey(input.choices, drugsKey, e.target.checked ? 'take' : undefined) })}
-            />{' '}
-            Anagathics<span className="visually-hidden"> in term {term.number}</span>
-          </label>
+          <span className="term-anagathics">
+            <label>
+              <input
+                type="checkbox"
+                checked={input.choices[drugsKey] === 'take'}
+                onChange={(e) => onChange({ ...input, choices: setKey(input.choices, drugsKey, e.target.checked ? 'take' : undefined) })}
+              />{' '}
+              Anagathics<span className="visually-hidden"> in term {term.number}</span>
+            </label>
+            <InfoTip label="About anagathics" text={anagathicsInfo(anagathics)} />
+          </span>
         )}
       </div>
       <ul className="steps">
@@ -462,8 +522,8 @@ function StartForm({ careers, prefix, exclude, input, onChange }: StartFormProps
 
 interface RunProps {
   run: CareerRun
-  /** True when the rules allow anagathics. */
-  anagathics: boolean
+  /** The rules' anagathics values, or undefined when the rules have none. */
+  anagathics: Rules['anagathics']
   input: CareerInput
   onChange: (next: CareerInput) => void
 }
@@ -587,7 +647,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
             <StartForm careers={careers} prefix="" exclude={[]} input={input} onChange={update} />
           )}
           {result.runs.map((run) => (
-            <Run key={run.index} run={run} anagathics={rules.rules.anagathics !== undefined} input={input} onChange={update} />
+            <Run key={run.index} run={run} anagathics={rules.rules.anagathics} input={input} onChange={update} />
           ))}
           {pending?.kind === 'start' && (
             <>
