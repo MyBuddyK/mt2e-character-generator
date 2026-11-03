@@ -86,8 +86,16 @@ test.describe('characteristics', () => {
   })
 })
 
-// Browser tests for the career list and the page layout.
+// Browser tests for the career list, the legal notice and the page layout.
 test.describe('page', () => {
+  // Loads the page and expects the footer to show the Fair Use disclaimer naming Mongoose Publishing.
+  test('the footer shows the Fair Use disclaimer', async ({ page }) => {
+    await page.goto('./?seed=portfolio')
+    const disclaimer = page.getByRole('contentinfo').getByTestId('fair-use-disclaimer')
+    await expect(disclaimer).toContainText('owned by Mongoose Publishing')
+    await expect(disclaimer).toContainText('for personal, non-commercial use only')
+  })
+
   // Loads the page and expects the career list to contain at least one item and no error panel.
   test('career data files are listed without errors', async ({ page }) => {
     await page.goto('./?seed=portfolio')

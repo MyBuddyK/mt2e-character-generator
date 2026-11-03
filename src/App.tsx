@@ -11,6 +11,7 @@ import {
 } from './engine/characteristics'
 import { current, isOverridden, type Overridable } from './engine/overridable'
 import { careerErrors, careers } from './data/careers'
+import { FAIR_USE_DISCLAIMER } from './legal'
 
 /** Returns the trimmed ?seed= value from the page URL, or a new random seed when it is missing or empty. */
 function initialSeed(): string {
@@ -115,8 +116,8 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
 }
 
 /**
- * Renders the characteristics table, the list of loaded careers, any career file errors, and the legal
- * notice. The current seed is kept in the URL's ?seed= value. Reroll picks a new seed and rolls a new
+ * Renders the characteristics table, the list of loaded careers, any career file errors, and a footer
+ * with Mongoose Publishing's Fair Use disclaimer. The current seed is kept in the URL's ?seed= value. Reroll picks a new seed and rolls a new
  * character.
  */
 export default function App() {
@@ -199,9 +200,9 @@ export default function App() {
         </section>
       </main>
       <footer>
-        <p className="muted">
-          Unofficial fan project. Traveller is a trademark of Far Future Enterprises. Not affiliated with or endorsed by
-          Far Future Enterprises or Mongoose Publishing.
+        <p className="muted">Unofficial fan project, not affiliated with or endorsed by Mongoose Publishing.</p>
+        <p className="muted" data-testid="fair-use-disclaimer">
+          {FAIR_USE_DISCLAIMER}
         </p>
       </footer>
     </>

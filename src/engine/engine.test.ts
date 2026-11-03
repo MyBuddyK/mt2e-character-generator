@@ -6,6 +6,8 @@ import { current, isOverridden } from './overridable'
 import { loadCareers, parseCareer } from './career-schema'
 import { careerErrors, careers } from '../data/careers'
 import sampleCourier from '../data/careers/sample-courier.json'
+import { FAIR_USE_DISCLAIMER } from '../legal'
+import readme from '../../README.md?raw'
 
 /** Returns a deep copy of the sample career, for tests that break one field at a time. */
 function sample(): Record<string, unknown> {
@@ -265,5 +267,13 @@ describe('career data', () => {
     const result = loadCareers({ './good.json': sampleCourier, './broken.json': broken })
     expect(result.careers.map((c) => c.id)).toEqual(['sample-courier'])
     expect(result.errors).toContainEqual(expect.stringMatching(/^\.\/broken\.json: name: /))
+  })
+})
+
+// Tests for the Fair Use disclaimer in src/legal.ts.
+describe('legal notice', () => {
+  // Imports README.md as text and expects it to contain the same disclaimer text the app shows.
+  it('README carries the same Fair Use disclaimer as the app', () => {
+    expect(readme).toContain(FAIR_USE_DISCLAIMER)
   })
 })
