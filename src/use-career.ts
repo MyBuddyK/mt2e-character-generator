@@ -73,12 +73,23 @@ export function useCareer(
     setState(active)
   }
   const data = useMemo(() => ({ careers, rules }), [careers, rules])
-  const result = useMemo(() => buildCareer(seed, base, active.input, data), [seed, base, active.input, data])
+  const { choices, rolls, outcomes } = active.input
+  // buildCareer does not read notes, so a notes change keeps the same choices, rolls and outcomes objects and skips the rebuild.
+  const result = useMemo(
+    () => buildCareer(seed, base, { choices, rolls, outcomes, notes: {} }, data),
+    [seed, base, choices, rolls, outcomes, data],
+  )
 
-  /** Prunes `next` against its own build, saves it, and records how many keys were removed. */
+  /**
+   * Prunes `next` against its own build, saves it, and records how many keys were removed. When only
+   * the notes changed, it skips the build and pruning.
+   */
   const commit = (next: CareerInput, extra: Partial<LoadedState> = {}) => {
-    const built = buildCareer(seed, base, next, data)
-    const { input: pruned, removed } = pruneInput(next, built.usedKeys)
+    const notesOnly =
+      next.choices === active.input.choices && next.rolls === active.input.rolls && next.outcomes === active.input.outcomes
+    const { input: pruned, removed } = notesOnly
+      ? { input: next, removed: [] }
+      : pruneInput(next, buildCareer(seed, base, next, data).usedKeys)
     const empty =
       Object.keys(pruned.choices).length === 0 &&
       Object.keys(pruned.rolls).length === 0 &&

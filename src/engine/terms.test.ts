@@ -239,6 +239,56 @@ describe('buildCareer mustering out', () => {
   })
 })
 
+// Tests for effects and overrides found in review.
+describe('buildCareer effect and override details', () => {
+  /** Returns the sample career with the event for roll 7 replaced by one with `effects`. */
+  function withEvent7(effects: CareerDefinition['events'][number]['effects']): CareerDefinition {
+    const career = sampleCareer()
+    return { ...career, events: career.events.map((e) => (e.roll === 7 ? { roll: 7, summary: 'Test event', effects } : e)) }
+  }
+  const leaveAfter1 = { ...SERVICE, 'term-1.next': 'leave' }
+  const event7 = { ...PASSING, 'term-1.event': 7, 'term-1.advancement': 2 }
+
+  // Leaves after one term with rules giving three rolls per term, and expects benefitCount 3 before any roll is made.
+  it('reports the total number of benefit rolls', () => {
+    const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, perTerm: 3 } }
+    expect(build(started(leaveAfter1, event7), rules).benefitCount).toBe(3)
+  })
+
+  // Gives a +3 benefit DM, takes cash then a benefit with both dice at 1, and expects the cash roll
+  // total 1 and the benefit roll total 4.
+  it('a benefit DM applies to the next roll on the benefit table, not a cash roll', () => {
+    const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, perTerm: 2, rankBenefitDM: [] } }
+    const result = build(
+      started({ ...leaveAfter1, 'benefit-0': 'cash', 'benefit-1': 'benefit' }, { ...event7, 'benefit-0': 1, 'benefit-1': 1 }),
+      rules,
+      withEvent7([{ type: 'benefit-dm', dm: 3 }]),
+    )
+    expect(result.benefits.map((b) => b.step.total)).toEqual([1, 4])
+  })
+
+  // Gives an event a roll on advancedEducation with EDU 7 (below the sample minimum) and expects a
+  // note, no extra roll and no empty skill name.
+  it('a roll-table effect on a table the character cannot use becomes a note', () => {
+    const result = build(started(SERVICE, event7), sampleRules, withEvent7([{ type: 'roll-table', table: 'advancedEducation' }]))
+    expect(step(result, 1, 'event').notes[0]).toContain('EDU is below the minimum')
+    expect(Object.keys(result.skills)).not.toContain('')
+  })
+
+  // Gives a qualification DM from an event and expects it kept in the result for a later career.
+  it('keeps a qualification DM for a later career', () => {
+    const result = build(started(SERVICE, event7), sampleRules, withEvent7([{ type: 'dm-next', roll: 'qualification', dm: 2 }]))
+    expect(result.qualificationDM).toBe(2)
+  })
+
+  // Stores a Pass outcome on a survival check that already passes, and expects it unused so pruneInput removes it.
+  it('an outcome override equal to the automatic result is not kept', () => {
+    const input = started(SERVICE, PASSING, { 'term-1.survival': 'pass' })
+    const { removed } = pruneInput(input, build(input).usedKeys)
+    expect(removed).toContain('term-1.survival')
+  })
+})
+
 // Tests for the Generate the rest policy in policy.ts.
 describe('generateRest', () => {
   // Generates from a started career and expects a finished character with no pending choice, at most

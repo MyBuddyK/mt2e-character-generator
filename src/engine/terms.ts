@@ -109,6 +109,10 @@ export interface CareerResult {
   title: string | undefined
   age: number
   benefits: BenefitResult[]
+  /** How many mustering-out rolls the character gets, or 0 before mustering out. */
+  benefitCount: number
+  /** A DM from a dm-next effect for the next career's qualification roll (used by a later career). */
+  qualificationDM: number
   cash: number
   connections: ConnectionOpportunity[]
   /** The next choice to make, or undefined once the character has mustered out. */
@@ -183,6 +187,7 @@ export function buildCareer(
   const nextDM = { advancement: 0, qualification: 0 }
   let benefitDM = 0
   let extraBenefits = 0
+  let benefitCount = 0
 
   const value = (c: Characteristic) => normalizeCharacteristic(base[c] + changes[c]) ?? 0
   const choice = (key: string): string | undefined => {
@@ -190,20 +195,19 @@ export function buildCareer(
     if (v !== undefined) usedKeys.add(key)
     return v
   }
-  const rollOverride = (key: string): number | undefined => {
-    const v = input.rolls[key]
-    if (v !== undefined) usedKeys.add(`roll:${key}`)
-    return v
-  }
-  const outcomeOverride = (key: string): boolean | undefined => {
-    const v = input.outcomes[key]
-    if (v !== undefined) usedKeys.add(`outcome:${key}`)
-    return v === undefined ? undefined : v === 'pass'
-  }
+  // An override equal to the rolled value or the automatic result is not read, so pruneInput removes it.
   const dice = (key: string, count: number): Overridable<number> => {
     const rolledValue = diceFor(seed, key).roll(count)
-    const override = rollOverride(key)
-    return override === undefined || override === rolledValue ? { rolled: rolledValue } : { rolled: rolledValue, override }
+    const override = input.rolls[key]
+    if (override === undefined || override === rolledValue) return { rolled: rolledValue }
+    usedKeys.add(`roll:${key}`)
+    return { rolled: rolledValue, override }
+  }
+  const outcomeOverride = (key: string, auto: boolean): boolean | undefined => {
+    const v = input.outcomes[key]
+    if (v === undefined || (v === 'pass') === auto) return undefined
+    usedKeys.add(`outcome:${key}`)
+    return v === 'pass'
   }
 
   /** Rolls 2D + characteristic DM + `extraDM` against a check. */
@@ -212,8 +216,8 @@ export function buildCareer(
     const dm = characteristicDM(value(target.characteristic)) + extraDM
     const total = current(d) + dm
     const auto = total >= target.target
-    const ruled = outcomeOverride(key)
-    const passed: Overridable<boolean> = ruled === undefined || ruled === auto ? { rolled: auto } : { rolled: auto, override: ruled }
+    const ruled = outcomeOverride(key, auto)
+    const passed: Overridable<boolean> = ruled === undefined ? { rolled: auto } : { rolled: auto, override: ruled }
     return {
       key,
       label,
@@ -308,6 +312,13 @@ export function buildCareer(
         }
         case 'roll-table': {
           const entries = tableEntries(effect.table)
+          const blocked = effect.table === 'advancedEducation' && value('EDU') < rules.advancedEducationMinEDU
+          if (entries.length === 0 || blocked) {
+            step.notes.push(
+              `Roll on ${skillTableName(effect.table)}: ${entries.length === 0 ? 'this career has no such table' : 'EDU is below the minimum for this table'}. Apply by hand.`,
+            )
+            break
+          }
           const { step: rollStep } = tableRoll(effectKey, `Skill roll: ${skillTableName(effect.table)}`, 1, 0, entries.map((_, n) => ({ roll: n + 1 })))
           const entry = entries[Math.min(Math.max((rollStep.total ?? 1) - 1, 0), entries.length - 1)] ?? ''
           rollStep.result = entry
@@ -317,11 +328,15 @@ export function buildCareer(
         }
         case 'dm-next':
           nextDM[effect.roll] += effect.dm
-          step.applied.push(`DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next ${effect.roll} roll`)
+          step.applied.push(
+            effect.roll === 'qualification'
+              ? `DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next qualification roll (kept for a later career)`
+              : `DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next advancement roll`,
+          )
           break
         case 'benefit-dm':
           benefitDM += effect.dm
-          step.applied.push(`DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next benefit roll`)
+          step.applied.push(`DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next roll on the benefit table`)
           break
         case 'extra-benefit': {
           const count = effect.count ?? 1
@@ -342,6 +357,8 @@ export function buildCareer(
             mishapDepth += 1
             mishap(effectKey, termSteps, term, false)
             mishapDepth -= 1
+          } else {
+            step.notes.push('Roll another mishap. The app rolls only one extra mishap per entry; apply this one by hand.')
           }
           break
       }
@@ -351,7 +368,8 @@ export function buildCareer(
   /** Rolls on the mishap table and applies the entry. When `endsCareer`, the career ends after the term. */
   const mishap = (key: string, termSteps: Step[], term: TermResult | undefined, endsCareer: boolean) => {
     if (!career) return
-    const { step, row } = tableRoll(key, endsCareer ? 'Mishap' : 'Mishap (keeps the job)', 1, 0, career.mishaps)
+    const label = endsCareer ? 'Mishap' : term?.endReason ? 'Extra mishap' : 'Mishap (keeps the job)'
+    const { step, row } = tableRoll(key, label, 1, 0, career.mishaps)
     step.result = row?.summary ?? ''
     if (row?.connection) step.connection = true
     termSteps.push(step)
@@ -477,6 +495,7 @@ export function buildCareer(
     const highest = <T extends { minRank: number }>(list: T[]) =>
       [...list].filter((e) => e.minRank <= rank).sort((a, b) => b.minRank - a.minRank)[0]
     const count = terms.length * rules.benefits.perTerm + (highest(rules.benefits.rankExtra)?.extra ?? 0) + extraBenefits
+    benefitCount = count
     const rankDM = highest(rules.benefits.rankBenefitDM)?.dm ?? 0
     let cashRolls = 0
     for (let i = 0; i < count; i += 1) {
@@ -488,8 +507,8 @@ export function buildCareer(
       }
       const table = picked === 'cash' ? 'cash' : 'benefit'
       if (table === 'cash') cashRolls += 1
-      const dm = benefitDM + (table === 'benefit' ? rankDM : 0)
-      benefitDM = 0
+      const dm = table === 'benefit' ? benefitDM + rankDM : 0
+      if (table === 'benefit') benefitDM = 0
       const { step, row } = tableRoll(key, table === 'cash' ? 'Cash roll' : 'Benefit roll', 1, dm, career.musteringOut)
       const result: BenefitResult = {
         step,
@@ -518,6 +537,8 @@ export function buildCareer(
     title,
     age,
     benefits,
+    benefitCount,
+    qualificationDM: nextDM.qualification,
     cash: benefits.reduce((sum, b) => sum + b.cash, 0),
     connections,
     pending,

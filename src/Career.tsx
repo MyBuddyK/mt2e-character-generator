@@ -2,9 +2,9 @@ import { useState } from 'react'
 import type { Characteristic } from './engine/characteristics'
 import type { CareerDefinition } from './engine/career-schema'
 import type { SelectedRules } from './engine/career-pack'
-import { current, isOverridden } from './engine/overridable'
+import { current } from './engine/overridable'
 import { POLICY_SUMMARY } from './engine/policy'
-import { skillTableName, type CareerInput, type PendingChoice, type Step, type TermResult } from './engine/terms'
+import { skillTableName, stepOverridden, type CareerInput, type PendingChoice, type Step, type TermResult } from './engine/terms'
 import { useCareer } from './use-career'
 
 /** Returns a DM as text with a sign, e.g. "+1", "+0", "-2". */
@@ -35,7 +35,7 @@ interface StepRowProps {
  */
 function StepRow({ step, context, input, onChange }: StepRowProps) {
   const name = `${context} ${step.label}`
-  const overridden = (step.dice !== undefined && isOverridden(step.dice)) || (step.passed !== undefined && isOverridden(step.passed))
+  const overridden = stepOverridden(step)
   const diceValue = step.dice === undefined ? undefined : current(step.dice)
   const [draft, setDraft] = useState(diceValue === undefined ? '' : String(diceValue))
   const [shown, setShown] = useState(diceValue)
@@ -289,7 +289,6 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
   const assignment = selected?.assignments.find((a) => a.id === pickedAssignment) ?? selected?.assignments[0]
   const started = result.career !== undefined && result.assignment !== undefined
   const pending = result.pending
-  const benefitCount = result.benefits.length + (pending?.kind === 'benefit' ? 1 : 0)
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)
 
   return (
@@ -417,7 +416,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
           )}
 
           {pending && started && (
-            <Pending pending={pending} input={input} onChange={update} onGenerate={career.generate} benefitCount={benefitCount} />
+            <Pending pending={pending} input={input} onChange={update} onGenerate={career.generate} benefitCount={result.benefitCount} />
           )}
 
           {result.finished && (

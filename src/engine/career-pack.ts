@@ -16,8 +16,8 @@ export const PACK_FORMAT = 'mt2e-career-pack'
  */
 export const PACK_FORMAT_VERSION = 2
 
-/** Every `formatVersion` this app reads. */
-export const SUPPORTED_FORMAT_VERSIONS: readonly number[] = [1, 2]
+/** Every `formatVersion` this app reads: 1 up to PACK_FORMAT_VERSION. */
+export const SUPPORTED_FORMAT_VERSIONS: readonly number[] = Array.from({ length: PACK_FORMAT_VERSION }, (_, i) => i + 1)
 
 const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
 
@@ -26,7 +26,9 @@ const packFields = {
   /** Optional link to a JSON Schema, for editors. The app ignores it. */
   $schema: z.string().optional(),
   format: z.literal(PACK_FORMAT),
-  formatVersion: z.union([z.literal(1), z.literal(2)]),
+  formatVersion: z.int().refine((v) => SUPPORTED_FORMAT_VERSIONS.includes(v), {
+    message: `must be one of ${SUPPORTED_FORMAT_VERSIONS.join(', ')}`,
+  }),
   id: nonEmpty,
   name: nonEmpty,
   /** A whole number the referee raises each time they edit the pack. */
