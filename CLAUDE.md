@@ -38,7 +38,8 @@ also the owner's portfolio project.
   `npx playwright init-agents --loop=claude` and then edited to follow this file. Re-running that
   command overwrites the edits.
 - `playwright-test-monitor`: runs the suite, sorts failures into regressions, broken tests and flaky
-  tests, and hands broken tests to the healer.
+  tests, and hands broken tests to the healer. On a green run it also removes duplicate or purgeable tests,
+  following the rules in its file.
 
 ## Type checking
 
@@ -66,4 +67,5 @@ plans.
 - Treat the repo as public. Never commit rulebook text or full tables. Career files hold short summaries and a
   `source` citation; the owner fills in the real data.
 - Specs load the app with a fixed `?seed=` so results are deterministic.
-- Never skip or delete a test to get green.
+- Never skip or delete a test to get green. Removing a test that duplicates another, or that checks
+  removed behavior, is a separate change made only on a green run (see `playwright-test-monitor`).
