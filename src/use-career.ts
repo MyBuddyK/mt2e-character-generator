@@ -88,15 +88,17 @@ export function useCareer(
 
   /**
    * Prunes `next` against its own build, saves it, and records how many keys were removed. When only
-   * the notes changed, it skips the build and pruning. `extra` is applied last, so it can replace
-   * removedCount; removedTerm is cleared unless `extra` sets it.
+   * the notes changed, or `removedTerm` is given (removeLastTerm has already pruned `next`), it skips
+   * the build and pruning. It sets removedTerm to `removedTerm`, so any other change clears it.
+   * `savedFromOtherPacks` is applied when given.
    */
-  const commit = (next: CareerInput, extra: Partial<LoadedState> = {}) => {
+  const commit = (next: CareerInput, extra: { savedFromOtherPacks?: undefined; removedTerm?: number } = {}) => {
     const notesOnly =
       next.choices === active.input.choices && next.rolls === active.input.rolls && next.outcomes === active.input.outcomes
-    const { input: pruned, removed } = notesOnly
-      ? { input: next, removed: [] }
-      : pruneInput(next, buildCareer(seed, base, next, data).usedKeys)
+    const { input: pruned, removed } =
+      notesOnly || extra.removedTerm !== undefined
+        ? { input: next, removed: [] }
+        : pruneInput(next, buildCareer(seed, base, next, data).usedKeys)
     const empty =
       Object.keys(pruned.choices).length === 0 &&
       Object.keys(pruned.rolls).length === 0 &&
@@ -105,11 +107,11 @@ export function useCareer(
     const write = writeSavedCharacter(storage, seed, empty ? undefined : { packs, input: pruned })
     setState((s) => ({
       ...s,
-      removedTerm: undefined,
+      ...('savedFromOtherPacks' in extra ? { savedFromOtherPacks: undefined } : {}),
+      removedTerm: extra.removedTerm,
       input: pruned,
       removedCount: removed.length,
       saveFailed: write === 'failed',
-      ...extra,
     }))
   }
 
@@ -130,9 +132,8 @@ export function useCareer(
       setState((s) => ({ ...s, savedFromOtherPacks: undefined, input: EMPTY_INPUT, removedCount: 0, removedTerm: undefined }))
     },
     removeLastTerm: () => {
-      const number = result.terms[result.terms.length - 1]?.number
-      const next = removeLastTerm(seed, base, active.input, data)
-      if (next !== undefined && number !== undefined) commit(next, { removedCount: 0, removedTerm: number })
+      const removal = removeLastTerm(seed, base, active.input, data, result)
+      if (removal) commit(removal.input, { removedTerm: removal.removed })
     },
   }
 }

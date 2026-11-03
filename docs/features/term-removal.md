@@ -38,6 +38,9 @@ now the most recent.
 
 6. **A notice says what was removed.** After a removal, a line says which term was removed and which term
    the character is back at the end of (or that the career pick is next). The next change clears it.
+   The line is a polite live region that stays on the page, so screen readers can announce each removal. Keyboard
+   focus moves to the new most recent term's Remove term button, or to Start career when no term is left,
+   because the clicked button is gone.
 
 7. **There is no confirmation and no undo.** The removal is saved straight away, like every other change.
 
@@ -54,3 +57,5 @@ now the most recent.
 - [x] **TR-7** Removing a term deletes that term's choices, overrides and notes and keeps those of earlier terms,
       and the result is still there after a reload.
 - [x] **TR-8** After a removal, a notice names the removed term and the term the character is back at.
+- [x] **TR-9** After a removal, keyboard focus is on the new most recent term's Remove term button, or on Start
+      career when no term is left.

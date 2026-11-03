@@ -634,9 +634,21 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
   const { input, result, update } = career
   const pending = result.pending
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)
+  const sectionRef = useRef<HTMLElement>(null)
+  const removedTerm = career.removedTerm
+  // After a removal the clicked button is gone, so focus moves to the new most recent term's Remove
+  // term button, or to Start career when no term is left.
+  useEffect(() => {
+    if (removedTerm === undefined) return
+    const section = sectionRef.current
+    const target =
+      section?.querySelector<HTMLButtonElement>('[data-testid="remove-term"]') ??
+      section?.querySelector<HTMLButtonElement>('.career-start button[type="submit"]')
+    target?.focus()
+  }, [removedTerm])
 
   return (
-    <section aria-labelledby="career-heading" data-testid="career">
+    <section aria-labelledby="career-heading" data-testid="career" ref={sectionRef}>
       <h2 id="career-heading">Career</h2>
 
       {rules.packName === undefined ? (
@@ -679,14 +691,12 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
               override{career.removedCount === 1 ? '' : 's'} that no longer apply.
             </p>
           )}
-          {career.removedTerm !== undefined && (
-            <p className="notice small" data-testid="removed-term-notice" role="status">
-              Removed term {career.removedTerm}.{' '}
-              {career.removedTerm > 1
-                ? `The character is back at the end of term ${career.removedTerm - 1}.`
-                : 'Pick a career to start again.'}
-            </p>
-          )}
+          {/* The live region stays mounted, empty until a removal, so screen readers announce the first removal too. */}
+          <p className={removedTerm === undefined ? undefined : 'notice small'} data-testid="removed-term-notice" aria-live="polite">
+            {removedTerm === undefined
+              ? ''
+              : `Removed term ${removedTerm}. ${removedTerm > 1 ? `The character is back at the end of term ${removedTerm - 1}.` : 'Pick a career to start again.'}`}
+          </p>
           {career.saveFailed && (
             <p className="notice small" data-testid="career-save-failed">
               This character could not be saved in this browser. It stays until the page closes.

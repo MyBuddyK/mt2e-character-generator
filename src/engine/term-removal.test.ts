@@ -60,6 +60,11 @@ function playTo(seed: string, base: Record<Characteristic, number>, input: Caree
   throw new Error(`${seed}: no pause after term ${terms}`)
 }
 
+/** Returns the input removeLastTerm gives for these arguments, or undefined when it removes nothing. */
+function removeInput(seed: string, base: Record<Characteristic, number>, input: CareerInput, data: CareerData): CareerInput | undefined {
+  return removeLastTerm(seed, base, input, data)?.input
+}
+
 /** Seeds `remove-0` to `remove-39`, a fixed list so a failure names a seed that reproduces it. */
 const SEEDS = Array.from({ length: 40 }, (_, i) => `remove-${i}`)
 
@@ -68,7 +73,7 @@ const SEEDS = Array.from({ length: 40 }, (_, i) => `remove-${i}`)
 describe('removeLastTerm sweep', () => {
   // For each seed and each career in the sample career and the valid fixture pack, runs Finish career,
   // then removes the most recent term until none are left. After each removal that leaves k terms,
-  // expects the input and the built career to equal those of a character played with the same policy
+  // expects the removed term's number to be k + 1, the input and the built career to equal those of a character played with the same policy
   // that stopped at the end of term k, and the terms to equal the first k terms of the full career.
   // After the last removal, expects an empty input with the start choice pending.
   // Criteria: TR-2, TR-3, TR-4.
@@ -83,9 +88,10 @@ describe('removeLastTerm sweep', () => {
         const fullTerms = buildCareer(seed, base, full, data).terms
         let input = full
         for (let k = fullTerms.length - 1; k >= 0; k -= 1) {
-          const removed = removeLastTerm(seed, base, input, data)
-          if (removed === undefined) throw new Error(`${career.id} ${seed}: nothing removed with ${k + 1} terms`)
-          input = removed
+          const removal = removeLastTerm(seed, base, input, data)
+          if (removal === undefined) throw new Error(`${career.id} ${seed}: nothing removed with ${k + 1} terms`)
+          expect(removal.removed, `${career.id} ${seed}`).toBe(k + 1)
+          input = removal.input
           removals += 1
           const result = buildCareer(seed, base, input, data)
           const label = `${career.id} ${seed} back to ${k} terms`
@@ -96,7 +102,7 @@ describe('removeLastTerm sweep', () => {
           expect(result, label).toEqual(buildCareer(seed, base, reference, data))
           expect(result.pending?.kind, label).toBe(k === 0 ? 'start' : 'next')
         }
-        expect(removeLastTerm(seed, base, input, data), `${career.id} ${seed}`).toBeUndefined()
+        expect(removeInput(seed, base, input, data), `${career.id} ${seed}`).toBeUndefined()
       }
     }
     expect(removals).toBeGreaterThan(SEEDS.length)
@@ -115,7 +121,7 @@ describe('removeLastTerm sweep', () => {
       const base = baseFor(seed)
       const full = finishCareer(seed, base, startOf(career), data)
       if (buildCareer(seed, base, full, data).terms.length < 2) continue
-      const removed = removeLastTerm(seed, base, full, data) ?? EMPTY_INPUT
+      const removed = removeInput(seed, base, full, data) ?? EMPTY_INPUT
       expect(finishCareer(seed, base, removed, data), seed).toEqual(full)
       checked += 1
     }
@@ -151,15 +157,15 @@ describe('removeLastTerm', () => {
   // Builds a career with only the start choice made (no terms yet) and expects undefined.
   // Criteria: TR-3.
   it('returns undefined when the career has no terms', () => {
-    expect(removeLastTerm(SEED, BASE, EMPTY_INPUT, DATA)).toBeUndefined()
-    expect(removeLastTerm(SEED, BASE, { ...EMPTY_INPUT, choices: { 'start.career': 'sample-sanitation' } }, DATA)).toBeUndefined()
+    expect(removeInput(SEED, BASE, EMPTY_INPUT, DATA)).toBeUndefined()
+    expect(removeInput(SEED, BASE, { ...EMPTY_INPUT, choices: { 'start.career': 'sample-sanitation' } }, DATA)).toBeUndefined()
   })
 
   // Removes term 2 of TWO_TERMS and expects term 1's choices, rolls and note kept, term 2's choices,
   // rolls and note gone, term-1.next gone, and the after-term choice of term 1 pending.
   // Criteria: TR-2, TR-7.
   it('removes the term’s choices, overrides and note and keeps the earlier term’s', () => {
-    const removed = removeLastTerm(SEED, BASE, TWO_TERMS, DATA)
+    const removed = removeInput(SEED, BASE, TWO_TERMS, DATA)
     expect(removed).toEqual({
       choices: { 'start.career': 'sample-sanitation', 'start.assignment': 'debris-sweep', 'term-1.skill-0.table': 'serviceSkills' },
       rolls: { qualification: 12, 'term-1.survival': 12, 'term-1.advancement': 2 },
@@ -176,7 +182,7 @@ describe('removeLastTerm', () => {
   // equal those of the input that stops after term 1 with no term 2 keys.
   // Criteria: TR-2.
   it('undoes the skills, rank and age the removed term added', () => {
-    const removed = buildCareer(SEED, BASE, removeLastTerm(SEED, BASE, TWO_TERMS, DATA) ?? EMPTY_INPUT, DATA)
+    const removed = buildCareer(SEED, BASE, removeInput(SEED, BASE, TWO_TERMS, DATA) ?? EMPTY_INPUT, DATA)
     const oneTerm = buildCareer(
       SEED,
       BASE,
@@ -197,7 +203,7 @@ describe('removeLastTerm', () => {
   // Then picks Leave career instead and expects one term and the first benefit roll pending.
   // Criteria: TR-5.
   it('continue or leave after a removal goes on from the end of the term before', () => {
-    const removed = removeLastTerm(SEED, BASE, TWO_TERMS, DATA) ?? EMPTY_INPUT
+    const removed = removeInput(SEED, BASE, TWO_TERMS, DATA) ?? EMPTY_INPUT
     const again = buildCareer(
       SEED,
       BASE,
@@ -218,7 +224,7 @@ describe('removeLastTerm', () => {
   it('removes the mustering out that followed the term', () => {
     const mustered = withTwo({ 'term-2.next': 'leave', 'benefit-0': 'cash', 'benefit-1': 'benefit' })
     expect(buildCareer(SEED, BASE, mustered, DATA).finished).toBe(true)
-    const removed = removeLastTerm(SEED, BASE, mustered, DATA) ?? EMPTY_INPUT
+    const removed = removeInput(SEED, BASE, mustered, DATA) ?? EMPTY_INPUT
     expect(Object.keys(removed.choices).filter((k) => k.startsWith('benefit-') || k === 'term-1.next')).toEqual([])
     const result = buildCareer(SEED, BASE, removed, DATA)
     expect(result.benefits).toEqual([])
@@ -242,7 +248,7 @@ describe('removeLastTerm', () => {
     const before = buildCareer(SEED, BASE, withRolls, DATA)
     expect(before.runs).toHaveLength(2)
     expect(before.terms[2]?.key).toBe('career-2.term-1')
-    const removed = removeLastTerm(SEED, BASE, withRolls, DATA) ?? EMPTY_INPUT
+    const removed = removeInput(SEED, BASE, withRolls, DATA) ?? EMPTY_INPUT
     const keys = [...Object.keys(removed.choices), ...Object.keys(removed.rolls)]
     expect(keys.filter((k) => k.startsWith('career-2.') || k.startsWith('benefit-') || k === 'term-2.next')).toEqual([])
     const result = buildCareer(SEED, BASE, removed, DATA)
@@ -255,8 +261,27 @@ describe('removeLastTerm', () => {
   // removed and the start choice pending.
   // Criteria: TR-4.
   it('removing the first term goes back to the career pick', () => {
-    const removed = removeLastTerm(SEED, BASE, removeLastTerm(SEED, BASE, TWO_TERMS, DATA) ?? EMPTY_INPUT, DATA)
+    const removed = removeInput(SEED, BASE, removeInput(SEED, BASE, TWO_TERMS, DATA) ?? EMPTY_INPUT, DATA)
     expect(removed).toEqual(EMPTY_INPUT)
     expect(buildCareer(SEED, BASE, removed ?? TWO_TERMS, DATA).pending?.kind).toBe('start')
+  })
+
+  // Gives TWO_TERMS notes for terms 3 and 4 as well (left by terms an earlier change dropped), plus
+  // a term 1 survival override that fails, so the career has one term. Removes term 1 and expects
+  // every note gone and removed set to 1; removes term 2 of TWO_TERMS with the same extra notes and
+  // expects only the term 1 note kept.
+  // Criteria: TR-7.
+  it('removes notes left by later terms that an earlier change dropped', () => {
+    const stale = { 'term-3': 'old third', 'term-4': 'old fourth' }
+    const oneTerm: CareerInput = {
+      ...TWO_TERMS,
+      rolls: { ...TWO_TERMS.rolls, 'term-1.survival': 2 },
+      notes: { ...TWO_TERMS.notes, ...stale },
+    }
+    expect(buildCareer(SEED, BASE, oneTerm, DATA).terms).toHaveLength(1)
+    expect(removeLastTerm(SEED, BASE, oneTerm, DATA)).toEqual({ input: EMPTY_INPUT, removed: 1 })
+    const removal = removeLastTerm(SEED, BASE, { ...TWO_TERMS, notes: { ...TWO_TERMS.notes, ...stale } }, DATA)
+    expect(removal?.removed).toBe(2)
+    expect(removal?.input.notes).toEqual({ 'term-1': 'first term note' })
   })
 })

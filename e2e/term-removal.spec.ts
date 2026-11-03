@@ -28,9 +28,10 @@ async function playTerms(page: Page, terms: number): Promise<void> {
 // sample career and ?seed=terms.
 test.describe('removing the most recent term', () => {
   // Plays three terms and expects one Remove term button, on term 3. Removes term 3, then term 2, then
-  // term 1, and after each removal expects the term gone, the button on the term before it, and a
-  // notice naming the removed term; after the last removal expects the Start career form.
-  // Criteria: TR-1, TR-3, TR-4, TR-8.
+  // term 1, and after each removal expects the term gone, the button on the term before it with
+  // keyboard focus, and a notice naming the removed term; after the last removal expects focus on
+  // Start career.
+  // Criteria: TR-1, TR-3, TR-4, TR-8, TR-9.
   test('terms can be removed one at a time back to the career pick', async ({ page }) => {
     await playTerms(page, 3)
     await expect(page.getByTestId('remove-term')).toHaveCount(1)
@@ -43,14 +44,14 @@ test.describe('removing the most recent term', () => {
         `Removed term ${term}. The character is back at the end of term ${term - 1}.`,
       )
       await expect(page.getByTestId('remove-term')).toHaveCount(1)
-      await expect(page.getByTestId(`term-${term - 1}`).getByRole('button', { name: `Remove term ${term - 1}` })).toBeVisible()
+      await expect(page.getByTestId(`term-${term - 1}`).getByRole('button', { name: `Remove term ${term - 1}` })).toBeFocused()
       await expect(page.getByRole('button', { name: 'Continue in career' })).toBeVisible()
     }
 
     await page.getByRole('button', { name: 'Remove term 1' }).click()
     await expect(page.getByTestId('term-1')).toHaveCount(0)
     await expect(page.getByTestId('removed-term-notice')).toHaveText('Removed term 1. Pick a career to start again.')
-    await expect(page.getByRole('button', { name: 'Start career' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Start career' })).toBeFocused()
   })
 
   // Plays one term, continues, sets the term 2 event dice to 6 and picks Engineer, leaves and takes
