@@ -5,7 +5,8 @@ An unofficial fan-made web app for building Mongoose Traveller 2nd Edition chara
 Current state: the app rolls the six characteristics from a seed, and the player can override each value.
 Players can import career packs from a file or an https link. A character can go through one career term by
 term (qualification, skills, survival, events, mishaps, advancement, aging and mustering out), with every
-roll and choice overridable and a Finish career button that plays on until the character is forced out. Events marked as connections are listed for the
+roll and choice overridable and a Finish career button that plays on until the character is forced out. The most
+recent term can be removed, one term at a time, and play goes on from the end of the term before it. Events marked as connections are listed for the
 group to talk through.
 
 Planned: more than one career per character, and exporting to Foundry VTT.

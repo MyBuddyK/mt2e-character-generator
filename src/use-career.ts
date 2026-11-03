@@ -3,7 +3,7 @@ import type { Characteristic } from './engine/characteristics'
 import type { CareerDefinition } from './engine/career-schema'
 import { finishCareer } from './engine/policy'
 import type { Rules } from './engine/rules-schema'
-import { buildCareer, EMPTY_INPUT, pruneInput, type CareerInput, type CareerResult } from './engine/terms'
+import { buildCareer, EMPTY_INPUT, pruneInput, removeLastTerm, type CareerInput, type CareerResult } from './engine/terms'
 import { browserStorage } from './storage/career-packs'
 import { readSavedCharacter, writeSavedCharacter, type SavedCharacter } from './storage/characters'
 
@@ -17,6 +17,8 @@ export interface CareerState {
   removedCount: number
   /** True when the last save failed. */
   saveFailed: boolean
+  /** The number of the term the last change removed with removeLastTerm, or undefined after any other change. */
+  removedTerm: number | undefined
   /** Replaces the input, removes keys the new build doesn't read, and saves it. */
   update: (next: CareerInput) => void
   /** Makes the remaining choices with the Finish career policy, and saves the result. */
@@ -25,6 +27,8 @@ export interface CareerState {
   applySaved: () => void
   /** Deletes savedFromOtherPacks and starts this character over. */
   discardSaved: () => void
+  /** Removes the most recent term with removeLastTerm and saves the result. Does nothing when there are no terms. */
+  removeLastTerm: () => void
 }
 
 interface LoadedState {
@@ -34,6 +38,7 @@ interface LoadedState {
   savedFromOtherPacks: SavedCharacter | undefined
   removedCount: number
   saveFailed: boolean
+  removedTerm: number | undefined
 }
 
 /**
@@ -50,6 +55,7 @@ function load(storage: Storage | undefined, seed: string, packs: string): Loaded
     savedFromOtherPacks: saved !== undefined && !matches ? saved : undefined,
     removedCount: 0,
     saveFailed: false,
+    removedTerm: undefined,
   }
 }
 
@@ -82,7 +88,8 @@ export function useCareer(
 
   /**
    * Prunes `next` against its own build, saves it, and records how many keys were removed. When only
-   * the notes changed, it skips the build and pruning.
+   * the notes changed, it skips the build and pruning. `extra` is applied last, so it can replace
+   * removedCount; removedTerm is cleared unless `extra` sets it.
    */
   const commit = (next: CareerInput, extra: Partial<LoadedState> = {}) => {
     const notesOnly =
@@ -96,7 +103,14 @@ export function useCareer(
       Object.keys(pruned.outcomes).length === 0 &&
       Object.values(pruned.notes).every((n) => n === '')
     const write = writeSavedCharacter(storage, seed, empty ? undefined : { packs, input: pruned })
-    setState((s) => ({ ...s, ...extra, input: pruned, removedCount: removed.length, saveFailed: write === 'failed' }))
+    setState((s) => ({
+      ...s,
+      removedTerm: undefined,
+      input: pruned,
+      removedCount: removed.length,
+      saveFailed: write === 'failed',
+      ...extra,
+    }))
   }
 
   return {
@@ -105,6 +119,7 @@ export function useCareer(
     savedFromOtherPacks: active.savedFromOtherPacks,
     removedCount: active.removedCount,
     saveFailed: active.saveFailed,
+    removedTerm: active.removedTerm,
     update: (next) => commit(next),
     generate: () => commit(finishCareer(seed, base, active.input, data)),
     applySaved: () => {
@@ -112,7 +127,12 @@ export function useCareer(
     },
     discardSaved: () => {
       writeSavedCharacter(storage, seed, undefined)
-      setState((s) => ({ ...s, savedFromOtherPacks: undefined, input: EMPTY_INPUT, removedCount: 0 }))
+      setState((s) => ({ ...s, savedFromOtherPacks: undefined, input: EMPTY_INPUT, removedCount: 0, removedTerm: undefined }))
+    },
+    removeLastTerm: () => {
+      const number = result.terms[result.terms.length - 1]?.number
+      const next = removeLastTerm(seed, base, active.input, data)
+      if (next !== undefined && number !== undefined) commit(next, { removedCount: 0, removedTerm: number })
     },
   }
 }

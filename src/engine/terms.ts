@@ -1191,3 +1191,30 @@ export function pruneInput(input: CareerInput, used: Set<string>): { input: Care
     removed,
   }
 }
+
+/**
+ * Returns the input that removes the most recent term of the career built from `seed`, `base`,
+ * `input` and `data`, or undefined when that career has no terms. The term before it, when there is
+ * one, loses its after-term choice ("<term>.next"), so the rebuilt career stops at the end of that
+ * term with the after-term choice pending. Every choice, roll override and outcome override the
+ * rebuilt career no longer reads is then removed with pruneInput: the removed term's own keys, and
+ * any mustering out and later careers that followed it. When the removed term is the character's
+ * first, every choice and override is removed, so the career pick is pending again. Notes for the
+ * removed term are removed; notes for earlier terms are kept.
+ */
+export function removeLastTerm(
+  seed: string,
+  base: Record<Characteristic, number>,
+  input: CareerInput,
+  data: CareerData,
+): CareerInput | undefined {
+  const { terms } = buildCareer(seed, base, input, data)
+  const last = terms[terms.length - 1]
+  if (!last) return undefined
+  const previous = terms[terms.length - 2]
+  const notes = Object.fromEntries(Object.entries(input.notes).filter(([k]) => k !== `term-${last.number}`))
+  if (!previous) return { ...EMPTY_INPUT, notes }
+  const choices = Object.fromEntries(Object.entries(input.choices).filter(([k]) => k !== `${previous.key}.next`))
+  const trimmed: CareerInput = { ...input, choices, notes }
+  return pruneInput(trimmed, buildCareer(seed, base, trimmed, data).usedKeys).input
+}
