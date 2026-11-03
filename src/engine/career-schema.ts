@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CHARACTERISTICS } from './characteristics'
+import { EffectsSchema } from './effects'
 
 /**
  * Schema and types for the career data files in src/data/careers. Adding a career means adding a
@@ -27,22 +28,28 @@ export type SkillTableEntry = z.infer<typeof SkillTableEntrySchema>
 export const SkillTableSchema = z.array(SkillTableEntrySchema).length(6, 'must have exactly 6 entries')
 
 /**
- * An event or mishap table entry: the roll it answers to, a short summary, and an optional
- * `connection` flag that marks the entry as a possible link between two characters.
+ * An event or mishap table entry: the roll it answers to, a short summary, an optional
+ * `connection` flag that marks the entry as a possible link between two characters, and optional
+ * structured `effects` that the career engine applies (see effects.ts).
  */
 export const EventEntrySchema = z.object({
   roll: z.int(),
   summary: nonEmpty,
   connection: z.boolean().optional(),
+  effects: EffectsSchema,
 })
 /** One event or mishap entry, as described by EventEntrySchema. */
 export type EventEntry = z.infer<typeof EventEntrySchema>
 
-/** A rank within an assignment: its number (0 to 6), optional title and optional bonus gained on reaching it. */
+/**
+ * A rank within an assignment: its number (0 to 6), optional title, optional free-text bonus gained
+ * on reaching it, and optional `effects` that the career engine applies for that bonus.
+ */
 export const RankSchema = z.object({
   rank: z.int().min(0).max(6),
   title: nonEmpty.optional(),
   bonus: nonEmpty.optional(),
+  effects: EffectsSchema,
 })
 /** One rank, as described by RankSchema. */
 export type Rank = z.infer<typeof RankSchema>

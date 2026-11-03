@@ -1,6 +1,6 @@
 # Career terms (step 2)
 
-Status: proposed. Nothing in this spec is built yet.
+Status: part 1 built. Part 2 is planned.
 
 ## Problem
 
@@ -189,39 +189,39 @@ At 320px wide the term rows stack, as the characteristics table does now.
 
 ## Acceptance criteria
 
-- [ ] With `?seed=terms` and the sample career, Start career shows a first term whose rolls are the same
+- [x] With `?seed=terms` and the sample career, Start career shows a first term whose rolls are the same
       on every load.
-- [ ] Overriding the survival dice of term 1 to a failing total shows a mishap instead of an event, and the
+- [x] Overriding the survival dice of term 1 to a failing total shows a mishap instead of an event, and the
       advancement roll disappears.
-- [ ] Resetting that override brings back the original event and advancement roll.
-- [ ] Overriding the advancement roll in term 1 does not change the skill roll in term 2.
-- [ ] An event with a `skill` effect adds that skill to the character.
-- [ ] Reaching a rank with a `skill` effect adds that skill; a rank with only a `bonus` shows it as a note.
-- [ ] The first term adds the skills from the `basicTraining` table at the level in `rules`.
-- [ ] After a failed survival, the only button is Muster out.
-- [ ] A benefit roll whose total is above the table's highest roll uses the highest row and says so.
-- [ ] With two packs that have different `rules`, the notice names the pack whose rules are used, and
+- [x] Resetting that override brings back the original event and advancement roll.
+- [x] Overriding the advancement roll in term 1 does not change the skill roll in term 2.
+- [x] An event with a `skill` effect adds that skill to the character.
+- [x] Reaching a rank with a `skill` effect adds that skill; a rank with only a `bonus` shows it as a note.
+- [x] The first term adds the skills from the `basicTraining` table at the level in `rules`.
+- [x] After a failed survival, the only button is Muster out.
+- [x] A benefit roll whose total is above the table's highest roll uses the highest row and says so.
+- [x] With two packs that have different `rules`, the notice names the pack whose rules are used, and
       importing them in either order uses the same one.
-- [ ] Opening a saved seed with a different pack loaded shows the saved-choices notice, and Start over
+- [x] Opening a saved seed with a different pack loaded shows the saved-choices notice, and Start over
       clears the saved choices.
-- [ ] Importing a pack with `formatVersion` 1 that uses `effects` shows an alert saying it must be
+- [x] Importing a pack with `formatVersion` 1 that uses `effects` shows an alert saying it must be
       version 2.
-- [ ] An event with no `effects` shows its summary and a notes field, and the character is unchanged until
+- [x] An event with no `effects` shows its summary and a notes field, and the character is unchanged until
       the player edits it.
-- [ ] Events with `connection: true` show a Connection marker in the term summary.
-- [ ] The finished character's Connection opportunities list shows each marked event with its term, and
+- [x] Events with `connection: true` show a Connection marker in the term summary.
+- [x] The finished character's Connection opportunities list shows each marked event with its term, and
       is empty with a short line when there are none.
-- [ ] Continue in career adds a term, and the age goes up by the term length from `rules`.
-- [ ] Aging is rolled once the age reaches the threshold in `rules`, and not before.
-- [ ] Generate the rest finishes the character and stops at mustering out, and each choice it made can be
+- [x] Continue in career adds a term, and the age goes up by the term length from `rules`.
+- [x] Aging is rolled once the age reaches the threshold in `rules`, and not before.
+- [x] Generate the rest finishes the character and stops at mustering out, and each choice it made can be
       changed.
-- [ ] Leave career leads to mustering out with the number of benefit rolls given by `rules`.
-- [ ] Each benefit roll can switch between cash and benefit, and the cash total stays within the limit in
+- [x] Leave career leads to mustering out with the number of benefit rolls given by `rules`.
+- [x] Each benefit roll can switch between cash and benefit, and the cash total stays within the limit in
       `rules`.
-- [ ] After a reload with the same seed, the choices, overrides and notes are still there.
-- [ ] With only the bundled data loaded, the sample rules notice is shown.
-- [ ] At 320px wide the page does not scroll sideways with three terms shown.
-- [ ] The Career section can be used with the keyboard alone.
+- [x] After a reload with the same seed, the choices, overrides and notes are still there.
+- [x] With only the bundled data loaded, the sample rules notice is shown.
+- [x] At 320px wide the page does not scroll sideways with three terms shown.
+- [x] The Career section can be used with the keyboard alone.
 
 ## Resolved questions
 

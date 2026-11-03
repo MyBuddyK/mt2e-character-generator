@@ -105,11 +105,11 @@ describe('parseCareerPack', () => {
     expect(parseCareerPack(data)).toMatchObject({ ok: false, reason: 'not a career pack: "format" must be "mt2e-career-pack"' })
   })
 
-  // Parses the later-version fixture (formatVersion 2) and expects a message naming version 1.
+  // Parses the later-version fixture (formatVersion 3) and expects a message naming versions 1 and 2.
   it('rejects a later format version and names the supported version', () => {
     expect(parseCareerPack(laterVersionPack)).toMatchObject({
       ok: false,
-      reason: 'this pack has format version 2; this app supports version 1',
+      reason: 'this pack has format version 3; this app supports versions 1 and 2',
     })
   })
 

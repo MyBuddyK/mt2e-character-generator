@@ -3,81 +3,370 @@
   "name": "Sample: Orbital Sanitation",
   "source": "Invented sample to show the data format. Not taken from any published career. Replace with careers from your own books.",
   "summary": "Collects debris, scrap and waste from orbits, stations and ships. Placeholder content only.",
-  "qualification": { "characteristic": "END", "target": 5 },
+  "qualification": {
+    "characteristic": "END",
+    "target": 5
+  },
   "skillTables": {
-    "personalDevelopment": ["STR", "END", "DEX", "Carouse", "Athletics", "Melee"],
-    "serviceSkills": ["Vacc Suit", "Pilot", "Mechanic", "Electronics", "Broker", "Steward"],
-    "advancedEducation": ["Engineer", "Science", "Medic", "Admin", "Investigate", "Diplomat"]
+    "personalDevelopment": [
+      "STR",
+      "END",
+      "DEX",
+      "Carouse",
+      "Athletics",
+      "Melee"
+    ],
+    "serviceSkills": [
+      "Vacc Suit",
+      "Pilot",
+      "Mechanic",
+      "Electronics",
+      "Broker",
+      "Steward"
+    ],
+    "advancedEducation": [
+      "Engineer",
+      "Science",
+      "Medic",
+      "Admin",
+      "Investigate",
+      "Diplomat"
+    ]
   },
   "assignments": [
     {
       "id": "debris-sweep",
       "name": "Debris sweep",
-      "survival": { "characteristic": "DEX", "target": 6 },
-      "advancement": { "characteristic": "INT", "target": 7 },
-      "skills": ["Pilot", "Vacc Suit", "Gunner", "Sensors", "Astrogation", "Zero-G"],
+      "survival": {
+        "characteristic": "DEX",
+        "target": 6
+      },
+      "advancement": {
+        "characteristic": "INT",
+        "target": 7
+      },
+      "skills": [
+        "Pilot",
+        "Vacc Suit",
+        "Gunner",
+        "Sensors",
+        "Astrogation",
+        "Zero-G"
+      ],
       "ranks": [
-        { "rank": 0, "title": "Sweeper" },
-        { "rank": 1, "title": "Tug Pilot", "bonus": "Pilot 1" },
-        { "rank": 2, "title": "Shift Lead" },
-        { "rank": 3, "title": "Sector Boss", "bonus": "Leadership 1" }
+        {
+          "rank": 0,
+          "title": "Sweeper"
+        },
+        {
+          "rank": 1,
+          "title": "Tug Pilot",
+          "bonus": "Pilot 1",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Pilot"
+              ],
+              "level": 1
+            }
+          ]
+        },
+        {
+          "rank": 2,
+          "title": "Shift Lead"
+        },
+        {
+          "rank": 3,
+          "title": "Sector Boss",
+          "bonus": "Leadership 1",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Leadership"
+              ],
+              "level": 1
+            }
+          ]
+        }
       ]
     },
     {
       "id": "salvage-barge",
       "name": "Salvage barge",
-      "survival": { "characteristic": "END", "target": 7 },
-      "advancement": { "characteristic": "EDU", "target": 6 },
-      "skills": ["Mechanic", "Engineer", "Broker", "Vacc Suit", "Electronics", "Streetwise"],
+      "survival": {
+        "characteristic": "END",
+        "target": 7
+      },
+      "advancement": {
+        "characteristic": "EDU",
+        "target": 6
+      },
+      "skills": [
+        "Mechanic",
+        "Engineer",
+        "Broker",
+        "Vacc Suit",
+        "Electronics",
+        "Streetwise"
+      ],
       "ranks": [
-        { "rank": 0, "title": "Scrapper" },
-        { "rank": 1, "title": "Cutter", "bonus": "Mechanic 1" },
-        { "rank": 2, "title": "Yard Foreman" },
-        { "rank": 3, "title": "Barge Master", "bonus": "Broker 1" }
+        {
+          "rank": 0,
+          "title": "Scrapper"
+        },
+        {
+          "rank": 1,
+          "title": "Cutter",
+          "bonus": "Mechanic 1",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Mechanic"
+              ],
+              "level": 1
+            }
+          ]
+        },
+        {
+          "rank": 2,
+          "title": "Yard Foreman"
+        },
+        {
+          "rank": 3,
+          "title": "Barge Master",
+          "bonus": "Broker 1",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Broker"
+              ],
+              "level": 1
+            }
+          ]
+        }
       ]
     },
     {
       "id": "hazmat",
       "name": "Hazardous waste",
-      "survival": { "characteristic": "INT", "target": 7 },
-      "advancement": { "characteristic": "EDU", "target": 8 },
-      "skills": ["Science", "Medic", "Vacc Suit", "Investigate", "Admin", "Recon"],
+      "survival": {
+        "characteristic": "INT",
+        "target": 7
+      },
+      "advancement": {
+        "characteristic": "EDU",
+        "target": 8
+      },
+      "skills": [
+        "Science",
+        "Medic",
+        "Vacc Suit",
+        "Investigate",
+        "Admin",
+        "Recon"
+      ],
       "ranks": [
-        { "rank": 0, "title": "Handler" },
-        { "rank": 1, "title": "Certified Handler", "bonus": "Vacc Suit 1" },
-        { "rank": 2, "title": "Containment Officer" },
-        { "rank": 3, "title": "Disposal Inspector", "bonus": "Admin 1" }
+        {
+          "rank": 0,
+          "title": "Handler"
+        },
+        {
+          "rank": 1,
+          "title": "Certified Handler",
+          "bonus": "Vacc Suit 1",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Vacc Suit"
+              ],
+              "level": 1
+            }
+          ]
+        },
+        {
+          "rank": 2,
+          "title": "Containment Officer"
+        },
+        {
+          "rank": 3,
+          "title": "Disposal Inspector",
+          "bonus": "Admin 1",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Admin"
+              ],
+              "level": 1
+            }
+          ]
+        }
       ]
     }
   ],
   "events": [
-    { "roll": 2, "summary": "Roll on the mishap table, but you keep your job." },
-    { "roll": 3, "summary": "You pull an escape pod out of a junk field. Someone inside owes you their life.", "connection": true },
-    { "roll": 4, "summary": "A quiet term hauling the same route. Gain one service skill." },
-    { "roll": 5, "summary": "You and another traveller are trapped together on a drifting hulk for a week.", "connection": true },
-    { "roll": 6, "summary": "Recycling-plant training. Gain one level in Mechanic or Engineer." },
-    { "roll": 7, "summary": "Life event." },
-    { "roll": 8, "summary": "You find a working starship part in the scrap and sell it. +1 DM to one benefit roll." },
-    { "roll": 9, "summary": "A rival crew keeps poaching your salvage claims. Gain a rival.", "connection": true },
-    { "roll": 10, "summary": "You dispose of something a client wanted gone, no questions asked. Gain a contact.", "connection": true },
-    { "roll": 11, "summary": "A station administrator notices your work. Gain an ally.", "connection": true },
-    { "roll": 12, "summary": "You clear a debris field that was closing a busy lane. You are promoted automatically." }
+    {
+      "roll": 2,
+      "summary": "Roll on the mishap table, but you keep your job.",
+      "effects": [
+        {
+          "type": "mishap"
+        }
+      ]
+    },
+    {
+      "roll": 3,
+      "summary": "You pull an escape pod out of a junk field. Someone inside owes you their life.",
+      "connection": true,
+      "effects": [
+        {
+          "type": "skill",
+          "options": [
+            "Medic",
+            "Vacc Suit"
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 4,
+      "summary": "A quiet term hauling the same route. Gain one service skill.",
+      "effects": [
+        {
+          "type": "roll-table",
+          "table": "serviceSkills"
+        }
+      ]
+    },
+    {
+      "roll": 5,
+      "summary": "You and another traveller are trapped together on a drifting hulk for a week.",
+      "connection": true
+    },
+    {
+      "roll": 6,
+      "summary": "Recycling-plant training. Gain one level in Mechanic or Engineer.",
+      "effects": [
+        {
+          "type": "skill",
+          "options": [
+            "Mechanic",
+            "Engineer"
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 7,
+      "summary": "Life event."
+    },
+    {
+      "roll": 8,
+      "summary": "You find a working starship part in the scrap and sell it. +1 DM to one benefit roll.",
+      "effects": [
+        {
+          "type": "benefit-dm",
+          "dm": 1
+        }
+      ]
+    },
+    {
+      "roll": 9,
+      "summary": "A rival crew keeps poaching your salvage claims. Gain a rival.",
+      "connection": true
+    },
+    {
+      "roll": 10,
+      "summary": "You dispose of something a client wanted gone, no questions asked. Gain a contact.",
+      "connection": true
+    },
+    {
+      "roll": 11,
+      "summary": "A station administrator notices your work. Gain an ally.",
+      "connection": true
+    },
+    {
+      "roll": 12,
+      "summary": "You clear a debris field that was closing a busy lane. You are promoted automatically."
+    }
   ],
   "mishaps": [
-    { "roll": 1, "summary": "A compacted debris bale ruptures your suit. Severely injured." },
-    { "roll": 2, "summary": "You report a client for illegal dumping and lose the contract.", "connection": true },
-    { "roll": 3, "summary": "A salvage claim goes to court and you lose. Gain an enemy.", "connection": true },
-    { "roll": 4, "summary": "The station automates your route and lets the crew go." },
-    { "roll": 5, "summary": "A crewmate's mistake vents your tug, and you take the blame.", "connection": true },
-    { "roll": 6, "summary": "Injured by a tumbling hull plate." }
+    {
+      "roll": 1,
+      "summary": "A compacted debris bale ruptures your suit. Severely injured."
+    },
+    {
+      "roll": 2,
+      "summary": "You report a client for illegal dumping and lose the contract.",
+      "connection": true
+    },
+    {
+      "roll": 3,
+      "summary": "A salvage claim goes to court and you lose. Gain an enemy.",
+      "connection": true
+    },
+    {
+      "roll": 4,
+      "summary": "The station automates your route and lets the crew go. Gain one level in Admin from the paperwork.",
+      "effects": [
+        {
+          "type": "skill",
+          "options": [
+            "Admin"
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 5,
+      "summary": "A crewmate's mistake vents your tug, and you take the blame.",
+      "connection": true
+    },
+    {
+      "roll": 6,
+      "summary": "Injured by a tumbling hull plate."
+    }
   ],
   "musteringOut": [
-    { "roll": 1, "cash": 1000, "benefit": "Contact" },
-    { "roll": 2, "cash": 2000, "benefit": "END +1" },
-    { "roll": 3, "cash": 5000, "benefit": "Vacc suit" },
-    { "roll": 4, "cash": 5000, "benefit": "Tool kit" },
-    { "roll": 5, "cash": 10000, "benefit": "Ship share" },
-    { "roll": 6, "cash": 10000, "benefit": "INT +1" },
-    { "roll": 7, "cash": 20000, "benefit": "Two ship shares" }
+    {
+      "roll": 1,
+      "cash": 1000,
+      "benefit": "Contact"
+    },
+    {
+      "roll": 2,
+      "cash": 2000,
+      "benefit": "END +1"
+    },
+    {
+      "roll": 3,
+      "cash": 5000,
+      "benefit": "Vacc suit"
+    },
+    {
+      "roll": 4,
+      "cash": 5000,
+      "benefit": "Tool kit"
+    },
+    {
+      "roll": 5,
+      "cash": 10000,
+      "benefit": "Ship share"
+    },
+    {
+      "roll": 6,
+      "cash": 10000,
+      "benefit": "INT +1"
+    },
+    {
+      "roll": 7,
+      "cash": 20000,
+      "benefit": "Two ship shares"
+    }
   ]
 }

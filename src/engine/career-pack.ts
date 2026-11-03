@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CareerSchema, parseCareer, type CareerDefinition } from './career-schema'
+import { RulesSchema, type Rules } from './rules-schema'
 
 /**
  * Career packs: one JSON file that holds any number of careers, which a referee shares with their
@@ -9,8 +10,14 @@ import { CareerSchema, parseCareer, type CareerDefinition } from './career-schem
 /** The value every career pack has in its `format` field. */
 export const PACK_FORMAT = 'mt2e-career-pack'
 
-/** The only `formatVersion` this app reads. A pack with a later version is rejected. */
-export const PACK_FORMAT_VERSION = 1
+/**
+ * The latest `formatVersion` this app reads. The app reads versions 1 and 2; a pack with any other
+ * version is rejected. Version 2 adds the optional `rules` object and `effects` on careers.
+ */
+export const PACK_FORMAT_VERSION = 2
+
+/** Every `formatVersion` this app reads. */
+export const SUPPORTED_FORMAT_VERSIONS: readonly number[] = [1, 2]
 
 const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
 
@@ -19,12 +26,14 @@ const packFields = {
   /** Optional link to a JSON Schema, for editors. The app ignores it. */
   $schema: z.string().optional(),
   format: z.literal(PACK_FORMAT),
-  formatVersion: z.literal(PACK_FORMAT_VERSION),
+  formatVersion: z.union([z.literal(1), z.literal(2)]),
   id: nonEmpty,
   name: nonEmpty,
   /** A whole number the referee raises each time they edit the pack. */
   revision: z.int().min(0),
   source: nonEmpty,
+  /** Values that apply to every career (version 2 only). See rules-schema.ts. */
+  rules: RulesSchema.optional(),
 }
 
 /**
@@ -57,7 +66,7 @@ export interface PackInfo {
  * the messages behind it.
  */
 export type PackParseResult =
-  | { ok: true; pack: PackInfo; careers: CareerDefinition[]; problems: string[] }
+  | { ok: true; pack: PackInfo; careers: CareerDefinition[]; rules: Rules | undefined; problems: string[] }
   | { ok: false; reason: string; problems: string[] }
 
 /** Returns true when `value` is a plain object (not null and not an array). */
@@ -77,10 +86,22 @@ function careerLabel(data: unknown): string {
   return label === undefined ? '' : ` (${label})`
 }
 
+/** Returns true when any event, mishap or rank in the raw careers has an `effects` key. */
+function usesEffects(careers: unknown[]): boolean {
+  const hasEffects = (list: unknown) => Array.isArray(list) && list.some((e) => isRecord(e) && 'effects' in e)
+  return careers.some((c) => {
+    if (!isRecord(c)) return false
+    if (hasEffects(c['events']) || hasEffects(c['mishaps'])) return true
+    const assignments = c['assignments']
+    return Array.isArray(assignments) && assignments.some((a) => isRecord(a) && hasEffects(a['ranks']))
+  })
+}
+
 /**
  * Checks parsed JSON as a career pack. It rejects the pack when it is not an object, when `format`
- * is not PACK_FORMAT, when `formatVersion` is not PACK_FORMAT_VERSION (with a message naming the
- * supported version), when another pack field fails, or when no career passes. Otherwise it checks
+ * is not PACK_FORMAT, when `formatVersion` is not one of SUPPORTED_FORMAT_VERSIONS (with a message
+ * naming them), when a version 1 pack uses `rules` or `effects` (with a message that it must say
+ * version 2), when another pack field fails, or when no career passes. Otherwise it checks
  * each career with parseCareer and skips the ones that fail, and also skips a career whose id was
  * used by an earlier career in the same pack. Each skipped career adds messages of the form
  * "careers.<index> (<id>): <path>: <message>". It does not throw for any input.
@@ -93,12 +114,26 @@ export function parseCareerPack(data: unknown): PackParseResult {
     return { ok: false, reason: `not a career pack: "format" must be "${PACK_FORMAT}"`, problems: [] }
   }
   const version = data['formatVersion']
-  if (version !== PACK_FORMAT_VERSION) {
+  if (typeof version !== 'number' || !SUPPORTED_FORMAT_VERSIONS.includes(version)) {
     const got = typeof version === 'number' ? `format version ${version}` : 'no valid "formatVersion"'
     return {
       ok: false,
-      reason: `this pack has ${got}; this app supports version ${PACK_FORMAT_VERSION}`,
+      reason: `this pack has ${got}; this app supports versions ${SUPPORTED_FORMAT_VERSIONS.join(' and ')}`,
       problems: [],
+    }
+  }
+  if (version === 1) {
+    const rawCareers = data['careers']
+    const features = [
+      ...('rules' in data ? ['"rules"'] : []),
+      ...(Array.isArray(rawCareers) && usesEffects(rawCareers) ? ['"effects"'] : []),
+    ]
+    if (features.length > 0) {
+      return {
+        ok: false,
+        reason: `this pack uses ${features.join(' and ')}, so its "formatVersion" must be 2`,
+        problems: [],
+      }
     }
   }
   const envelope = PackEnvelopeSchema.safeParse(data)
@@ -109,7 +144,7 @@ export function parseCareerPack(data: unknown): PackParseResult {
       problems: envelope.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`),
     }
   }
-  const { careers: rawCareers, id, name, revision, source } = envelope.data
+  const { careers: rawCareers, id, name, revision, source, rules } = envelope.data
   const careers: CareerDefinition[] = []
   const problems: string[] = []
   const seen = new Set<string>()
@@ -130,7 +165,7 @@ export function parseCareerPack(data: unknown): PackParseResult {
   if (careers.length === 0) {
     return { ok: false, reason: 'no career in the pack is valid', problems }
   }
-  return { ok: true, pack: { id, name, revision, source }, careers, problems }
+  return { ok: true, pack: { id, name, revision, source }, careers, rules, problems }
 }
 
 /**
@@ -236,4 +271,26 @@ export function parsePackRefs(value: string): PackRef[] {
     refs.push({ id, fingerprint: entry.slice(at + 1) })
   }
   return refs.sort((a, b) => compareCodeUnits(a.id, b.id))
+}
+
+/** The result of selectRules: the rules to use, the name of the pack they came from (undefined for the sample), and whether loaded packs disagree. */
+export interface SelectedRules {
+  rules: Rules
+  packName: string | undefined
+  differ: boolean
+}
+
+/**
+ * Returns the rules to use: those of the pack whose `id` sorts first (in code unit order) among
+ * `packs` that have `rules`, or `sample` when none has. `differ` is true when two of those packs'
+ * rules are not the same (compared with canonicalJson).
+ */
+export function selectRules(packs: { id: string; name: string; rules: Rules | undefined }[], sample: Rules): SelectedRules {
+  const withRules = packs
+    .flatMap((p) => (p.rules ? [{ id: p.id, name: p.name, rules: p.rules }] : []))
+    .sort((a, b) => compareCodeUnits(a.id, b.id))
+  const first = withRules[0]
+  if (!first) return { rules: sample, packName: undefined, differ: false }
+  const text = canonicalJson(first.rules)
+  return { rules: first.rules, packName: first.name, differ: withRules.some((p) => canonicalJson(p.rules) !== text) }
 }

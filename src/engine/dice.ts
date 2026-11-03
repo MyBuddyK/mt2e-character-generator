@@ -58,3 +58,12 @@ export function createDice(seed: number): Dice {
     },
   }
 }
+
+/**
+ * Returns a Dice instance for one roll of a character: it is seeded from `seed` and `path` joined
+ * with a colon (for example "abc:term-3.survival"), so each roll has its own sequence and changing
+ * one roll does not move any other roll.
+ */
+export function diceFor(seed: string, path: string): Dice {
+  return createDice(seedFromString(`${seed}:${path}`))
+}

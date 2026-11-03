@@ -282,3 +282,119 @@ input[type='number'] {
     align-items: flex-start;
   }
 }
+
+.terms,
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+
+.term {
+  border-top: 1px solid var(--border);
+  padding: 0.5rem 0;
+}
+
+.term-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+}
+
+.term-head h3,
+.summary h3,
+[data-testid='benefits'] h3 {
+  font-size: 1rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.step {
+  padding: 0.25rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.step.overridden {
+  background: var(--override);
+}
+
+.step-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  align-items: center;
+}
+
+.step-label {
+  font-weight: 600;
+}
+
+.step-roll {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.step-roll input {
+  width: 3.25rem;
+}
+
+.step-outcome select,
+.career-start select {
+  font: inherit;
+}
+
+.step-applied,
+.step-note {
+  font-size: 0.875rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.step-result {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.badge.connection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.term-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.term-notes textarea {
+  font: inherit;
+  width: 100%;
+}
+
+.career-start,
+.pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.career-start label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  max-width: 100%;
+}
+
+.career-start select {
+  max-width: 100%;
+}
+
+.pending p {
+  flex-basis: 100%;
+  margin: 0;
+}
