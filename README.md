@@ -94,6 +94,9 @@ The top level of a pack:
   `qualification.automatic`, `qualification.automaticAt`, `qualification.ageDM`, a list of characteristics
   in any check (the best DM is used), and `basicTraining: "assignment"`. See
   [`docs/features/career-rules.md`](docs/features/career-rules.md).
+- For more than one career: `rules.qualification.dmPerPreviousCareer`, `rules.draft` (the Draft table),
+  `rules.fallbackCareer` (a career id) and `rules.commission`. A career can set `commission` (a check),
+  `officerRanks` and `skillTables.officer`.
 
 The full field list is in [`src/engine/career-schema.ts`](src/engine/career-schema.ts),
 [`src/engine/rules-schema.ts`](src/engine/rules-schema.ts) and

@@ -7,8 +7,11 @@ import { CHARACTERISTICS } from './characteristics'
  * shows as a note for the player to apply by hand.
  */
 
-/** The skill tables a career can have. `assignment` is the skill table of the current assignment. */
-export const SKILL_TABLES = ['personalDevelopment', 'serviceSkills', 'assignment', 'advancedEducation'] as const
+/**
+ * The skill tables a career can have. `assignment` is the skill table of the current assignment.
+ * `officer` is offered only to a commissioned officer.
+ */
+export const SKILL_TABLES = ['personalDevelopment', 'serviceSkills', 'assignment', 'advancedEducation', 'officer'] as const
 /** One of SKILL_TABLES. */
 export type SkillTableKey = (typeof SKILL_TABLES)[number]
 

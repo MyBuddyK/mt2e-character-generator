@@ -54,7 +54,7 @@ const SERVICE = { 'term-1.skill-0.table': 'serviceSkills' }
 describe('buildCareer start', () => {
   // Builds with no choices and expects the start choice to be pending.
   it('asks for a career first', () => {
-    expect(build(EMPTY_INPUT).pending).toEqual({ kind: 'start', failedQualification: false })
+    expect(build(EMPTY_INPUT).pending).toEqual({ kind: 'start', prefix: '', exclude: [], failedQualification: false })
   })
 
   // Saves a career id that isn't loaded and expects a problem naming it and the start choice pending.
@@ -68,7 +68,7 @@ describe('buildCareer start', () => {
   it('stops after a failed qualification', () => {
     const result = build(started({}, { qualification: 2 }))
     expect(result.qualification?.passed).toEqual({ rolled: false })
-    expect(result.pending).toEqual({ kind: 'start', failedQualification: true })
+    expect(result.pending).toEqual({ kind: 'start', prefix: '', exclude: [], failedQualification: true })
     expect(result.terms).toEqual([])
   })
 
@@ -220,7 +220,7 @@ describe('buildCareer mustering out', () => {
   it('stops offering cash once the cash roll limit is reached', () => {
     const rules: Rules = { ...sampleRules, benefits: { ...sampleRules.benefits, perTerm: 3, cashRollLimit: 1 } }
     const result = build(started({ ...SERVICE, 'term-1.next': 'leave', 'benefit-0': 'cash' }, { ...PASSING, 'term-1.advancement': 2 }), rules)
-    expect(result.pending).toEqual({ kind: 'benefit', key: 'benefit-1', index: 1, cashAllowed: false })
+    expect(result.pending).toEqual({ kind: 'benefit', key: 'benefit-1', index: 1, count: 3, cashAllowed: false })
   })
 
   // Takes the event with a +1 benefit DM (event roll 8), uses rules with a +2 rank DM on benefit

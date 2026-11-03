@@ -4,7 +4,15 @@ import type { CareerDefinition } from './engine/career-schema'
 import type { SelectedRules } from './engine/career-pack'
 import { current } from './engine/overridable'
 import { POLICY_SUMMARY } from './engine/policy'
-import { skillTableName, stepOverridden, type CareerInput, type PendingChoice, type Step, type TermResult } from './engine/terms'
+import {
+  skillTableName,
+  stepOverridden,
+  type CareerInput,
+  type CareerRun,
+  type PendingChoice,
+  type Step,
+  type TermResult,
+} from './engine/terms'
 import { useCareer } from './use-career'
 
 /** Returns a DM as text with a sign, e.g. "+1", "+0", "-2". */
@@ -163,7 +171,7 @@ function Term({ term, input, onChange }: TermProps) {
           age {term.ageStart}-{term.ageEnd}
         </span>
         <span data-testid="term-rank">
-          rank {term.rank}
+          {term.officer ? 'officer rank' : 'rank'} {term.rank}
           {term.title ? ` ${term.title}` : ''}
         </span>
       </div>
@@ -190,11 +198,10 @@ interface PendingProps {
   input: CareerInput
   onChange: (next: CareerInput) => void
   onGenerate: () => void
-  benefitCount: number
 }
 
-/** Renders the controls for the choice the career needs next. */
-function Pending({ pending, input, onChange, onGenerate, benefitCount }: PendingProps) {
+/** Renders the controls for the choice the career needs next. The start choice is rendered by StartForm. */
+function Pending({ pending, input, onChange, onGenerate }: PendingProps) {
   const choose = (key: string, value: string) => onChange({ ...input, choices: { ...input.choices, [key]: value } })
   const generate = (
     <>
@@ -209,6 +216,46 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
   switch (pending.kind) {
     case 'start':
       return null
+    case 'fallback':
+      return (
+        <div className="pending" role="group" aria-label="Qualification failed">
+          <p>Qualification failed. Override the roll, or:</p>
+          {pending.draftAllowed && (
+            <button type="button" onClick={() => choose(pending.key, 'draft')}>
+              Take the Draft
+            </button>
+          )}
+          {pending.fallback !== undefined && (
+            <button type="button" onClick={() => choose(pending.key, 'fallback')}>
+              Enter {pending.fallback}
+            </button>
+          )}
+        </div>
+      )
+    case 'assignment':
+      return (
+        <div className="pending" role="group" aria-label="Choose an assignment">
+          <p>Choose an assignment in {pending.careerName}:</p>
+          {pending.options.map((o) => (
+            <button type="button" key={o.id} onClick={() => choose(pending.key, o.id)}>
+              {o.name}
+            </button>
+          ))}
+        </div>
+      )
+    case 'commission':
+      return (
+        <div className="pending" role="group" aria-label="Commission">
+          <p>A commission can be tried this term instead of the advancement roll.</p>
+          <button type="button" onClick={() => choose(pending.key, 'try')}>
+            Try for commission
+          </button>
+          <button type="button" onClick={() => choose(pending.key, 'skip')}>
+            Skip commission
+          </button>
+          {generate}
+        </div>
+      )
     case 'skill-table':
       return (
         <div className="pending" role="group" aria-label="Choose a skill table">
@@ -278,7 +325,7 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
       return (
         <div className="pending" role="group" aria-label="Mustering out">
           <p>
-            Benefit roll {pending.index + 1} of {benefitCount}: roll on which table?
+            Benefit roll {pending.index + 1} of {pending.count}: roll on which table?
           </p>
           <button type="button" disabled={!pending.cashAllowed} onClick={() => choose(pending.key, 'cash')}>
             Cash
@@ -293,6 +340,119 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
   }
 }
 
+interface StartFormProps {
+  careers: CareerDefinition[]
+  /** The key prefix of the career's choices: "" for the first career. */
+  prefix: string
+  /** Career ids that can't be picked. */
+  exclude: string[]
+  input: CareerInput
+  onChange: (next: CareerInput) => void
+}
+
+/**
+ * Renders the career and assignment pickers and the start button. For the first career (prefix "")
+ * starting replaces every choice and override; for a later career it replaces only the choices and
+ * overrides whose keys start with `prefix`.
+ */
+function StartForm({ careers, prefix, exclude, input, onChange }: StartFormProps) {
+  const [pickedCareer, setPickedCareer] = useState('')
+  const [pickedAssignment, setPickedAssignment] = useState('')
+  const offered = careers.filter((c) => !exclude.includes(c.id))
+  const selected = offered.find((c) => c.id === pickedCareer) ?? offered[0]
+  const assignment = selected?.assignments.find((a) => a.id === pickedAssignment) ?? selected?.assignments[0]
+  const without = <T,>(record: Record<string, T>) => Object.fromEntries(Object.entries(record).filter(([k]) => !k.startsWith(prefix)))
+  return (
+    <form
+      className="career-start"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!selected || !assignment) return
+        const picks = { [`${prefix}start.career`]: selected.id, [`${prefix}start.assignment`]: assignment.id }
+        onChange(
+          prefix === ''
+            ? { ...input, choices: picks, rolls: {}, outcomes: {} }
+            : { ...input, choices: { ...without(input.choices), ...picks }, rolls: without(input.rolls), outcomes: without(input.outcomes) },
+        )
+      }}
+    >
+      <label>
+        Career
+        <select value={selected?.id ?? ''} onChange={(e) => setPickedCareer(e.target.value)}>
+          {offered.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Assignment
+        <select value={assignment?.id ?? ''} onChange={(e) => setPickedAssignment(e.target.value)}>
+          {selected?.assignments.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit" disabled={!selected || !assignment}>
+        {prefix === '' ? 'Start career' : 'Start next career'}
+      </button>
+    </form>
+  )
+}
+
+interface RunProps {
+  run: CareerRun
+  input: CareerInput
+  onChange: (next: CareerInput) => void
+}
+
+/**
+ * Renders one career entered: its name and assignment (with a heading from the second career on),
+ * the qualification roll, how a Draft or fallback career was entered, its terms and its mustering out.
+ */
+function Run({ run, input, onChange }: RunProps) {
+  const context = run.index === 1 ? 'Career' : `Career ${run.index}`
+  return (
+    <div className="career-run" data-testid={`career-run-${run.index}`}>
+      {run.index > 1 && <h3>Career {run.index}</h3>}
+      <p data-testid="career-name">
+        <strong>{run.career.name}</strong>
+        {run.assignment ? ` / ${run.assignment.name}` : ''}
+      </p>
+      <ul className="steps">
+        <StepRow step={run.qualification} context={context} input={input} onChange={onChange} />
+        {run.draft && <StepRow step={run.draft} context={context} input={input} onChange={onChange} />}
+      </ul>
+      {run.entry !== 'qualified' && (
+        <p className="notice small" data-testid="career-entry">
+          Qualification for {run.applied.name} failed.{' '}
+          {run.entry === 'draft' ? `Drafted into ${run.career.name}.` : `Entered ${run.career.name} instead.`}
+        </p>
+      )}
+      {run.terms.length > 0 && (
+        <ol className="terms">
+          {run.terms.map((t) => (
+            <Term key={t.number} term={t} input={input} onChange={onChange} />
+          ))}
+        </ol>
+      )}
+      {run.benefits.length > 0 && (
+        <div data-testid={run.index === 1 ? 'benefits' : `benefits-${run.index}`}>
+          <h3>Mustering out</h3>
+          <ul className="steps">
+            {run.benefits.map((b) => (
+              <StepRow key={b.step.key} step={b.step} context={run.index === 1 ? 'Mustering out' : `${context} mustering out`} input={input} onChange={onChange} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Props for the Career section. */
 export interface CareerProps {
   seed: string
@@ -303,18 +463,14 @@ export interface CareerProps {
 }
 
 /**
- * Renders the Career section (docs/features/career-terms.md, part 1): career and assignment
- * pickers, the qualification roll, each term with its steps and notes, the controls for the next
- * choice, mustering out, and the finished character's summary and connection opportunities.
+ * Renders the Career section (docs/features/career-terms.md and career-rules.md): career and
+ * assignment pickers, then each career entered with its qualification roll, terms, steps, notes and
+ * mustering out, the controls for the next choice, the finished character's summary and connection
+ * opportunities, and the optional next-career picker.
  */
 export function Career({ seed, base, careers, rules, packs }: CareerProps) {
   const career = useCareer(seed, base, careers, rules.rules, packs)
   const { input, result, update } = career
-  const [pickedCareer, setPickedCareer] = useState('')
-  const [pickedAssignment, setPickedAssignment] = useState('')
-  const selected = careers.find((c) => c.id === pickedCareer) ?? careers[0]
-  const assignment = selected?.assignments.find((a) => a.id === pickedAssignment) ?? selected?.assignments[0]
-  const started = result.career !== undefined && result.assignment !== undefined
   const pending = result.pending
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)
 
@@ -368,81 +524,31 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
             </p>
           )}
 
-          {!started || pending?.kind === 'start' ? (
-            <form
-              className="career-start"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (!selected || !assignment) return
-                update({
-                  ...input,
-                  choices: { 'start.career': selected.id, 'start.assignment': assignment.id },
-                  rolls: {},
-                  outcomes: {},
-                })
-              }}
-            >
-              <label>
-                Career
-                <select value={selected?.id ?? ''} onChange={(e) => setPickedCareer(e.target.value)}>
-                  {careers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Assignment
-                <select value={assignment?.id ?? ''} onChange={(e) => setPickedAssignment(e.target.value)}>
-                  {selected?.assignments.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit" disabled={!selected || !assignment}>
-                Start career
-              </button>
-            </form>
-          ) : (
-            <p data-testid="career-name">
-              <strong>{result.career?.name}</strong> / {result.assignment?.name}
-            </p>
+          {result.runs.length === 0 && pending?.kind !== 'start' && (
+            <StartForm careers={careers} prefix="" exclude={[]} input={input} onChange={update} />
+          )}
+          {result.runs.map((run) => (
+            <Run key={run.index} run={run} input={input} onChange={update} />
+          ))}
+          {pending?.kind === 'start' && (
+            <>
+              {pending.failedQualification && (
+                <p className="notice" data-testid="qualification-failed">
+                  Qualification failed. Override the roll, or pick a career and start again.
+                </p>
+              )}
+              <StartForm
+                key={pending.prefix}
+                careers={careers}
+                prefix={pending.prefix}
+                exclude={pending.exclude}
+                input={input}
+                onChange={update}
+              />
+            </>
           )}
 
-          {result.qualification && (
-            <ul className="steps">
-              <StepRow step={result.qualification} context="Career" input={input} onChange={update} />
-            </ul>
-          )}
-          {pending?.kind === 'start' && pending.failedQualification && (
-            <p className="notice" data-testid="qualification-failed">
-              Qualification failed. Override the roll, or pick a career and start again.
-            </p>
-          )}
-
-          {result.terms.length > 0 && (
-            <ol className="terms">
-              {result.terms.map((t) => (
-                <Term key={t.number} term={t} input={input} onChange={update} />
-              ))}
-            </ol>
-          )}
-
-          {result.benefits.length > 0 && (
-            <div data-testid="benefits">
-              <h3>Mustering out</h3>
-              <ul className="steps">
-                {result.benefits.map((b) => (
-                  <StepRow key={b.step.key} step={b.step} context="Mustering out" input={input} onChange={update} />
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {pending && started && (
+          {pending && pending.kind !== 'start' && (
             <>
               {pending.kind === 'next' && result.terms[result.terms.length - 1]?.ageingCrisis && (
                 <p className="notice" data-testid="ageing-crisis-notice">
@@ -450,13 +556,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
                   before going on.
                 </p>
               )}
-              <Pending
-                pending={pending}
-                input={input}
-                onChange={update}
-                onGenerate={career.generate}
-                benefitCount={result.benefitCount}
-              />
+              <Pending pending={pending} input={input} onChange={update} onGenerate={career.generate} />
             </>
           )}
 
@@ -464,9 +564,18 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
             <div className="summary" data-testid="career-summary">
               <h3>Finished character</h3>
               <p>
-                Age <strong data-testid="summary-age">{result.age}</strong>, rank {result.rank}
+                Age <strong data-testid="summary-age">{result.age}</strong>,{' '}
+                {result.runs[result.runs.length - 1]?.officerRank !== undefined ? 'officer rank' : 'rank'} {result.rank}
                 {result.title ? ` ${result.title}` : ''}, cash <strong data-testid="summary-cash">Cr{result.cash}</strong>
               </p>
+              {result.runs.length > 1 && (
+                <p data-testid="summary-careers">
+                  Careers:{' '}
+                  {result.runs
+                    .map((r) => `${r.career.name} (${r.terms.length} term${r.terms.length === 1 ? '' : 's'})`)
+                    .join(', ')}
+                </p>
+              )}
               <p data-testid="summary-skills">
                 Skills:{' '}
                 {Object.entries(result.skills)
@@ -487,7 +596,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
               <h3>Connection opportunities</h3>
               {result.connections.length === 0 ? (
                 <p className="muted" data-testid="connections-empty">
-                  No events in this career were marked as connection opportunities.
+                  No events in these careers were marked as connection opportunities.
                 </p>
               ) : (
                 <ul data-testid="connections">
@@ -498,6 +607,23 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+          {result.nextCareer && (
+            <div className="next-career" data-testid="next-career">
+              <h3>Next career</h3>
+              <p className="muted small">
+                Optional. The character can enter another career; {result.runs[result.runs.length - 1]?.career.name ?? 'the career just left'}{' '}
+                can't be entered again straight away.
+              </p>
+              <StartForm
+                key={result.nextCareer.prefix}
+                careers={careers}
+                prefix={result.nextCareer.prefix}
+                exclude={result.nextCareer.exclude}
+                input={input}
+                onChange={update}
+              />
             </div>
           )}
         </>

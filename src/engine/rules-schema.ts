@@ -43,6 +43,28 @@ export const RulesSchema = z.strictObject({
   basicTraining: z.strictObject({ table: z.enum(SKILL_TABLES), level: z.int().min(0) }),
   /** The lowest EDU that allows rolls on the advancedEducation table. */
   advancedEducationMinEDU: z.int().min(0),
+  /**
+   * Optional. `dmPerPreviousCareer`: a DM on each qualification roll for every career the character
+   * has already served.
+   */
+  qualification: z.strictObject({ dmPerPreviousCareer: z.int() }).optional(),
+  /**
+   * Optional. The Draft table, rolled on 1D when qualification fails and the player takes the Draft
+   * (once per character). Each row names a career id and, optionally, an assignment id; without one
+   * the player picks the assignment.
+   */
+  draft: z
+    .array(z.strictObject({ roll: z.int(), career: z.string().trim().min(1, 'must be a non-empty string'), assignment: z.string().trim().min(1, 'must be a non-empty string').optional() }))
+    .min(1, 'must have at least one row')
+    .superRefine(consecutiveRolls)
+    .optional(),
+  /** Optional. The id of the career offered without a qualification roll when qualification fails. */
+  fallbackCareer: z.string().trim().min(1, 'must be a non-empty string').optional(),
+  /**
+   * Optional commission rules: a commission roll is allowed in a career's first term, or in any term
+   * when SOC is at least `anyTermFromSOC`, with `dmPerLaterTerm` for each term after the first.
+   */
+  commission: z.strictObject({ anyTermFromSOC: z.int().min(0), dmPerLaterTerm: z.int() }).optional(),
   /** Optional. `failOnNatural`: survival fails when the dice (before DMs) are at or below this value. */
   survival: z.strictObject({ failOnNatural: z.int().min(0).optional() }).optional(),
   /**

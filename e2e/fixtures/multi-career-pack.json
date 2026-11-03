@@ -1,0 +1,789 @@
+{
+  "format": "mt2e-career-pack",
+  "formatVersion": 2,
+  "id": "test-multi-career",
+  "name": "Multi-career test pack",
+  "revision": 1,
+  "source": "Invented test data for the e2e suite",
+  "careers": [
+    {
+      "id": "test-fleet",
+      "name": "Test fleet",
+      "source": "Invented test data for the e2e suite",
+      "summary": "Invented test career with commissions.",
+      "qualification": {
+        "characteristic": "END",
+        "target": 5
+      },
+      "skillTables": {
+        "personalDevelopment": [
+          "STR",
+          "END",
+          "DEX",
+          "Carouse",
+          "Athletics",
+          "Melee"
+        ],
+        "serviceSkills": [
+          "Vacc Suit",
+          "Pilot",
+          "Mechanic",
+          "Electronics",
+          "Broker",
+          "Steward"
+        ],
+        "advancedEducation": [
+          "Engineer",
+          "Science",
+          "Medic",
+          "Admin",
+          "Investigate",
+          "Diplomat"
+        ],
+        "officer": [
+          "Leadership",
+          "Tactics",
+          "Admin",
+          "Diplomat",
+          "Advocate",
+          "Electronics"
+        ]
+      },
+      "assignments": [
+        {
+          "id": "debris-sweep",
+          "name": "Debris sweep",
+          "survival": {
+            "characteristic": "DEX",
+            "target": 5
+          },
+          "advancement": {
+            "characteristic": "INT",
+            "target": 7
+          },
+          "skills": [
+            "Pilot",
+            "Vacc Suit",
+            "Gunner",
+            "Sensors",
+            "Astrogation",
+            "Zero-G"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Sweeper"
+            },
+            {
+              "rank": 1,
+              "title": "Tug Pilot",
+              "bonus": "Pilot 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Pilot"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Shift Lead"
+            },
+            {
+              "rank": 3,
+              "title": "Sector Boss",
+              "bonus": "Leadership 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Leadership"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "salvage-barge",
+          "name": "Salvage barge",
+          "survival": {
+            "characteristic": "DEX",
+            "target": 5
+          },
+          "advancement": {
+            "characteristic": "EDU",
+            "target": 6
+          },
+          "skills": [
+            "Mechanic",
+            "Engineer",
+            "Broker",
+            "Vacc Suit",
+            "Electronics",
+            "Streetwise"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Scrapper"
+            },
+            {
+              "rank": 1,
+              "title": "Cutter",
+              "bonus": "Mechanic 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Mechanic"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Yard Foreman"
+            },
+            {
+              "rank": 3,
+              "title": "Barge Master",
+              "bonus": "Broker 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Broker"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hazmat",
+          "name": "Hazardous waste",
+          "survival": {
+            "characteristic": "DEX",
+            "target": 5
+          },
+          "advancement": {
+            "characteristic": "EDU",
+            "target": 8
+          },
+          "skills": [
+            "Science",
+            "Medic",
+            "Vacc Suit",
+            "Investigate",
+            "Admin",
+            "Recon"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Handler"
+            },
+            {
+              "rank": 1,
+              "title": "Certified Handler",
+              "bonus": "Vacc Suit 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Vacc Suit"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Containment Officer"
+            },
+            {
+              "rank": 3,
+              "title": "Disposal Inspector",
+              "bonus": "Admin 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Admin"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "roll": 2,
+          "summary": "Invented quiet event 2."
+        },
+        {
+          "roll": 3,
+          "summary": "Invented quiet event 3."
+        },
+        {
+          "roll": 4,
+          "summary": "Invented quiet event 4."
+        },
+        {
+          "roll": 5,
+          "summary": "Invented quiet event 5."
+        },
+        {
+          "roll": 6,
+          "summary": "Invented quiet event 6."
+        },
+        {
+          "roll": 7,
+          "summary": "Invented quiet event 7."
+        },
+        {
+          "roll": 8,
+          "summary": "Invented quiet event 8."
+        },
+        {
+          "roll": 9,
+          "summary": "Invented quiet event 9."
+        },
+        {
+          "roll": 10,
+          "summary": "Invented quiet event 10."
+        },
+        {
+          "roll": 11,
+          "summary": "Invented quiet event 11."
+        },
+        {
+          "roll": 12,
+          "summary": "Invented quiet event 12."
+        }
+      ],
+      "mishaps": [
+        {
+          "roll": 1,
+          "summary": "Invented mishap 1."
+        },
+        {
+          "roll": 2,
+          "summary": "Invented mishap 2."
+        },
+        {
+          "roll": 3,
+          "summary": "Invented mishap 3."
+        },
+        {
+          "roll": 4,
+          "summary": "Invented mishap 4."
+        },
+        {
+          "roll": 5,
+          "summary": "Invented mishap 5."
+        },
+        {
+          "roll": 6,
+          "summary": "Invented mishap 6."
+        }
+      ],
+      "musteringOut": [
+        {
+          "roll": 1,
+          "cash": 1000,
+          "benefit": "Contact"
+        },
+        {
+          "roll": 2,
+          "cash": 2000,
+          "benefit": "END +1"
+        },
+        {
+          "roll": 3,
+          "cash": 5000,
+          "benefit": "Vacc suit"
+        },
+        {
+          "roll": 4,
+          "cash": 5000,
+          "benefit": "Tool kit"
+        },
+        {
+          "roll": 5,
+          "cash": 10000,
+          "benefit": "Ship share"
+        },
+        {
+          "roll": 6,
+          "cash": 10000,
+          "benefit": "INT +1"
+        },
+        {
+          "roll": 7,
+          "cash": 20000,
+          "benefit": "Two ship shares"
+        }
+      ],
+      "commission": {
+        "characteristic": "SOC",
+        "target": 8
+      },
+      "officerRanks": [
+        {
+          "rank": 1,
+          "title": "Ensign"
+        },
+        {
+          "rank": 2,
+          "title": "Commander"
+        }
+      ]
+    },
+    {
+      "id": "test-wanderer",
+      "name": "Test wanderer",
+      "source": "Invented test data for the e2e suite",
+      "summary": "Invented test career that needs no qualification roll.",
+      "qualification": {
+        "characteristic": "END",
+        "target": 2,
+        "automatic": true
+      },
+      "skillTables": {
+        "personalDevelopment": [
+          "STR",
+          "END",
+          "DEX",
+          "Carouse",
+          "Athletics",
+          "Melee"
+        ],
+        "serviceSkills": [
+          "Vacc Suit",
+          "Pilot",
+          "Mechanic",
+          "Electronics",
+          "Broker",
+          "Steward"
+        ],
+        "advancedEducation": [
+          "Engineer",
+          "Science",
+          "Medic",
+          "Admin",
+          "Investigate",
+          "Diplomat"
+        ]
+      },
+      "assignments": [
+        {
+          "id": "debris-sweep",
+          "name": "Debris sweep",
+          "survival": {
+            "characteristic": "DEX",
+            "target": 2
+          },
+          "advancement": {
+            "characteristic": "INT",
+            "target": 7
+          },
+          "skills": [
+            "Pilot",
+            "Vacc Suit",
+            "Gunner",
+            "Sensors",
+            "Astrogation",
+            "Zero-G"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Sweeper"
+            },
+            {
+              "rank": 1,
+              "title": "Tug Pilot",
+              "bonus": "Pilot 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Pilot"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Shift Lead"
+            },
+            {
+              "rank": 3,
+              "title": "Sector Boss",
+              "bonus": "Leadership 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Leadership"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "salvage-barge",
+          "name": "Salvage barge",
+          "survival": {
+            "characteristic": "END",
+            "target": 7
+          },
+          "advancement": {
+            "characteristic": "EDU",
+            "target": 6
+          },
+          "skills": [
+            "Mechanic",
+            "Engineer",
+            "Broker",
+            "Vacc Suit",
+            "Electronics",
+            "Streetwise"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Scrapper"
+            },
+            {
+              "rank": 1,
+              "title": "Cutter",
+              "bonus": "Mechanic 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Mechanic"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Yard Foreman"
+            },
+            {
+              "rank": 3,
+              "title": "Barge Master",
+              "bonus": "Broker 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Broker"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hazmat",
+          "name": "Hazardous waste",
+          "survival": {
+            "characteristic": "INT",
+            "target": 7
+          },
+          "advancement": {
+            "characteristic": "EDU",
+            "target": 8
+          },
+          "skills": [
+            "Science",
+            "Medic",
+            "Vacc Suit",
+            "Investigate",
+            "Admin",
+            "Recon"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Handler"
+            },
+            {
+              "rank": 1,
+              "title": "Certified Handler",
+              "bonus": "Vacc Suit 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Vacc Suit"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Containment Officer"
+            },
+            {
+              "rank": 3,
+              "title": "Disposal Inspector",
+              "bonus": "Admin 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Admin"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "roll": 2,
+          "summary": "Invented quiet event 2."
+        },
+        {
+          "roll": 3,
+          "summary": "Invented quiet event 3."
+        },
+        {
+          "roll": 4,
+          "summary": "Invented quiet event 4."
+        },
+        {
+          "roll": 5,
+          "summary": "Invented quiet event 5."
+        },
+        {
+          "roll": 6,
+          "summary": "Invented quiet event 6."
+        },
+        {
+          "roll": 7,
+          "summary": "Invented quiet event 7."
+        },
+        {
+          "roll": 8,
+          "summary": "Invented quiet event 8."
+        },
+        {
+          "roll": 9,
+          "summary": "Invented quiet event 9."
+        },
+        {
+          "roll": 10,
+          "summary": "Invented quiet event 10."
+        },
+        {
+          "roll": 11,
+          "summary": "Invented quiet event 11."
+        },
+        {
+          "roll": 12,
+          "summary": "Invented quiet event 12."
+        }
+      ],
+      "mishaps": [
+        {
+          "roll": 1,
+          "summary": "Invented mishap 1."
+        },
+        {
+          "roll": 2,
+          "summary": "Invented mishap 2."
+        },
+        {
+          "roll": 3,
+          "summary": "Invented mishap 3."
+        },
+        {
+          "roll": 4,
+          "summary": "Invented mishap 4."
+        },
+        {
+          "roll": 5,
+          "summary": "Invented mishap 5."
+        },
+        {
+          "roll": 6,
+          "summary": "Invented mishap 6."
+        }
+      ],
+      "musteringOut": [
+        {
+          "roll": 1,
+          "cash": 1000,
+          "benefit": "Contact"
+        },
+        {
+          "roll": 2,
+          "cash": 2000,
+          "benefit": "END +1"
+        },
+        {
+          "roll": 3,
+          "cash": 5000,
+          "benefit": "Vacc suit"
+        },
+        {
+          "roll": 4,
+          "cash": 5000,
+          "benefit": "Tool kit"
+        },
+        {
+          "roll": 5,
+          "cash": 10000,
+          "benefit": "Ship share"
+        },
+        {
+          "roll": 6,
+          "cash": 10000,
+          "benefit": "INT +1"
+        },
+        {
+          "roll": 7,
+          "cash": 20000,
+          "benefit": "Two ship shares"
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "source": "Invented test data for the e2e suite",
+    "startingAge": 18,
+    "termLength": 4,
+    "termLimit": 5,
+    "skillRolls": {
+      "perTerm": 1,
+      "onAdvancement": 1
+    },
+    "basicTraining": {
+      "table": "serviceSkills",
+      "level": 0
+    },
+    "advancedEducationMinEDU": 9,
+    "aging": {
+      "fromTerm": 3,
+      "dice": 2,
+      "dmPerTerm": -1,
+      "table": [
+        {
+          "roll": 0,
+          "summary": "Joints creak in zero-g. STR -1 and DEX -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "STR",
+              "change": -1
+            },
+            {
+              "type": "characteristic",
+              "characteristic": "DEX",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 1,
+          "summary": "Years of hauling show. END -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "END",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 2,
+          "summary": "A little slower. DEX -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "DEX",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 3,
+          "summary": "No effect."
+        }
+      ]
+    },
+    "benefits": {
+      "perTerm": 1,
+      "rankExtra": [
+        {
+          "minRank": 2,
+          "extra": 1
+        }
+      ],
+      "rankBenefitDM": [
+        {
+          "minRank": 3,
+          "dm": 1
+        }
+      ],
+      "cashRollLimit": 2
+    },
+    "qualification": {
+      "dmPerPreviousCareer": -1
+    },
+    "draft": [
+      {
+        "roll": 1,
+        "career": "test-fleet"
+      },
+      {
+        "roll": 2,
+        "career": "test-fleet"
+      },
+      {
+        "roll": 3,
+        "career": "test-fleet"
+      },
+      {
+        "roll": 4,
+        "career": "test-fleet"
+      },
+      {
+        "roll": 5,
+        "career": "test-fleet"
+      },
+      {
+        "roll": 6,
+        "career": "test-fleet"
+      }
+    ],
+    "fallbackCareer": "test-wanderer",
+    "commission": {
+      "anyTermFromSOC": 9,
+      "dmPerLaterTerm": -1
+    }
+  }
+}
