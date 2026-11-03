@@ -82,8 +82,9 @@ The top level of a pack:
   `benefit-dm`, `extra-benefit`, `characteristic`, `leave-career` and `mishap`; see
   [`src/engine/effects.ts`](src/engine/effects.ts). Anything else goes in the entry's summary, which the app
   shows for the player to apply by hand.
-- `effects` can also be `promote` (the advancement roll passes without a roll), and on a mishap
-  `stay-in-career` and `keep-benefit`.
+- `effects` can also be `promote` (the advancement roll passes without a roll), on a mishap
+  `stay-in-career` and `keep-benefit`, and `wager`, which lets the player bet benefit rolls earned so far
+  on a skill roll (`skills`, `target`, optional `maxWager` and `gainUsedSkill`).
 - An entry such as `"Drive or Vacc Suit"` asks the player to pick one. `" or "` inside parentheses, as in
   `"Pilot (small craft or spacecraft)"`, doesn't split the entry.
 - Mark an event or mishap with `"connection": true` to list it as a connection opportunity.

@@ -311,10 +311,10 @@ describe('finishCareer', () => {
   // expects muster, continue and leave.
   it('follows a forced muster or continue, and leaves at the term limit', () => {
     const result = build(started(SERVICE, PASSING))
-    expect(policyChoice({ kind: 'next', key: 'k', forced: 'muster', reason: 'x' }, result, 5)).toBe('muster')
-    expect(policyChoice({ kind: 'next', key: 'k', forced: 'continue', reason: 'x' }, result, 1)).toBe('continue')
-    expect(policyChoice({ kind: 'next', key: 'k', forced: undefined, reason: undefined }, result, 1)).toBe('leave')
-    expect(policyChoice({ kind: 'next', key: 'k', forced: undefined, reason: undefined }, result, 2)).toBe('continue')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: 'muster', reason: 'x' }, result, 5, SEED)).toBe('muster')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: 'continue', reason: 'x' }, result, 1, SEED)).toBe('continue')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: undefined, reason: undefined }, result, 1, SEED)).toBe('leave')
+    expect(policyChoice({ kind: 'next', key: 'k', forced: undefined, reason: undefined }, result, 2, SEED)).toBe('continue')
   })
 })
 
@@ -735,5 +735,86 @@ describe('finishCareer stopping points and review fixes', () => {
     const result = build(started(SERVICE, PASSING), sampleRules, changed)
     expect(result.skills['Athletics']).toBe(0)
     expect(result.pending?.kind).not.toBe('skill-option')
+  })
+})
+
+// Tests for the wager effect: wagering benefit rolls on a skill roll.
+describe('buildCareer wager effect', () => {
+  /** Returns the sample career with event 7 replaced by a wager on Gambler or Broker 8+. */
+  function wagerCareer(extra: { maxWager?: number; gainUsedSkill?: boolean } = {}): CareerDefinition {
+    const career = sampleCareer()
+    return {
+      ...career,
+      events: career.events.map((e) =>
+        e.roll === 7 ? { roll: 7, summary: 'Wager', effects: [{ type: 'wager', skills: ['Gambler', 'Broker'], target: 8, ...extra }] } : e,
+      ),
+    }
+  }
+  const rolls = { ...PASSING, 'term-1.event': 7, 'term-1.advancement': 2 }
+  const wagerKey = 'term-1.event.effect-0'
+
+  // In term 1 with one benefit roll per term, expects a wager choice of 0 to 1.
+  it('asks how many benefit rolls to wager, up to the rolls earned so far', () => {
+    expect(build(started(SERVICE, rolls), sampleRules, wagerCareer()).pending).toEqual({
+      kind: 'wager',
+      key: `${wagerKey}.wager`,
+      max: 1,
+      skills: ['Gambler', 'Broker'],
+      target: 8,
+    })
+  })
+
+  // Wagers 1 on Broker (Broker 0 from basic training, DM +0) with dice 8, leaves, and expects 2 benefit rolls.
+  it('a won wager adds half the wager, rounded up, in benefit rolls', () => {
+    const input = started({ ...SERVICE, [`${wagerKey}.wager`]: '1', [`${wagerKey}.skill`]: 'Broker', 'term-1.next': 'leave' }, { ...rolls, [wagerKey]: 8 })
+    const result = build(input, sampleRules, wagerCareer())
+    expect(step(result, 1, 'event.effect-0').result).toBe('pass')
+    expect(result.benefitCount).toBe(2)
+  })
+
+  // Wagers 1 on Broker with dice 2, leaves, and expects no benefit rolls.
+  it('a lost wager loses the wagered benefit rolls', () => {
+    const input = started({ ...SERVICE, [`${wagerKey}.wager`]: '1', [`${wagerKey}.skill`]: 'Broker', 'term-1.next': 'leave' }, { ...rolls, [wagerKey]: 2 })
+    expect(build(input, sampleRules, wagerCareer()).benefitCount).toBe(0)
+  })
+
+  // Wagers on Gambler (untrained, DM -3) with dice 10 and expects a total of 7, a fail.
+  it('an untrained skill gives DM -3', () => {
+    const input = started({ ...SERVICE, [`${wagerKey}.wager`]: '1', [`${wagerKey}.skill`]: 'Gambler' }, { ...rolls, [wagerKey]: 10 })
+    const roll = step(build(input, sampleRules, wagerCareer()), 1, 'event.effect-0')
+    expect(roll.total).toBe(7)
+    expect(roll.result).toBe('fail')
+  })
+
+  // Wagers 0 and expects no wager roll and one benefit roll.
+  it('wagering nothing skips the roll', () => {
+    const result = build(started({ ...SERVICE, [`${wagerKey}.wager`]: '0', 'term-1.next': 'leave' }, rolls), sampleRules, wagerCareer())
+    expect(result.terms[0]?.steps.some((s) => s.key === wagerKey)).toBe(false)
+    expect(result.benefitCount).toBe(1)
+  })
+
+  // With gainUsedSkill, wagers on Broker and expects Broker 1 whatever the result.
+  it('gainUsedSkill raises the skill used', () => {
+    const input = started({ ...SERVICE, [`${wagerKey}.wager`]: '1', [`${wagerKey}.skill`]: 'Broker' }, { ...rolls, [wagerKey]: 2 })
+    expect(build(input, sampleRules, wagerCareer({ gainUsedSkill: true })).skills['Broker']).toBe(1)
+  })
+
+  // Expects the Finish career policy to pick a wager from 0 to 1, the same one each time for the same seed.
+  it('Finish career picks a wager at random from the seed', () => {
+    const result = build(started(SERVICE, rolls), sampleRules, wagerCareer())
+    const pick = result.pending && policyChoice(result.pending, result, 5, SEED)
+    expect(['0', '1']).toContain(pick)
+    expect(result.pending && policyChoice(result.pending, result, 5, SEED)).toBe(pick)
+  })
+
+  // Asks the policy for a six-option skill choice under 40 seeds and expects more than one option picked.
+  it('Finish career picks skill options at random, not always the first', () => {
+    const result = build(started(SERVICE, rolls), sampleRules, wagerCareer())
+    const options = ['A', 'B', 'C', 'D', 'E', 'F']
+    const picks = new Set(
+      Array.from({ length: 40 }, (_, i) => policyChoice({ kind: 'skill-option', key: 'k', options }, result, 5, `seed-${i}`)),
+    )
+    expect(picks.size).toBeGreaterThan(1)
+    for (const p of picks) expect(options).toContain(p)
   })
 })

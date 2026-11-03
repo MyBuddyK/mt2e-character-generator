@@ -257,4 +257,18 @@ test.describe('career rule enforcement', () => {
     await expect(next.getByRole('button', { name: 'Continue in career' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Leave career' })).toHaveCount(0)
   })
+
+  // Passes survival, sets the event to 7 (a wager on Gambler or Broker 8+), wagers 1 on Broker, sets
+  // the wager dice to 12, and expects a pass with one extra benefit roll.
+  test('a wager event bets benefit rolls on a skill roll', async ({ page }) => {
+    await startEnforced(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Event', 7)
+    await page.getByRole('group', { name: 'Wager benefit rolls' }).getByRole('button', { name: 'Wager 1' }).click()
+    await page.getByRole('group', { name: 'Choose a skill' }).getByRole('button', { name: 'Broker' }).click()
+    await setDice(page, 'Term 1 Wager: Broker', 12)
+    const wager = page.getByTestId('step-term-1.event.effect-0')
+    await expect(wager.getByTestId('step-result')).toHaveText('Pass')
+    await expect(wager).toContainText('1 extra benefit roll')
+  })
 })

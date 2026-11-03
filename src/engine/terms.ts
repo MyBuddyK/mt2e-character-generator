@@ -44,6 +44,8 @@ export type PendingChoice =
    */
   | { kind: 'next'; key: string; forced: 'muster' | 'continue' | undefined; reason: string | undefined }
   | { kind: 'benefit'; key: string; index: number; cashAllowed: boolean }
+  /** How many benefit rolls to wager on a `wager` effect: a whole number from 0 to `max`, stored as text. */
+  | { kind: 'wager'; key: string; max: number; skills: string[]; target: number }
 
 /**
  * One line of a term. Roll steps have `dice` (the dice total, overridable), `dm`, and `total`;
@@ -479,6 +481,64 @@ export function buildCareer(
         case 'stay-in-career':
           step.applied.push('Stays in the career')
           break
+        case 'wager': {
+          const available = Math.max(0, terms.length - lostBenefitTerms) * rules.benefits.perTerm + extraBenefits
+          const max = Math.min(available, effect.maxWager ?? available)
+          const wagerKey = `${effectKey}.wager`
+          if (max === 0) {
+            step.applied.push('No benefit rolls to wager yet')
+            break
+          }
+          const answer = choice(wagerKey)
+          const amount = answer === undefined ? undefined : Number(answer)
+          if (amount === undefined || !Number.isInteger(amount) || amount < 0 || amount > max) {
+            throw new Stop({ kind: 'wager', key: wagerKey, max, skills: effect.skills, target: effect.target })
+          }
+          if (amount === 0) {
+            step.applied.push('Wagered no benefit rolls')
+            break
+          }
+          let skill = effect.skills[0] ?? ''
+          if (effect.skills.length > 1) {
+            const picked = choice(`${effectKey}.skill`)
+            const found = effect.skills.find((o) => o === picked)
+            if (found === undefined) throw new Stop({ kind: 'skill-option', key: `${effectKey}.skill`, options: effect.skills })
+            skill = found
+          }
+          // A skill check: the DM is the skill level (or -3 untrained), not a characteristic DM.
+          const dm = skills[skill] ?? -3
+          const d = dice(effectKey, 2)
+          const total = current(d) + dm
+          const auto = total >= effect.target
+          const ruled = outcomeOverride(effectKey, auto)
+          const passed: Overridable<boolean> = ruled === undefined ? { rolled: auto } : { rolled: auto, override: ruled }
+          const roll: Step = {
+            key: effectKey,
+            label: `Wager: ${skill}`,
+            dice: d,
+            diceCount: 2,
+            dm,
+            total,
+            target: effect.target,
+            passed,
+            result: current(passed) ? 'pass' : 'fail',
+            applied: [],
+            notes: [],
+            reasons: [],
+          }
+          roll.reasons.push(`Wagered ${amount} benefit roll${amount === 1 ? '' : 's'} on ${skill} ${effect.target}+ (DM ${signedText(dm)} from the skill level).`)
+          termSteps.push(roll)
+          if (current(passed)) {
+            const won = Math.ceil(amount / 2)
+            extraBenefits += won
+            roll.applied.push(`${won} extra benefit roll${won === 1 ? '' : 's'}`)
+          } else {
+            extraBenefits -= amount
+            roll.applied.push(`Lost ${amount} benefit roll${amount === 1 ? '' : 's'}`)
+          }
+          if (effect.gainUsedSkill) gainSkill(skill, roll)
+          break
+        }
         case 'keep-benefit':
           step.applied.push("Keeps this term's benefit roll")
           break
@@ -664,8 +724,11 @@ export function buildCareer(
 
     const highest = <T extends { minRank: number }>(list: T[]) =>
       [...list].filter((e) => e.minRank <= rank).sort((a, b) => b.minRank - a.minRank)[0]
-    const count =
-      Math.max(0, terms.length - lostBenefitTerms) * rules.benefits.perTerm + (highest(rules.benefits.rankExtra)?.extra ?? 0) + extraBenefits
+    // extraBenefits can be negative after a lost wager, so the count is kept at 0 or more.
+    const count = Math.max(
+      0,
+      Math.max(0, terms.length - lostBenefitTerms) * rules.benefits.perTerm + (highest(rules.benefits.rankExtra)?.extra ?? 0) + extraBenefits,
+    )
     benefitCount = count
     const rankDM = highest(rules.benefits.rankBenefitDM)?.dm ?? 0
     const cashSkill = rules.benefits.cashSkillDM

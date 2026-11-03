@@ -233,6 +233,21 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
           {generate}
         </div>
       )
+    case 'wager':
+      return (
+        <div className="pending" role="group" aria-label="Wager benefit rolls">
+          <p>
+            Wager benefit rolls on {pending.skills.join(' or ')} {pending.target}+? Success gains half the wager (rounded
+            up); failure loses it.
+          </p>
+          {Array.from({ length: pending.max + 1 }, (_, n) => (
+            <button type="button" key={n} onClick={() => choose(pending.key, String(n))}>
+              {n === 0 ? 'Wager nothing' : `Wager ${n}`}
+            </button>
+          ))}
+          {generate}
+        </div>
+      )
     case 'next':
       if (pending.forced === 'muster') {
         return (

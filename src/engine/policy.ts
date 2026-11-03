@@ -1,4 +1,5 @@
 import type { Characteristic } from './characteristics'
+import { diceFor } from './dice'
 import { buildCareer, type CareerData, type CareerInput, type CareerResult, type PendingChoice } from './terms'
 
 /**
@@ -8,28 +9,32 @@ import { buildCareer, type CareerData, type CareerInput, type CareerResult, type
 
 /** A one-line description of what policyChoice picks, shown next to the Finish career button. */
 export const POLICY_SUMMARY =
-  'Finish career keeps this career and assignment, rolls on the last skill table the character can use, picks the first option when a skill is a choice, and continues term after term until the character is forced out (by a mishap, an event or the advancement roll) or reaches the term limit in the rules. It stops at an ageing crisis. When the career ends it takes cash for the first benefit roll and benefits after that.'
+  'Finish career keeps this career and assignment, rolls on the last skill table the character can use, picks at random (from the seed) when an event, mishap or table entry offers a choice of skills and how many benefit rolls to wager, and continues term after term until the character is forced out (by a mishap, an event or the advancement roll) or reaches the term limit in the rules. It stops at an ageing crisis. When the career ends it takes cash for the first benefit roll and benefits after that.'
 
 /**
- * Returns the answer the policy gives to `pending`, given the career so far and the term limit:
- * the last skill table offered, the first skill option, the forced answer when a rule forces the
+ * Returns the answer the policy gives to `pending`, given the career so far, the term limit and the
+ * character's `seed`: the last skill table offered, a skill option picked with the dice for
+ * "finish:<key>", the forced answer when a rule forces the
  * after-term choice, "continue" until `termLimit` terms are done and "leave" after that, and "cash" for
- * the first benefit roll when cash is allowed ("benefit" otherwise). Returns undefined for the start
+ * the first benefit roll when cash is allowed ("benefit" otherwise), and a wager from 0 to its maximum
+ * picked the same way. The same seed and key always give the same pick. Returns undefined for the start
  * choice, which the player must make.
  */
-export function policyChoice(pending: PendingChoice, result: CareerResult, termLimit: number): string | undefined {
+export function policyChoice(pending: PendingChoice, result: CareerResult, termLimit: number, seed: string): string | undefined {
   switch (pending.kind) {
     case 'start':
       return undefined
     case 'skill-table':
       return pending.options[pending.options.length - 1]
     case 'skill-option':
-      return pending.options[0]
+      return pending.options[diceFor(seed, `finish:${pending.key}`).pick(pending.options.length)]
     case 'next':
       if (pending.forced !== undefined) return pending.forced
       return result.terms.length >= termLimit ? 'leave' : 'continue'
     case 'benefit':
       return pending.index === 0 && pending.cashAllowed ? 'cash' : 'benefit'
+    case 'wager':
+      return String(diceFor(seed, `finish:${pending.key}`).pick(pending.max + 1))
   }
 }
 
@@ -50,7 +55,7 @@ export function finishCareer(
     const result = buildCareer(seed, base, next, data)
     if (!result.pending) return next
     if (result.pending.kind === 'next' && result.terms[result.terms.length - 1]?.ageingCrisis) return next
-    const answer = policyChoice(result.pending, result, data.rules.termLimit)
+    const answer = policyChoice(result.pending, result, data.rules.termLimit, seed)
     if (answer === undefined || result.pending.kind === 'start') return next
     next = { ...next, choices: { ...next.choices, [result.pending.key]: answer } }
   }

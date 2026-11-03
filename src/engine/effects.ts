@@ -28,6 +28,10 @@ const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
  * - `promote`: this term's advancement roll passes without being rolled.
  * - `stay-in-career`: on a mishap, the career does not end because of the mishap.
  * - `keep-benefit`: on a mishap, the term still gives its benefit roll.
+ * - `wager`: the player may wager benefit rolls earned so far in this career (at most `maxWager`, when
+ *   set) on a 2D roll with one of `skills` (skill level as the DM, -3 when untrained) against `target`.
+ *   Success gains half the wager in extra benefit rolls, rounded up; failure loses the wager. With
+ *   `gainUsedSkill`, the skill used gains a level either way. Wagering 0 skips the roll.
  */
 export const EffectSchema = z.discriminatedUnion('type', [
   z.strictObject({
@@ -45,6 +49,13 @@ export const EffectSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('promote') }),
   z.strictObject({ type: z.literal('stay-in-career') }),
   z.strictObject({ type: z.literal('keep-benefit') }),
+  z.strictObject({
+    type: z.literal('wager'),
+    skills: z.array(nonEmpty).min(1, 'must list at least one skill'),
+    target: z.int().min(0).max(20),
+    maxWager: z.int().min(1).optional(),
+    gainUsedSkill: z.boolean().optional(),
+  }),
 ])
 /** One effect, as described by EffectSchema. */
 export type Effect = z.infer<typeof EffectSchema>

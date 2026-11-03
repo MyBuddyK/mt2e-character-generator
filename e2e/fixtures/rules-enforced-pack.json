@@ -271,7 +271,18 @@
         },
         {
           "roll": 7,
-          "summary": "Life event."
+          "summary": "A card game in the crew mess. Wager benefit rolls on Gambler or Broker 8+.",
+          "effects": [
+            {
+              "type": "wager",
+              "skills": [
+                "Gambler",
+                "Broker"
+              ],
+              "target": 8,
+              "gainUsedSkill": true
+            }
+          ]
         },
         {
           "roll": 8,

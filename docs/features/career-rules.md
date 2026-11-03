@@ -69,6 +69,24 @@ Requested by the owner on 2026-11-03, replacing Generate the rest and a short-li
 - When a term's aging causes an ageing crisis, it stops at that term's after-term choice and a notice
   says why, so the players can resolve it before going on.
 - It is also offered when the career is forced to end, where it rolls the benefits.
+- Where an event, mishap, rank or table entry offers a choice of skills, or a wager asks how many
+  benefit rolls to bet, Finish career picks at random with `Dice.pick` from the dice for
+  `finish:<choice key>`, so the same seed gives the same picks. It still uses the last skill table
+  offered, and takes cash for the first benefit roll.
+
+## Wagers
+
+Requested by the owner on 2026-11-03, for events where the character bets benefit rolls on a skill roll.
+
+- Effect `{ "type": "wager", "skills": [...], "target": 8, "maxWager": 1, "gainUsedSkill": true }`
+  (`maxWager` and `gainUsedSkill` are optional).
+- The player picks how many benefit rolls to wager, from 0 to the rolls earned in the career so far
+  (terms served times `benefits.perTerm`, plus extra rolls from effects, minus terms lost to mishaps;
+  rank extras are not counted), capped by `maxWager`. Wagering 0 skips the roll.
+- With more than one skill, the player picks the skill. The roll is 2D plus the skill level (DM -3 when
+  the character doesn't have the skill) against `target`, with the usual dice and result overrides.
+- Success adds half the wager, rounded up, as extra benefit rolls; failure removes the wager. The
+  benefit count never goes below 0. With `gainUsedSkill`, the skill used gains a level either way.
 
 ## User flow
 

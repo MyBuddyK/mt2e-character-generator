@@ -95,7 +95,8 @@ players' browsers, so there is no group code and no server.
 
 7. **Finish career uses a simple, visible policy.** It keeps the current career, picks the assignment
    the player already chose, rolls on the skill table with the highest-numbered entry the character can
-   use, continues until the character is forced out or reaches a term limit from `rules`, and takes cash
+   use, picks skill options and wagers at random from the seed (see career-rules.md), continues until the
+   character is forced out or reaches a term limit from `rules`, and takes cash
    for the first benefit roll and benefits after that. The policy is shown in a short note next to the
    button, and every choice it made can be changed afterwards like any other choice.
 
