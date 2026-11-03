@@ -10,6 +10,7 @@
   --badge-bg: #7a5a00;
   --badge-text: #ffffff;
   --error-bg: #fdecea;
+  --notice-bg: #eef3fb;
   font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
 }
@@ -27,6 +28,7 @@
     --badge-bg: #ffd666;
     --badge-text: #1d1d1f;
     --error-bg: #3d1a17;
+    --notice-bg: #17243a;
   }
 }
 
@@ -70,8 +72,101 @@ section {
   margin-top: 1rem;
 }
 
-section.errors {
+.errors {
   background: var(--error-bg);
+}
+
+.notice {
+  background: var(--notice-bg);
+}
+
+div.errors,
+div.notice,
+p.notice {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.75rem 0;
+}
+
+div.errors p,
+div.notice p {
+  margin: 0;
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.import-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.file-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-weight: 600;
+}
+
+.file-label input {
+  font: inherit;
+  font-weight: normal;
+  max-width: 100%;
+}
+
+.url-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.url-form label {
+  font-weight: 600;
+}
+
+.url-form input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font: inherit;
+  padding: 0.2rem 0.4rem;
+}
+
+.url-form p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pack-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+
+.pack-list > li {
+  border-top: 1px solid var(--border);
+  padding: 0.5rem 0;
+}
+
+.pack-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+}
+
+code {
+  overflow-wrap: anywhere;
 }
 
 .row {

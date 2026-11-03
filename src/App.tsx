@@ -10,7 +10,10 @@ import {
   type Characteristic,
 } from './engine/characteristics'
 import { current, isOverridden, type Overridable } from './engine/overridable'
-import { careerErrors, careers } from './data/careers'
+import { careerErrors, careers as bundledCareers } from './data/careers'
+import { formatPackRefs, parsePackRefs } from './engine/career-pack'
+import { CareerData } from './CareerData'
+import { useCareerPacks } from './use-career-packs'
 import { FAIR_USE_DISCLAIMER } from './legal'
 
 /** Returns the trimmed ?seed= value from the page URL, or a new random seed when it is missing or empty. */
@@ -19,11 +22,26 @@ function initialSeed(): string {
   return fromUrl ? fromUrl : randomSeed()
 }
 
-/** Replaces the ?seed= value in the address bar with `seed`, without adding a history entry. */
-function writeSeedToUrl(seed: string): void {
+/**
+ * Returns the ?packs= value from the page URL in the form formatPackRefs writes, or undefined when
+ * the URL has no ?packs= value.
+ */
+function initialPacksParam(): string | undefined {
+  const value = new URLSearchParams(window.location.search).get('packs')
+  return value === null ? undefined : formatPackRefs(parsePackRefs(value))
+}
+
+/**
+ * Sets ?seed= to `seed` and ?packs= to `packs` in the address bar, without adding a history entry.
+ * Removes ?packs= when `packs` is empty. Does nothing when both already match.
+ */
+function writeParamsToUrl(seed: string, packs: string): void {
   const url = new URL(window.location.href)
-  if (url.searchParams.get('seed') === seed) return
+  const currentPacks = url.searchParams.get('packs') ?? ''
+  if (url.searchParams.get('seed') === seed && currentPacks === packs) return
   url.searchParams.set('seed', seed)
+  if (packs === '') url.searchParams.delete('packs')
+  else url.searchParams.set('packs', packs)
   window.history.replaceState(null, '', url)
 }
 
@@ -116,16 +134,27 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
 }
 
 /**
- * Renders the characteristics table, the list of loaded careers, any career file errors, and a footer
- * with Mongoose Publishing's Fair Use disclaimer. The current seed is kept in the URL's ?seed= value. Reroll picks a new seed and rolls a new
- * character.
+ * Renders the characteristics table, the Career data section, the list of careers, any career file
+ * errors, and a footer with Mongoose Publishing's Fair Use disclaimer. The current seed is kept in
+ * the URL's ?seed= value and the loaded packs in ?packs=. Reroll picks a new seed and rolls a new
+ * character. When the page was opened with a ?packs= value that differs from the loaded packs, a
+ * notice lists both and the address bar keeps the link's ?packs= value until they match; rolling
+ * still works.
  */
 export default function App() {
   const [character, setCharacter] = useState<Character>(() => newCharacter(initialSeed()))
+  const [expectedPacks] = useState(initialPacksParam)
+  const packs = useCareerPacks(bundledCareers)
+  const showingSample = packs.entries.length === 0
+
+  const mismatch = expectedPacks !== undefined && expectedPacks !== packs.packsParam
+  // While the loaded packs differ from the link's ?packs=, the link's value stays in the address bar,
+  // so a reload or bookmark still shows the notice.
+  const urlPacks = mismatch ? expectedPacks : packs.packsParam
 
   useEffect(() => {
-    writeSeedToUrl(character.seed)
-  }, [character.seed])
+    writeParamsToUrl(character.seed, urlPacks)
+  }, [character.seed, urlPacks])
 
   return (
     <>
@@ -143,6 +172,21 @@ export default function App() {
                 <li key={e}>{e}</li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {mismatch && (
+          <section className="notice" data-testid="pack-mismatch" aria-labelledby="mismatch-heading">
+            <h2 id="mismatch-heading">Different career packs</h2>
+            <p>
+              This link was made with other career packs than the ones loaded here, so results may not match the
+              referee's. The link keeps its pack list until the loaded packs match it.
+            </p>
+            <p>
+              Link: <code>{expectedPacks || 'none'}</code>
+              <br />
+              Loaded: <code>{packs.packsParam || 'none'}</code>
+            </p>
           </section>
         )}
 
@@ -188,12 +232,15 @@ export default function App() {
           </div>
         </section>
 
+        <CareerData packs={packs} />
+
         <section aria-labelledby="careers-heading">
           <h2 id="careers-heading">Careers loaded</h2>
           <ul data-testid="career-list">
-            {careers.map((c) => (
+            {packs.careers.map((c) => (
               <li key={c.id}>
-                <strong>{c.name}</strong> <span className="muted">{c.summary}</span>
+                {showingSample && <span className="badge">Sample</span>} <strong>{c.name}</strong>{' '}
+                <span className="muted">{c.summary}</span>
               </li>
             ))}
           </ul>

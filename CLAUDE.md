@@ -20,8 +20,13 @@ also the owner's portfolio project.
 - `src/data/careers/*.json`: career data. Every JSON file in that folder is checked against the zod
   `CareerSchema` in `src/engine/career-schema.ts` when it loads. Files that fail are left out and
   listed in `careerErrors`, which the app shows and a unit test checks.
+- `src/engine/career-pack.ts`: career pack parsing, fingerprints, and the rule for which careers are listed
+  when packs are loaded. `src/storage/`: localStorage and URL fetching for packs. `src/use-career-packs.ts`
+  and `src/CareerData.tsx`: the pack state and the Career data section.
+- `scripts/`: `validate-pack` and `schema` (writes the git-ignored `public/career-pack.schema.json`), run with
+  tsx and typechecked by `tsconfig.scripts.json`.
 - `src/App.tsx`: UI.
-- `e2e/`: Playwright specs. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
+- `e2e/`: Playwright specs. `e2e/fixtures/` holds invented career packs used by the specs and unit tests. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
   relative URLs (`./?seed=x`) so they run under any `BASE_PATH`; CI runs them at `/` and at the Pages path.
 - `specs/`: test plans from the planner agent. `docs/features/`: feature specs from `feature-designer`.
 

@@ -1,6 +1,6 @@
 # Career file import
 
-Status: proposed. Nothing in this spec is built yet.
+Status: built. Not yet done: the list of file hosts that allow loading from other sites (decision 5).
 
 ## Problem
 
@@ -51,7 +51,11 @@ either from their device or from a link, and keep it between visits.
      the app says so.
    - If a write fails after storage has worked, for example with `QuotaExceededError`, the value already saved
      under the key is left as it was, the new pack stays loaded for that visit only, and the app says the pack
-     could not be saved and names it.
+     could not be saved and names it. A removal that can't be saved shows an alert saying the pack will come
+     back after a reload.
+   - Saved values the app can't read, and saved packs that no longer pass the schema (for example after a
+     format change), are kept in storage and listed. The player can remove each pack, or delete the
+     unreadable values.
 
 4. **The sample career is hidden once a pack is loaded.** With nothing loaded, the site lists the invented
    sample career (`sample-sanitation.json`, an orbital sanitation job), marked "Sample", so it can be used
@@ -65,12 +69,13 @@ either from their device or from a link, and keep it between visits.
    - A pack loaded from a URL is saved with its URL. A **Check for update** button fetches it again and, if
      its fingerprint differs from the saved copy, offers to replace it, showing both revisions and
      fingerprints. If the fingerprint changed but the `revision` did not go up, the offer also says the
-     referee may have forgotten to raise it.
+     referee may have forgotten to raise it. The pack being checked is the one replaced, even if the pack at
+     the URL now has a different `id`; the confirmation then names both ids.
    - A browser can only read a file from another site when that site's server allows it, through the CORS
      `Access-Control-Allow-Origin` header. Some file hosts send that header for raw file links and some
      don't. When the request is blocked, the app says the host doesn't allow loading from other sites, and
-     suggests downloading the file and importing it instead. Which hosts work is to be tested during the
-     build and listed in the README.
+     suggests downloading the file and importing it instead. Which hosts work has not been tested yet; the
+     README will list them once it has.
    - A link that anyone can open makes the pack readable by anyone who has the link. The import dialog says
      this next to the URL field.
    - The fetched content is only parsed as JSON and checked with the schemas. It is never run as code.
@@ -80,6 +85,8 @@ either from their device or from a link, and keep it between visits.
    SHA-256 of the pack's JSON in a fixed key order. The fingerprint is added to the shared URL as
    `?packs=<id>@<fingerprint>,...`. When someone opens a link and their loaded packs differ, the app warns that
    the results may not match the referee's. It still rolls with the packs that are loaded; it never refuses.
+   While the packs differ, the address bar keeps the link's `?packs=` value, so a reload still shows the
+   notice.
 
 7. **Authoring help for the referee.**
    - A JSON Schema generated from the zod schemas with `z.toJSONSchema`, published with the site as
@@ -160,37 +167,37 @@ part of this spec.
 
 ## Acceptance criteria
 
-- [ ] With nothing imported, the Career data section lists no packs and the career list shows the sample career.
-- [ ] After a pack is imported, the sample career is no longer in the career list. After the last pack is
+- [x] With nothing imported, the Career data section lists no packs and the career list shows the sample career.
+- [x] After a pack is imported, the sample career is no longer in the career list. After the last pack is
       removed, it is listed again.
-- [ ] Importing `e2e/fixtures/valid-pack.json` adds its careers to the career list and shows its name, revision,
+- [x] Importing `e2e/fixtures/valid-pack.json` adds its careers to the career list and shows its name, revision,
       fingerprint and career count.
-- [ ] After a reload, the imported pack is still listed.
-- [ ] Clicking Remove on a pack removes its careers from the list, and they stay removed after a reload.
-- [ ] Importing a file that isn't JSON shows an alert naming the file, and nothing is saved.
-- [ ] Importing a pack with `formatVersion` 2 shows an alert saying the app supports version 1.
-- [ ] Importing a pack with one invalid career loads the others and lists the invalid one by index and field.
-- [ ] Importing a pack with an `id` that's already loaded asks for confirmation and shows both revisions.
+- [x] After a reload, the imported pack is still listed.
+- [x] Clicking Remove on a pack removes its careers from the list, and they stay removed after a reload.
+- [x] Importing a file that isn't JSON shows an alert naming the file, and nothing is saved.
+- [x] Importing a pack with `formatVersion` 2 shows an alert saying the app supports version 1.
+- [x] Importing a pack with one invalid career loads the others and lists the invalid one by index and field.
+- [x] Importing a pack with an `id` that's already loaded asks for confirmation and shows both revisions.
       Cancelling keeps the old pack.
-- [ ] With `localStorage` blocked, an import still loads the pack for the visit and shows the storage notice.
-- [ ] Loading `https://packs.test/valid-pack.json` (served by `page.route`) adds its careers and shows the pack's
+- [x] With `localStorage` blocked, an import still loads the pack for the visit and shows the storage notice.
+- [x] Loading `https://packs.test/valid-pack.json` (served by `page.route`) adds its careers and shows the pack's
       source as URL.
-- [ ] Loading a URL whose route responds with status 404 shows an alert that includes the status.
-- [ ] Loading a URL whose route is aborted shows the alert for a blocked or unreachable link.
-- [ ] Entering an `http://` URL shows an alert saying only `https://` links are accepted, and no request is made.
-- [ ] Check for update on a URL pack whose route now serves a higher revision asks to replace it, and shows
+- [x] Loading a URL whose route responds with status 404 shows an alert that includes the status.
+- [x] Loading a URL whose route is aborted shows the alert for a blocked or unreachable link.
+- [x] Entering an `http://` URL shows an alert saying only `https://` links are accepted, and no request is made.
+- [x] Check for update on a URL pack whose route now serves a higher revision asks to replace it, and shows
       both revisions.
-- [ ] Check for update on a URL pack whose route serves changed content with the same revision asks to
+- [x] Check for update on a URL pack whose route serves changed content with the same revision asks to
       replace it and says the revision was not raised.
-- [ ] Two packs that define the same career id, imported in either order, keep the career from the pack whose
+- [x] Two packs that define the same career id, imported in either order, keep the career from the pack whose
       `id` sorts first and report the duplicate.
-- [ ] A pack career with the id `sample-sanitation` is listed after import.
-- [ ] With an import's storage write made to throw `QuotaExceededError`, the pack loads for the visit, the
+- [x] A pack career with the id `sample-sanitation` is listed after import.
+- [x] With an import's storage write made to throw `QuotaExceededError`, the pack loads for the visit, the
       not-saved notice names it, and the packs saved before it are still listed after a reload.
-- [ ] A shared link with `?packs=` that doesn't match the loaded packs shows the mismatch notice, and Reroll
+- [x] A shared link with `?packs=` that doesn't match the loaded packs shows the mismatch notice, and Reroll
       still works.
-- [ ] The import control can be reached and used with the keyboard alone.
-- [ ] `npm run validate-pack e2e/fixtures/partly-invalid-pack.json` prints the same messages the app shows and
+- [x] The import control can be reached and used with the keyboard alone.
+- [x] `npm run validate-pack e2e/fixtures/partly-invalid-pack.json` prints the same messages the app shows and
       exits with code 1. For the valid fixture it exits with code 0.
 
 ## Resolved questions

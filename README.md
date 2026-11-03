@@ -3,7 +3,8 @@
 An unofficial fan-made web app for building Mongoose Traveller 2nd Edition characters as a group.
 
 Current state: the app rolls the six characteristics from a seed, and the player can override each value.
-It loads and checks career data files but does not yet run careers.
+Players can import career packs from a file or an https link; the app checks them and lists their careers,
+but does not yet run careers.
 
 Planned: stepping through careers one term at a time, showing events that could connect characters,
 generating a whole character in one step, and exporting to Foundry VTT.
@@ -19,12 +20,35 @@ npm run test:e2e   # Playwright (run `npx playwright install chromium` once firs
 
 Add `?seed=anything` to the URL to get the same character every time.
 
-## Adding career data
+## Career packs
 
-Put a JSON file in `src/data/careers/` following `sample-sanitation.json`. Each file is checked against
+The public site includes only an invented sample career. A referee writes the real careers from their own books
+into a career pack, a JSON file described in `docs/features/career-import.md`, and shares it privately with
+their players. Each player opens **Career data** on the site and picks **Import from file**, or pastes an
+`https://` link and picks **Load from URL**. Packs are saved only in that player's browser. Once a pack is
+loaded, the sample career is hidden.
+
+For the referee:
+
+- Keep packs in `careers-private/`. It is listed in `.gitignore`, so `git add .` skips it; `git add -f` does
+  not, so take care not to force-add it in a public repo.
+- `npm run validate-pack careers-private/my-pack.json` prints the same messages the app shows on import, and
+  exits with code 1 if the pack is rejected or any career in it was skipped.
+- `npm run schema` writes `public/career-pack.schema.json` (the site also serves it as
+  `career-pack.schema.json`). Point a pack's `"$schema"` field at that file, or map it in your editor's JSON
+  settings, to get field names and types while editing. It does not check that each roll in a table is covered once or that
+  ids are unique; `validate-pack` does.
+- A link loads only if the file host allows other sites to read the file (CORS). Which hosts allow this has
+  not been tested yet. If a link is blocked, download the file and import it instead.
+- A shared link to a character includes `?packs=<id>@<fingerprint>` for the loaded packs. A player whose
+  packs differ sees a notice that results may not match.
+
+## Adding bundled career data
+
+`src/data/careers/` holds the sample career that ships with the site. Each JSON file there is checked against
 `CareerSchema` in `src/engine/career-schema.ts`. `npm test` fails and lists each problem by file and field,
-and the app shows the same list above the characteristics. Use short summaries in your own words and cite the book and
-page in `source`; don't copy rulebook text into this repo.
+and the app shows the same list above the characteristics. Since the repo is public, don't put rulebook
+text here; use a career pack instead.
 
 ## Tech
 
