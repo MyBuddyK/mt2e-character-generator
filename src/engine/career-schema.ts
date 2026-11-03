@@ -19,7 +19,10 @@ export const CheckSchema = z.object({
 /** A characteristic check, as described by CheckSchema. */
 export type Check = z.infer<typeof CheckSchema>
 
-/** One entry in a D6 skill table: a skill or characteristic name, optionally with a level or speciality. */
+/**
+ * One entry in a D6 skill table: a skill name, optionally with a level or speciality, or a characteristic
+ * change such as "DEX" or "DEX +1" (read by asCharacteristic in terms.ts).
+ */
 export const SkillTableEntrySchema = nonEmpty
 /** One skill table entry, as described by SkillTableEntrySchema. */
 export type SkillTableEntry = z.infer<typeof SkillTableEntrySchema>
