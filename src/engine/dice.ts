@@ -39,6 +39,8 @@ export interface Dice {
   roll(count: number): number
   /** Returns a D66 roll: the first die as the tens digit and the second as the units (11 to 66). */
   d66(): number
+  /** Returns a whole number from 0 to `count` - 1, each equally likely. Throws a RangeError if `count` is not a positive integer. */
+  pick(count: number): number
 }
 
 /** Returns a Dice instance whose rolls come from a generator seeded with `seed`. */
@@ -55,6 +57,10 @@ export function createDice(seed: number): Dice {
     },
     d66() {
       return d6() * 10 + d6()
+    },
+    pick(count) {
+      if (!Number.isInteger(count) || count < 1) throw new RangeError(`pick count must be a positive integer, got ${count}`)
+      return Math.floor(rng() * count)
     },
   }
 }

@@ -132,6 +132,11 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
         )}
       </div>
       {step.applied.length > 0 && <div className="step-applied">Applied: {step.applied.join(', ')}</div>}
+      {step.reasons.map((r, i) => (
+        <div className="step-reason" key={`${i}-${r}`} data-testid="step-reason">
+          {r}
+        </div>
+      ))}
       {step.notes.map((n) => (
         <div className="step-note" key={n}>
           Apply by hand: {n}
@@ -194,7 +199,7 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
   const generate = (
     <>
       <button type="button" className="secondary" onClick={onGenerate}>
-        Generate the rest
+        Finish career
       </button>
       <p className="muted small" data-testid="policy-note">
         {POLICY_SUMMARY}
@@ -228,22 +233,44 @@ function Pending({ pending, input, onChange, onGenerate, benefitCount }: Pending
           {generate}
         </div>
       )
-    case 'next':
-      return pending.forced ? (
-        <div className="pending" role="group" aria-label="End of career">
-          <p>{pending.reason}</p>
-          <button type="button" onClick={() => choose(pending.key, 'muster')}>
-            Muster out
-          </button>
+    case 'wager':
+      return (
+        <div className="pending" role="group" aria-label="Wager benefit rolls">
+          <p>
+            Wager benefit rolls on {pending.skills.join(' or ')} {pending.target}+? Success gains half the wager (rounded
+            up); failure loses it.
+          </p>
+          {Array.from({ length: pending.max + 1 }, (_, n) => (
+            <button type="button" key={n} onClick={() => choose(pending.key, String(n))}>
+              {n === 0 ? 'Wager nothing' : `Wager ${n}`}
+            </button>
+          ))}
+          {generate}
         </div>
-      ) : (
+      )
+    case 'next':
+      if (pending.forced === 'muster') {
+        return (
+          <div className="pending" role="group" aria-label="End of career">
+            <p>{pending.reason}</p>
+            <button type="button" onClick={() => choose(pending.key, 'muster')}>
+              Muster out
+            </button>
+            {generate}
+          </div>
+        )
+      }
+      return (
         <div className="pending" role="group" aria-label="After this term">
+          {pending.reason !== undefined && <p>{pending.reason}</p>}
           <button type="button" onClick={() => choose(pending.key, 'continue')}>
             Continue in career
           </button>
-          <button type="button" onClick={() => choose(pending.key, 'leave')}>
-            Leave career
-          </button>
+          {pending.forced === undefined && (
+            <button type="button" onClick={() => choose(pending.key, 'leave')}>
+              Leave career
+            </button>
+          )}
           {generate}
         </div>
       )
@@ -416,7 +443,21 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
           )}
 
           {pending && started && (
-            <Pending pending={pending} input={input} onChange={update} onGenerate={career.generate} benefitCount={result.benefitCount} />
+            <>
+              {pending.kind === 'next' && result.terms[result.terms.length - 1]?.ageingCrisis && (
+                <p className="notice" data-testid="ageing-crisis-notice">
+                  Term {result.terms.length} ended in an ageing crisis, so Finish career stopped here. Resolve it by hand
+                  before going on.
+                </p>
+              )}
+              <Pending
+                pending={pending}
+                input={input}
+                onChange={update}
+                onGenerate={career.generate}
+                benefitCount={result.benefitCount}
+              />
+            </>
           )}
 
           {result.finished && (

@@ -5,7 +5,7 @@ import {
   normalizeCharacteristic,
   type Characteristic,
 } from './characteristics'
-import type { Assignment, CareerDefinition, Check } from './career-schema'
+import type { Assignment, CareerDefinition, Check, Qualification } from './career-schema'
 import type { Effect, SkillTableKey } from './effects'
 import { SKILL_TABLES } from './effects'
 import { current, isOverridden, type Overridable } from './overridable'
@@ -38,8 +38,14 @@ export type PendingChoice =
   | { kind: 'start'; failedQualification: boolean }
   | { kind: 'skill-table'; key: string; options: SkillTableKey[] }
   | { kind: 'skill-option'; key: string; options: string[] }
-  | { kind: 'next'; key: string; forced: boolean; reason: string | undefined }
+  /**
+   * What to do after a term. `forced` is "muster" when the career must end, "continue" when the
+   * character must stay, or undefined when the player chooses; `reason` says why.
+   */
+  | { kind: 'next'; key: string; forced: 'muster' | 'continue' | undefined; reason: string | undefined }
   | { kind: 'benefit'; key: string; index: number; cashAllowed: boolean }
+  /** How many benefit rolls to wager on a `wager` effect: a whole number from 0 to `max`, stored as text. */
+  | { kind: 'wager'; key: string; max: number; skills: string[]; target: number }
 
 /**
  * One line of a term. Roll steps have `dice` (the dice total, overridable), `dm`, and `total`;
@@ -66,6 +72,8 @@ export interface Step {
   applied: string[]
   /** Text the player has to apply by hand (an entry or rank bonus with no structured effects). */
   notes: string[]
+  /** Rules the engine applied to this step, and gains a limit stopped, described for the player. */
+  reasons: string[]
 }
 
 /** One term of the career. */
@@ -78,6 +86,10 @@ export interface TermResult {
   title: string | undefined
   /** Why the career ends after this term, or undefined when the player may continue. */
   endReason: string | undefined
+  /** Why the character must continue after this term, or undefined when they may leave. */
+  stayReason: string | undefined
+  /** True when this term's aging took a characteristic to 0 or below (an ageing crisis). */
+  ageingCrisis: boolean
 }
 
 /** One mustering-out roll. */
@@ -111,6 +123,8 @@ export interface CareerResult {
   benefits: BenefitResult[]
   /** How many mustering-out rolls the character gets, or 0 before mustering out. */
   benefitCount: number
+  /** How many terms gave no benefit roll because they ended in a mishap (rules.benefits.mishapLosesTerm). */
+  lostBenefitTerms: number
   /** A DM from a dm-next effect for the next career's qualification roll (used by a later career). */
   qualificationDM: number
   cash: number
@@ -166,6 +180,37 @@ export function asCharacteristic(entry: string): { characteristic: Characteristi
 }
 
 /**
+ * Splits a skill table entry such as "Drive or Vacc Suit" into its options, splitting on " or " only
+ * outside parentheses, so "Pilot (small craft or spacecraft)" stays one entry. Returns a one-item list
+ * for an entry without a choice.
+ */
+export function entryOptions(entry: string): string[] {
+  const options: string[] = []
+  let depth = 0
+  let start = 0
+  for (let i = 0; i < entry.length; i += 1) {
+    const ch = entry[i]
+    if (ch === '(') depth += 1
+    else if (ch === ')') depth = Math.max(0, depth - 1)
+    else if (depth === 0 && entry.startsWith(' or ', i)) {
+      options.push(entry.slice(start, i).trim())
+      start = i + 4
+      i += 3
+    }
+  }
+  options.push(entry.slice(start).trim())
+  return options.filter((o) => o !== '')
+}
+
+/** Returns the characteristic of `check` with the highest DM for `value`, the first listed on a tie. */
+function bestCharacteristic(check: Check, value: (c: Characteristic) => number): Characteristic {
+  const list = typeof check.characteristic === 'string' ? [check.characteristic] : check.characteristic
+  let best: Characteristic = list[0] ?? 'STR'
+  for (const c of list) if (characteristicDM(value(c)) > characteristicDM(value(best))) best = c
+  return best
+}
+
+/**
  * Builds a career from `seed`, the base characteristic values `base` (after the player's
  * overrides), the player's `input` and `data`. It stops at the first choice in `input.choices` that
  * is missing and returns it as `pending`. A saved choice that names a career or assignment that
@@ -196,6 +241,9 @@ export function buildCareer(
   let benefitDM = 0
   let extraBenefits = 0
   let benefitCount = 0
+  let lostBenefitTerms = 0
+  let promoteThisTerm = false
+  const skillLimits = rules.skillLimits
 
   const value = (c: Characteristic) => normalizeCharacteristic(base[c] + changes[c]) ?? 0
   const choice = (key: string): string | undefined => {
@@ -218,12 +266,17 @@ export function buildCareer(
     return v === 'pass'
   }
 
-  /** Rolls 2D + characteristic DM + `extraDM` against a check. */
-  const check = (key: string, label: string, target: Check, extraDM: number): Step => {
+  /**
+   * Rolls 2D + `dm` against `target` and returns the step, with dice and outcome overrides applied.
+   * When `failOnNatural` is set, dice at or below it fail whatever the total, and the step says so.
+   */
+  const roll2D = (key: string, label: string, dm: number, target: number, failOnNatural?: number): Step => {
     const d = dice(key, 2)
-    const dm = characteristicDM(value(target.characteristic)) + extraDM
     const total = current(d) + dm
-    const auto = total >= target.target
+    const naturalFail = failOnNatural !== undefined && current(d) <= failOnNatural
+    const auto = total >= target && !naturalFail
+    const reasons: string[] = []
+    if (naturalFail && total >= target) reasons.push(`Natural ${current(d)}: ${label.toLowerCase()} fails whatever the DMs.`)
     const ruled = outcomeOverride(key, auto)
     const passed: Overridable<boolean> = ruled === undefined ? { rolled: auto } : { rolled: auto, override: ruled }
     return {
@@ -233,13 +286,61 @@ export function buildCareer(
       diceCount: 2,
       dm,
       total,
-      target: target.target,
-      characteristic: target.characteristic,
+      target,
       passed,
       result: current(passed) ? 'pass' : 'fail',
       applied: [],
       notes: [],
+      reasons,
     }
+  }
+
+  /** Rolls 2D + the best characteristic DM of `target` + `extraDM` against the check, as roll2D does. */
+  const check = (key: string, label: string, target: Check, extraDM: number, failOnNatural?: number): Step => {
+    const characteristic = bestCharacteristic(target, value)
+    const step = roll2D(key, label, characteristicDM(value(characteristic)) + extraDM, target.target, failOnNatural)
+    step.characteristic = characteristic
+    if (typeof target.characteristic !== 'string' && target.characteristic.length > 1) {
+      step.reasons.push(`Uses ${characteristic}, the best DM of ${target.characteristic.join(' or ')}.`)
+    }
+    return step
+  }
+
+  /** Returns the option of `options` stored under `key`, or the only option; stops to ask when there is a choice and none is stored. */
+  const pickOption = (key: string, options: string[]): string => {
+    if (options.length === 1) return options[0] ?? ''
+    const answer = choice(key)
+    const found = options.find((o) => o === answer)
+    if (found === undefined) throw new Stop({ kind: 'skill-option', key, options })
+    return found
+  }
+
+  /**
+   * Returns the benefit rolls earned so far in the career: terms that give a benefit roll times
+   * rules.benefits.perTerm, plus extra rolls from effects and wagers. Rank extras are not included.
+   * Never below 0.
+   */
+  const earnedBenefits = () => Math.max(0, Math.max(0, terms.length - lostBenefitTerms) * rules.benefits.perTerm + extraBenefits)
+
+  /** A step that passes without a roll (automatic qualification or promotion), with `reason`. The outcome can still be overridden. */
+  const automaticPass = (key: string, label: string, reason: string): Step => {
+    const ruled = outcomeOverride(key, true)
+    const passed: Overridable<boolean> = ruled === undefined ? { rolled: true } : { rolled: true, override: ruled }
+    return { key, label, passed, result: current(passed) ? 'pass' : 'fail', applied: [], notes: [], reasons: [reason] }
+  }
+
+  /** Rolls the qualification check for `q`, or passes it without a roll when `q` makes it automatic. */
+  const qualify = (key: string, q: Qualification, ageStart: number, extraDM: number): Step => {
+    if (q.automatic) return automaticPass(key, 'Qualification', 'Automatic qualification for this career.')
+    const listed = typeof q.characteristic === 'string' ? [q.characteristic] : q.characteristic
+    const high = q.automaticAt === undefined ? undefined : listed.find((c) => value(c) >= (q.automaticAt ?? 0))
+    if (high !== undefined) {
+      return automaticPass(key, 'Qualification', `Automatic qualification with ${high} ${q.automaticAt ?? 0} or higher.`)
+    }
+    const ageDM = q.ageDM !== undefined && ageStart >= q.ageDM.fromAge ? q.ageDM.dm : 0
+    const step = check(key, 'Qualification', q, extraDM + ageDM)
+    if (ageDM !== 0) step.reasons.push(`DM ${signedText(ageDM)} for age ${q.ageDM?.fromAge ?? ageStart} or more.`)
+    return step
   }
 
   /** Rolls `count` dice + `dm` on a table, using the nearest row when the total is outside it. */
@@ -255,13 +356,31 @@ export function buildCareer(
       row = total < first.roll ? first : last
       outOfRange = true
     }
-    const step: Step = { key, label, dice: d, diceCount: count, dm, total, outOfRange, result: '', applied: [], notes: [] }
+    const step: Step = { key, label, dice: d, diceCount: count, dm, total, outOfRange, result: '', applied: [], notes: [], reasons: [] }
     return { step, row }
   }
 
+  /**
+   * Gains a level in `skill`, or raises it to at least `level`. A gain that would break a limit in
+   * rules.skillLimits is lost, and the step says why.
+   */
   const gainSkill = (skill: string, step: Step, level?: number) => {
     const before = skills[skill]
     const after = level === undefined ? (before ?? 0) + 1 : Math.max(before ?? 0, level)
+    if (skillLimits?.maxLevel !== undefined && after > skillLimits.maxLevel) {
+      step.reasons.push(`Lost: ${skill} ${after} is above the skill limit of ${skillLimits.maxLevel}.`)
+      return
+    }
+    if (skillLimits?.totalPerIntEdu !== undefined && after > (before ?? 0)) {
+      const limit = skillLimits.totalPerIntEdu * (value('INT') + value('EDU'))
+      const total = Object.values(skills).reduce((sum, v) => sum + v, 0) - (before ?? 0) + after
+      if (total > limit) {
+        step.reasons.push(
+          `Lost: ${skill} ${after} would make ${total} skill levels in total, above ${skillLimits.totalPerIntEdu} × (INT + EDU) = ${limit}.`,
+        )
+        return
+      }
+    }
     skills[skill] = after
     step.applied.push(`${skill} ${after}`)
   }
@@ -272,14 +391,24 @@ export function buildCareer(
     return career.skillTables[table] ?? []
   }
 
-  /** Raises a characteristic, or gains a skill, for one skill table entry. */
-  const applyTableEntry = (entry: string, step: Step) => {
-    const c = asCharacteristic(entry)
+  /**
+   * Raises a characteristic, or gains a skill, for one skill table entry. An entry such as "Drive or
+   * Vacc Suit" asks the player to pick one first, under `${step.key}.pick`. With `level`, skills are
+   * raised to at least that level and characteristic entries are skipped (basic training).
+   */
+  const applyTableEntry = (entry: string, step: Step, level?: number, pickKey = `${step.key}.pick`) => {
+    // In basic training (level set) characteristic options give nothing, so they are not offered.
+    const all = entryOptions(entry)
+    const options = level === undefined ? all : all.filter((o) => asCharacteristic(o) === undefined)
+    if (options.length === 0) return
+    const picked = pickOption(pickKey, options)
+    const c = asCharacteristic(picked)
     if (c) {
+      if (level !== undefined) return
       changes[c.characteristic] += c.change
-      step.applied.push(`${c.characteristic} ${c.change >= 0 ? '+' : ''}${c.change}`)
+      step.applied.push(`${c.characteristic} ${signedText(c.change)}`)
     } else {
-      gainSkill(entry, step)
+      gainSkill(picked, step, level)
     }
   }
 
@@ -308,16 +437,9 @@ export function buildCareer(
     ;(effects ?? []).forEach((effect, i) => {
       const effectKey = `${key}.effect-${i}`
       switch (effect.type) {
-        case 'skill': {
-          let skill = effect.options[0]
-          if (effect.options.length > 1) {
-            const picked = choice(`${effectKey}.skill`)
-            skill = effect.options.find((o) => o === picked)
-            if (skill === undefined) throw new Stop({ kind: 'skill-option', key: `${effectKey}.skill`, options: effect.options })
-          }
-          if (skill !== undefined) gainSkill(skill, step, effect.level)
+        case 'skill':
+          gainSkill(pickOption(`${effectKey}.skill`, effect.options), step, effect.level)
           break
-        }
         case 'roll-table': {
           const entries = tableEntries(effect.table)
           const blocked = effect.table === 'advancedEducation' && value('EDU') < rules.advancedEducationMinEDU
@@ -338,13 +460,13 @@ export function buildCareer(
           nextDM[effect.roll] += effect.dm
           step.applied.push(
             effect.roll === 'qualification'
-              ? `DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next qualification roll (kept for a later career)`
-              : `DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next advancement roll`,
+              ? `DM ${signedText(effect.dm)} on the next qualification roll (kept for a later career)`
+              : `DM ${signedText(effect.dm)} on the next advancement roll`,
           )
           break
         case 'benefit-dm':
           benefitDM += effect.dm
-          step.applied.push(`DM ${effect.dm > 0 ? '+' : ''}${effect.dm} on the next roll on the benefit table`)
+          step.applied.push(`DM ${signedText(effect.dm)} on the next roll on the benefit table`)
           break
         case 'extra-benefit': {
           const count = effect.count ?? 1
@@ -354,11 +476,56 @@ export function buildCareer(
         }
         case 'characteristic':
           changes[effect.characteristic] += effect.change
-          step.applied.push(`${effect.characteristic} ${effect.change > 0 ? '+' : ''}${effect.change}`)
+          step.applied.push(`${effect.characteristic} ${signedText(effect.change)}`)
           break
         case 'leave-career':
           if (term) term.endReason = 'An event ends the career after this term.'
           step.applied.push('Leaves the career after this term')
+          break
+        case 'promote':
+          promoteThisTerm = true
+          step.applied.push('Automatic promotion this term')
+          break
+        case 'stay-in-career':
+          step.applied.push('Stays in the career')
+          break
+        case 'wager': {
+          const available = earnedBenefits()
+          const max = Math.min(available, effect.maxWager ?? available)
+          const wagerKey = `${effectKey}.wager`
+          if (max <= 0) {
+            step.applied.push('No benefit rolls to wager yet')
+            break
+          }
+          const answer = choice(wagerKey)
+          const amount = answer === undefined ? undefined : Number(answer)
+          if (amount === undefined || !Number.isInteger(amount) || amount < 0 || amount > max) {
+            throw new Stop({ kind: 'wager', key: wagerKey, max, skills: effect.skills, target: effect.target })
+          }
+          if (amount === 0) {
+            step.applied.push('Wagered no benefit rolls')
+            break
+          }
+          const skill = pickOption(`${effectKey}.skill`, effect.skills)
+          // A skill check: the DM is the skill level (or -3 untrained), not a characteristic DM.
+          const dm = skills[skill] ?? -3
+          const roll = roll2D(effectKey, `Wager: ${skill}`, dm, effect.target)
+          const passed = roll.passed ?? { rolled: false }
+          roll.reasons.push(`Wagered ${amount} benefit roll${amount === 1 ? '' : 's'} on ${skill} ${effect.target}+ (DM ${signedText(dm)} from the skill level).`)
+          termSteps.push(roll)
+          if (current(passed)) {
+            const won = Math.ceil(amount / 2)
+            extraBenefits += won
+            roll.applied.push(`${won} extra benefit roll${won === 1 ? '' : 's'}`)
+          } else {
+            extraBenefits -= amount
+            roll.applied.push(`Lost ${amount} benefit roll${amount === 1 ? '' : 's'}`)
+          }
+          if (effect.gainUsedSkill) gainSkill(skill, roll)
+          break
+        }
+        case 'keep-benefit':
+          step.applied.push("Keeps this term's benefit roll")
           break
         case 'mishap':
           if (career && mishapDepth === 0) {
@@ -382,8 +549,16 @@ export function buildCareer(
     if (row?.connection) step.connection = true
     termSteps.push(step)
     if (row && !row.effects) step.notes.push(row.summary)
+    const has = (type: Effect['type']) => row?.effects?.some((e) => e.type === type) ?? false
+    // The lost term is counted before the row's effects, so a wager on this row can't bet that term's roll.
+    if (endsCareer && term && !has('stay-in-career')) {
+      term.endReason = 'Survival failed, so this career ends after this term.'
+      if (rules.benefits.mishapLosesTerm && !has('keep-benefit')) {
+        lostBenefitTerms += 1
+        step.reasons.push('This term gives no benefit roll because it ended in a mishap.')
+      }
+    }
     if (row) applyEffects(row.effects, key, step, termSteps, term)
-    if (endsCareer && term) term.endReason = 'Survival failed, so this career ends after this term.'
   }
 
   /** Records the rank reached and applies its effects. */
@@ -399,6 +574,7 @@ export function buildCareer(
       result: `Rank ${newRank}${info?.title ? ` ${info.title}` : ''}`,
       applied: [],
       notes: [],
+      reasons: [],
     }
     if (info?.bonus && !info.effects) step.notes.push(info.bonus)
     termSteps.push(step)
@@ -416,7 +592,7 @@ export function buildCareer(
     }
     if (!career || !assignment) throw new Stop({ kind: 'start', failedQualification: false })
 
-    qualification = check('qualification', 'Qualification', career.qualification, nextDM.qualification)
+    qualification = qualify('qualification', career.qualification, rules.startingAge, nextDM.qualification)
     nextDM.qualification = 0
     if (!current(qualification.passed ?? { rolled: false })) throw new Stop({ kind: 'start', failedQualification: true })
 
@@ -431,29 +607,35 @@ export function buildCareer(
         rank,
         title,
         endReason: undefined,
+        stayReason: undefined,
+        ageingCrisis: false,
       }
       terms.push(term)
       const steps = term.steps
 
       if (n === 1) {
+        const trainingTable: SkillTableKey = career.basicTraining === 'assignment' ? 'assignment' : rules.basicTraining.table
         const training: Step = {
           key: `${termKey}.training`,
-          label: `Basic training: ${skillTableName(rules.basicTraining.table)}`,
+          label: `Basic training: ${skillTableName(trainingTable)}`,
           result: '',
           applied: [],
           notes: [],
+          reasons: [],
         }
-        for (const entry of tableEntries(rules.basicTraining.table)) {
-          if (!asCharacteristic(entry)) gainSkill(entry, training, rules.basicTraining.level)
-        }
-        training.result = training.applied.join(', ')
+        // The step is shown before its entries are applied, so a pick asked for here appears under it.
         steps.push(training)
+        tableEntries(trainingTable).forEach((entry, i) => {
+          applyTableEntry(entry, training, rules.basicTraining.level, `${termKey}.training.pick-${i}`)
+          training.result = training.applied.join(', ')
+        })
         reachRank(0, steps, term, `${termKey}.rank-0`)
       }
 
       for (let i = 0; i < rules.skillRolls.perTerm; i += 1) skillRoll(`${termKey}.skill-${i}`, steps)
 
-      const survival = check(`${termKey}.survival`, 'Survival', assignment.survival, 0)
+      promoteThisTerm = false
+      const survival = check(`${termKey}.survival`, 'Survival', assignment.survival, 0, rules.survival?.failOnNatural)
       steps.push(survival)
       const survived = current(survival.passed ?? { rolled: false })
       if (survived) {
@@ -468,8 +650,24 @@ export function buildCareer(
       }
 
       if (survived) {
-        const advancement = check(`${termKey}.advancement`, 'Advancement', assignment.advancement, nextDM.advancement)
-        nextDM.advancement = 0
+        const advancementKey = `${termKey}.advancement`
+        let advancement: Step
+        if (promoteThisTerm) {
+          advancement = automaticPass(advancementKey, 'Advancement', 'Automatic promotion from an event this term.')
+        } else {
+          advancement = check(advancementKey, 'Advancement', assignment.advancement, nextDM.advancement)
+          nextDM.advancement = 0
+          const adv = rules.advancement
+          const natural = advancement.dice === undefined ? 0 : current(advancement.dice)
+          const total = advancement.total ?? 0
+          if (adv?.stayOnNatural !== undefined && natural >= adv.stayOnNatural && term.endReason === undefined) {
+            term.stayReason = `Natural ${natural} on advancement: you must continue in this career.`
+            advancement.reasons.push(term.stayReason)
+          } else if (adv?.leaveAtOrBelowTerms && total <= n && term.endReason === undefined) {
+            term.endReason = `Advancement ${total} is at or below ${n} term${n === 1 ? '' : 's'} served, so this career ends after this term.`
+            advancement.reasons.push(term.endReason)
+          }
+        }
         steps.push(advancement)
         if (current(advancement.passed ?? { rolled: false })) {
           if (assignment.ranks.some((r) => r.rank === rank + 1)) reachRank(rank + 1, steps, term, `${termKey}.rank-${rank + 1}`)
@@ -482,7 +680,14 @@ export function buildCareer(
         step.result = row?.summary ?? ''
         if (row && !row.effects) step.notes.push(row.summary)
         steps.push(step)
+        const beforeAging = { ...changes }
         if (row) applyEffects(row.effects, `${termKey}.aging`, step, steps, term)
+        for (const c of CHARACTERISTICS) {
+          if (base[c] + changes[c] <= 0 && base[c] + beforeAging[c] > 0) {
+            term.ageingCrisis = true
+            step.reasons.push(`Ageing crisis: ${c} is 0 or lower. Resolve it by hand.`)
+          }
+        }
       }
 
       for (const step of steps) {
@@ -490,21 +695,26 @@ export function buildCareer(
       }
 
       const nextKey = `${termKey}.next`
-      const forced = term.endReason !== undefined
       const next = choice(nextKey)
-      if (forced) {
-        if (next !== 'muster') throw new Stop({ kind: 'next', key: nextKey, forced: true, reason: term.endReason })
+      if (term.endReason !== undefined) {
+        if (next !== 'muster') throw new Stop({ kind: 'next', key: nextKey, forced: 'muster', reason: term.endReason })
         break
       }
+      if (term.stayReason !== undefined) {
+        if (next !== 'continue') throw new Stop({ kind: 'next', key: nextKey, forced: 'continue', reason: term.stayReason })
+        continue
+      }
       if (next === 'leave') break
-      if (next !== 'continue') throw new Stop({ kind: 'next', key: nextKey, forced: false, reason: undefined })
+      if (next !== 'continue') throw new Stop({ kind: 'next', key: nextKey, forced: undefined, reason: undefined })
     }
 
     const highest = <T extends { minRank: number }>(list: T[]) =>
       [...list].filter((e) => e.minRank <= rank).sort((a, b) => b.minRank - a.minRank)[0]
-    const count = terms.length * rules.benefits.perTerm + (highest(rules.benefits.rankExtra)?.extra ?? 0) + extraBenefits
+    const count = earnedBenefits() + (highest(rules.benefits.rankExtra)?.extra ?? 0)
     benefitCount = count
     const rankDM = highest(rules.benefits.rankBenefitDM)?.dm ?? 0
+    const cashSkill = rules.benefits.cashSkillDM
+    const cashSkillDM = cashSkill !== undefined && skills[cashSkill.skill] !== undefined ? cashSkill.dm : 0
     let cashRolls = 0
     for (let i = 0; i < count; i += 1) {
       const key = `benefit-${i}`
@@ -515,9 +725,13 @@ export function buildCareer(
       }
       const table = picked === 'cash' ? 'cash' : 'benefit'
       if (table === 'cash') cashRolls += 1
-      const dm = table === 'benefit' ? benefitDM + rankDM : 0
+      const dm = table === 'benefit' ? benefitDM + rankDM : rankDM + cashSkillDM
+      const eventDM = table === 'benefit' ? benefitDM : 0
       if (table === 'benefit') benefitDM = 0
       const { step, row } = tableRoll(key, table === 'cash' ? 'Cash roll' : 'Benefit roll', 1, dm, career.musteringOut)
+      if (rankDM !== 0) step.reasons.push(`DM ${signedText(rankDM)} from rank ${rank}.`)
+      if (eventDM !== 0) step.reasons.push(`DM ${signedText(eventDM)} from an event.`)
+      if (table === 'cash' && cashSkillDM !== 0 && cashSkill) step.reasons.push(`DM ${signedText(cashSkillDM)} from ${cashSkill.skill}.`)
       const result: BenefitResult = {
         step,
         table,
@@ -546,6 +760,7 @@ export function buildCareer(
     age,
     benefits,
     benefitCount,
+    lostBenefitTerms,
     qualificationDM: nextDM.qualification,
     cash: benefits.reduce((sum, b) => sum + b.cash, 0),
     connections,
@@ -554,6 +769,11 @@ export function buildCareer(
     usedKeys,
     problems,
   }
+}
+
+/** Returns `n` as text with its sign: "+1", "-2", "+0". */
+function signedText(n: number): string {
+  return `${n >= 0 ? '+' : ''}${n}`
 }
 
 /** Returns true when a step's dice or result was overridden. */

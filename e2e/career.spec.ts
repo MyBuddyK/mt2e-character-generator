@@ -83,16 +83,26 @@ test.describe('career terms', () => {
     await expect(page.getByTestId('term-2').getByTestId('term-age')).toHaveText('age 22-26')
   })
 
-  // Clicks Generate the rest and expects the finished summary; then changes the first benefit's
-  // dice and expects the summary still shown.
-  test('generate the rest finishes the character and its choices can still be changed', async ({ page }) => {
+  // Clicks Finish career and expects the finished summary; then changes the first benefit's dice and
+  // expects the summary still shown.
+  test('finish career finishes the character and its choices can still be changed', async ({ page }) => {
     await startTerm1(page)
     await expect(page.getByTestId('policy-note')).toBeVisible()
-    await page.getByRole('button', { name: 'Generate the rest' }).click()
+    await page.getByRole('button', { name: 'Finish career' }).click()
     await expect(page.getByTestId('career-summary')).toBeVisible()
     await expect(page.getByTestId('summary-skills')).toContainText('Vacc Suit')
     await page.getByLabel('Mustering out Cash roll dice').first().fill('1')
     await expect(page.getByTestId('career-summary')).toBeVisible()
+  })
+
+  // Sets term 1 survival to 2 (a mishap that forces the character out), clicks Finish career, and
+  // expects a finished character with term 1 only.
+  test('finish career musters out when a mishap forces the character out', async ({ page }) => {
+    await startTerm1(page)
+    await setDice(page, 'Term 1 Survival', 2)
+    await page.getByRole('button', { name: 'Finish career' }).click()
+    await expect(page.getByTestId('career-summary')).toBeVisible()
+    await expect(page.getByTestId('term-2')).toHaveCount(0)
   })
 
   // Sets the term 1 event to 3 (a connection event that also offers Medic or Vacc Suit), picks
@@ -209,5 +219,56 @@ test.describe('career terms with packs', () => {
       'href',
       'https://github.com/MyBuddyK/mt2e-character-generator#writing-a-career-pack',
     )
+  })
+})
+
+// Browser tests for the rules that a pack's rules values switch on (docs/features/career-rules.md).
+test.describe('career rule enforcement', () => {
+  /** Opens ?seed=terms, imports rules-enforced-pack.json, starts its career and picks Service skills. */
+  async function startEnforced(page: Page): Promise<void> {
+    await page.goto('./?seed=terms')
+    await importFixture(page, 'rules-enforced-pack.json')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Enforced career' })
+    await page.getByRole('button', { name: 'Start career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await expect(page.getByTestId('step-term-1.survival')).toBeVisible()
+  }
+
+  // Sets the survival dice to 2 against a 2+ target and expects Fail with the natural-2 reason and a mishap.
+  test('a natural 2 fails survival and says why', async ({ page }) => {
+    await startEnforced(page)
+    await setDice(page, 'Term 1 Survival', 2)
+    const survival = page.getByTestId('step-term-1.survival')
+    await expect(survival.getByTestId('step-result')).toHaveText('Fail')
+    await expect(survival.getByTestId('step-reason')).toContainText('Natural 2')
+    await expect(page.getByTestId('step-term-1.mishap')).toBeVisible()
+  })
+
+  // Passes survival with event 9, rolls advancement 12, picks Service skills for the extra roll, and
+  // expects the natural-12 reason with Continue in career and no Leave career button.
+  test('a natural 12 on advancement offers only Continue in career', async ({ page }) => {
+    await startEnforced(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Event', 9)
+    await setDice(page, 'Term 1 Advancement', 12)
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    const next = page.getByRole('group', { name: 'After this term' })
+    await expect(next).toContainText('Natural 12 on advancement')
+    await expect(next.getByRole('button', { name: 'Continue in career' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Leave career' })).toHaveCount(0)
+  })
+
+  // Passes survival, sets the event to 7 (a wager on Gambler or Broker 8+), wagers 1 on Broker, sets
+  // the wager dice to 12, and expects a pass with one extra benefit roll.
+  test('a wager event bets benefit rolls on a skill roll', async ({ page }) => {
+    await startEnforced(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Event', 7)
+    await page.getByRole('group', { name: 'Wager benefit rolls' }).getByRole('button', { name: 'Wager 1', exact: true }).click()
+    await page.getByRole('group', { name: 'Choose a skill' }).getByRole('button', { name: 'Broker' }).click()
+    await setDice(page, 'Term 1 Wager: Broker', 12)
+    const wager = page.getByTestId('step-term-1.event.effect-0')
+    await expect(wager.getByTestId('step-result')).toHaveText('Pass')
+    await expect(wager).toContainText('1 extra benefit roll')
   })
 })

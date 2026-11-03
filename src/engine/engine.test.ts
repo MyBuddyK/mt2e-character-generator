@@ -278,3 +278,20 @@ describe('legal notice', () => {
     expect(readme).toContain(FAIR_USE_DISCLAIMER)
   })
 })
+
+// Tests for Dice.pick, which the Finish career policy uses for random choices.
+describe('Dice.pick', () => {
+  // Picks from 3 a thousand times and expects only 0, 1 and 2, each at least once.
+  it('returns each whole number from 0 to count - 1', () => {
+    const dice = createDice(seedFromString('pick'))
+    const seen = new Set(Array.from({ length: 1000 }, () => dice.pick(3)))
+    expect([...seen].sort()).toEqual([0, 1, 2])
+  })
+
+  // Expects a RangeError for 0 and for 1.5.
+  it('throws for a count that is not a positive integer', () => {
+    const dice = createDice(1)
+    expect(() => dice.pick(0)).toThrow(RangeError)
+    expect(() => dice.pick(1.5)).toThrow(RangeError)
+  })
+})

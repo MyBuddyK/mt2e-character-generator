@@ -25,7 +25,7 @@ also the owner's portfolio project.
   and `src/CareerData.tsx`: the pack state and the Career data section.
 - `src/engine/terms.ts`: the career engine. `buildCareer` rebuilds a career from the seed, the player's
   choices and overrides, and the data; each roll uses `diceFor(seed, path)`. `src/engine/policy.ts`: the
-  Generate the rest policy. `src/engine/effects.ts` and `src/engine/rules-schema.ts`: event effects and the
+  Finish career policy. `src/engine/effects.ts` and `src/engine/rules-schema.ts`: event effects and the
   `rules` values. `src/data/rules/sample-rules.json`: invented rules. `src/use-career.ts` and
   `src/Career.tsx`: the Career section; `src/storage/characters.ts` saves career input per seed.
 - `scripts/`: `validate-pack` and `schema` (writes the git-ignored `public/career-pack.schema.json`), run with

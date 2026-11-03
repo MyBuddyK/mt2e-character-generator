@@ -5,7 +5,7 @@ An unofficial fan-made web app for building Mongoose Traveller 2nd Edition chara
 Current state: the app rolls the six characteristics from a seed, and the player can override each value.
 Players can import career packs from a file or an https link. A character can go through one career term by
 term (qualification, skills, survival, events, mishaps, advancement, aging and mustering out), with every
-roll and choice overridable and a Generate the rest button. Events marked as connections are listed for the
+roll and choice overridable and a Finish career button that plays on until the character is forced out. Events marked as connections are listed for the
 group to talk through.
 
 Planned: more than one career per character, and exporting to Foundry VTT.
@@ -82,7 +82,18 @@ The top level of a pack:
   `benefit-dm`, `extra-benefit`, `characteristic`, `leave-career` and `mishap`; see
   [`src/engine/effects.ts`](src/engine/effects.ts). Anything else goes in the entry's summary, which the app
   shows for the player to apply by hand.
+- `effects` can also be `promote` (the advancement roll passes without a roll), on a mishap
+  `stay-in-career` and `keep-benefit`, and `wager`, which lets the player bet benefit rolls earned so far
+  on a skill roll (`skills`, `target`, optional `maxWager` and `gainUsedSkill`).
+- An entry such as `"Drive or Vacc Suit"` asks the player to pick one. `" or "` inside parentheses, as in
+  `"Pilot (small craft or spacecraft)"`, doesn't split the entry.
 - Mark an event or mishap with `"connection": true` to list it as a connection opportunity.
+- Optional rules values switch on rules from the book: `survival.failOnNatural`,
+  `advancement.leaveAtOrBelowTerms`, `advancement.stayOnNatural`, `skillLimits.maxLevel`,
+  `skillLimits.totalPerIntEdu`, `benefits.mishapLosesTerm` and `benefits.cashSkillDM`. A career can set
+  `qualification.automatic`, `qualification.automaticAt`, `qualification.ageDM`, a list of characteristics
+  in any check (the best DM is used), and `basicTraining: "assignment"`. See
+  [`docs/features/career-rules.md`](docs/features/career-rules.md).
 
 The full field list is in [`src/engine/career-schema.ts`](src/engine/career-schema.ts),
 [`src/engine/rules-schema.ts`](src/engine/rules-schema.ts) and

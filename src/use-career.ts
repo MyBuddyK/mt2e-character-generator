@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Characteristic } from './engine/characteristics'
 import type { CareerDefinition } from './engine/career-schema'
-import { generateRest } from './engine/policy'
+import { finishCareer } from './engine/policy'
 import type { Rules } from './engine/rules-schema'
 import { buildCareer, EMPTY_INPUT, pruneInput, type CareerInput, type CareerResult } from './engine/terms'
 import { browserStorage } from './storage/career-packs'
@@ -19,7 +19,7 @@ export interface CareerState {
   saveFailed: boolean
   /** Replaces the input, removes keys the new build doesn't read, and saves it. */
   update: (next: CareerInput) => void
-  /** Makes every remaining choice with the Generate the rest policy, and saves the result. */
+  /** Makes the remaining choices with the Finish career policy, and saves the result. */
   generate: () => void
   /** Applies savedFromOtherPacks to this character. */
   applySaved: () => void
@@ -106,7 +106,7 @@ export function useCareer(
     removedCount: active.removedCount,
     saveFailed: active.saveFailed,
     update: (next) => commit(next),
-    generate: () => commit(generateRest(seed, base, active.input, data)),
+    generate: () => commit(finishCareer(seed, base, active.input, data)),
     applySaved: () => {
       if (active.savedFromOtherPacks) commit(active.savedFromOtherPacks.input, { savedFromOtherPacks: undefined })
     },
