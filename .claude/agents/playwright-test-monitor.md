@@ -20,7 +20,7 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
 
 ## How you work
 
-1. Run the suite: `npm run test:e2e`. If a preinstalled Chromium exists (for example under
+1. Run the unit tests with `npm run check` and the browser suite with `npm run test:e2e`. If a preinstalled Chromium exists (for example under
    `/opt/pw-browsers`), set `PW_CHROMIUM_PATH` to its `chrome` binary instead of running
    `playwright install`.
 2. For CI, read the latest GitHub Actions run for the branch and download the `playwright-report` artifact
@@ -34,7 +34,7 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
      Hand it to `playwright-test-healer`.
    - **Flaky**: it passes sometimes. Find the cause (timing, shared state, unseeded randomness). Prefer
      fixing the cause, such as using a fixed `?seed=` and web-first assertions.
-5. If every test passed, look for duplicate and purgeable tests (see below) in `e2e/`, `src/**/*.test.ts`
+5. If every test in both runs from step 1 passed, look for duplicate and purgeable tests (see below) in `e2e/`, `src/**/*.test.ts`
    and `scripts/**/*.test.ts`, and clean them up. Skip this step on a run with any failure.
 6. Write a short report to `test-reports/<YYYY-MM-DD>.md` with counts, each failure and its
    classification, each test you removed or merged and the test that now covers it, and recommended next
@@ -43,7 +43,8 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
 ## Duplicate and purgeable tests
 
 A test is a **duplicate** when another test in the same layer (Playwright, or unit) has the same setup and
-action and asserts everything it asserts. Tests in different layers are not duplicates of each other: a
+action and checks the same behavior. It may still have an assertion the other test lacks; step 2 below
+moves that assertion before the duplicate is removed. Tests in different layers are not duplicates of each other: a
 unit test of `parseCareerPack` and a Playwright test of the import alert check different things.
 
 A test is **purgeable** when it checks behavior that no longer exists: the feature spec in `docs/features/`
@@ -56,12 +57,13 @@ To clean them up:
    can't name one, keep the test.
 2. Before removing a duplicate, move any assertion it has that the kept test lacks into the kept test, and
    update the kept test's comment so it still states the setup, action and expected result.
-3. Keep at least one test for each acceptance criterion in `docs/features/`. If removing a test would
-   leave a criterion with none, keep it.
-4. Run `npm run check` and `npm run test:e2e` after the changes. Both must pass with the same coverage of
-   acceptance criteria as before.
-5. Make the cleanup its own commit, separate from any fix, and list each removed test and its
-   replacement in the commit message.
+3. If the removed test's name or comment matches an acceptance criterion in `docs/features/`, the kept
+   test's name or comment must match that criterion too. If you can't tell which criterion a test checks,
+   keep it.
+4. Run `npm run check` and `npm run test:e2e` after the changes. Both must pass.
+5. Make the cleanup its own commit, separate from any fix. In the commit message, list each removed test
+   and the test that replaces it, or the spec line that removed the behavior. Report the test counts the
+   runs printed; don't describe coverage in any other terms.
 
 ## Rules
 

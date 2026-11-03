@@ -27,9 +27,18 @@ players' browsers, so there is no group code and no server.
 ## Decisions
 
 1. **The rules numbers come from data, not code.** The career data already holds the targets and tables
-   for each career. The values that apply to every career are also data: the starting age, the term
-   length, the aging table, how many benefit rolls a character gets, and the cash roll limit. They go in a
-   new optional `rules` object in a career pack, checked by a new zod `RulesSchema`. The repo ships an
+   for each career. The values that apply to every career are also data, in a new optional `rules` object
+   in a career pack, checked by a new zod `RulesSchema`:
+   - `startingAge` and `termLength`
+   - `aging`: the term from which aging is rolled, and the aging table
+   - `termLimit`: the most terms generate-the-rest adds (decision 7)
+   - `basicTraining`: which skill table the first term trains in, and at what level
+   - `benefitRolls`: how many benefit rolls a character gets per term and per rank
+   - `cashRollLimit`: the most cash rolls one character can take
+
+   When more than one loaded pack has `rules`, the engine uses the `rules` of the pack whose `id` sorts
+   first, the same order `combineCareers` uses, whichever pack the career came from. When the loaded packs'
+   `rules` differ, a notice names the pack whose rules are used. The repo ships an
    invented `sample-rules.json` next to the sample career, so the public site works without a pack. A
    pack without `rules` uses the sample rules, and the app says so. No value from a rulebook is written in
    code or in the repo.
@@ -45,6 +54,9 @@ players' browsers, so there is no group code and no server.
    - `leave-career`: the character leaves the career at the end of this term
    - `mishap`: roll on the mishap table without leaving the career
 
+   Rank bonuses use the same list: each rank gets an optional `effects` array next to its free-text
+   `bonus`, and the engine applies only `effects`. A rank whose `bonus` has no `effects` is shown as a note.
+
    The owner chose structured effects on 2026-11-03. An entry with no `effects`, or with effects that need
    judgement, is shown as a note. The player applies
    it by hand with the override controls and can type what happened in a free-text field on that term.
@@ -55,7 +67,13 @@ players' browsers, so there is no group code and no server.
    data)`. Choices are what the player decides (career, assignment, which skill table to roll on, whether
    to continue, cash or benefit). Overrides replace a single roll or result. The URL holds the seed; the
    choices and overrides are saved in the browser, like career packs, and can be exported later with the
-   Foundry export (step 3).
+   Foundry export (step 3). Links don't restore a character.
+
+   Saved choices are stored under the seed together with the `?packs=` value (pack ids and fingerprints)
+   they were made with. When a character is opened with different packs loaded, the saved choices are not
+   applied; a notice offers to apply them anyway or to start over. When they are applied, a choice that
+   names a career, assignment or table that no longer exists is dropped and listed in the notice, along
+   with every step after it.
 
 4. **Each roll has its own dice stream.** A roll's dice come from a seed made of the character seed plus
    the roll's place, for example `seed:term-3:survival`. Overriding one roll then changes only what follows
@@ -81,8 +99,10 @@ players' browsers, so there is no group code and no server.
    button, and every choice it made can be changed afterwards like any other choice.
 
 8. **Mustering out happens once, at the end.** The player rolls each benefit, picking the cash or benefit
-   table for each one. Rank bonuses and benefit DMs from events are applied. The result is a list of cash
-   and benefit entries, each overridable.
+   table for each one. Rank bonuses and benefit DMs from events are applied. A total above the table's
+   highest roll uses the highest row, and a total below its lowest roll uses the lowest row; the result
+   shows that the total was out of range. The result is a list of cash and benefit entries, each
+   overridable.
 
 9. **Connections are highlighted, and the players work them out.** Events and mishaps whose data has
    `connection: true` get a Connection marker in the term summary. The finished character also has a
@@ -102,8 +122,9 @@ players' browsers, so there is no group code and no server.
 6. If the character survived, the app rolls advancement and applies any rank bonus.
 7. If the character has reached the age where aging applies, the app rolls aging and applies the result.
 8. The term summary appears, with connection markers. The player adds notes, changes anything, and picks
-   Continue, Leave, or Generate the rest.
-9. When the character leaves, the player rolls mustering-out benefits.
+   Continue in career, Leave career, or Generate the rest. After a mishap or a `leave-career` effect, the
+   only button is **Muster out**.
+9. Leave career and Muster out both go to mustering out, where the player rolls benefits.
 10. The finished character shows characteristics, age, skills, rank and title, cash, benefits and the
     term history.
 
@@ -114,7 +135,7 @@ A **Career** section below the characteristics:
 ```
 Career  Sample: Orbital Sanitation / Debris sweep      [Start career]
 ──────────────────────────────────────────────────────────────────────
-Term 1   age 18-22                                       rank 1 Tug Pilot
+Term 1   age 18-22                                       rank 0 Sweeper
   Qualification  END 5+   2D 8 +1 = 9  pass               [override]
   Training       Vacc Suit 0, Pilot 0, Mechanic 0, ...  (from data)
   Skill roll     Service skills  D6 4  Electronics 1     [override]
@@ -122,19 +143,22 @@ Term 1   age 18-22                                       rank 1 Tug Pilot
   Mishap         D6 3  "..."                              [override]
   Notes          [                                         ]
 ──────────────────────────────────────────────────────────────────────
-[Continue in career]  [Leave career]  [Generate the rest]
-Generate the rest keeps this career and assignment, continues until ...
+[Muster out]
+Survival failed, so this career ends after this term.
 ```
 
 States:
 
 - **No career started:** the career and assignment pickers and Start career.
 - **Term in progress:** the rolls so far, in order.
-- **Paused after a term:** the term summary with connection markers and the three buttons.
-- **Forced out:** after a mishap or a leave-career effect, only Leave career and Muster out are offered.
+- **Paused after a term:** the term summary with connection markers, and Continue in career, Leave career
+  and Generate the rest, with the generate-the-rest policy in a note under the buttons.
+- **Forced out** (the sketch above): after a mishap or a `leave-career` effect, only Muster out is offered,
+  with a line saying why.
 - **Mustering out:** one row per benefit roll with a cash or benefit picker.
 - **Overridden:** each overridden roll shows the badge and Reset, as the characteristics do now.
 - **Changed by an override:** a term whose later steps were dropped or added shows a notice.
+- **Saved choices from other packs:** the notice from decision 3, with Apply anyway and Start over.
 - **Sample rules in use:** a notice that the rules values are invented, shown until a pack with `rules`
   is loaded.
 
@@ -144,9 +168,13 @@ At 320px wide the term rows stack, as the characteristics table does now.
 
 - `src/engine/rules-schema.ts`: `RulesSchema` for the values in decision 1, with each table checked for
   coverage like the career tables.
-- `src/engine/career-schema.ts`: an optional `effects` array on event and mishap entries (decision 2).
-- `src/engine/career-pack.ts`: an optional `rules` field on a pack. `formatVersion` stays 1 because older
-  packs still pass.
+- `src/engine/effects.ts`: `EffectSchema` for the effect list in decision 2.
+- `src/engine/career-schema.ts`: an optional `effects` array on event, mishap and rank entries.
+- `src/engine/career-pack.ts`: an optional `rules` field on a pack, and `PACK_FORMAT_VERSION` raised to 2.
+  The app reads versions 1 and 2. A pack that uses `rules` or `effects` must say version 2, so an older
+  app build rejects it with the version message instead of an unknown-key error. The app and
+  `npm run validate-pack` reject a version 1 pack that uses either, with a message that it must say
+  version 2.
 - `src/data/rules/sample-rules.json`: invented rules values.
 - `src/engine/dice.ts`: `diceFor(seed, path)`, which returns a `Dice` seeded from the seed and the roll's
   path (decision 4).
@@ -154,8 +182,8 @@ At 320px wide the term rows stack, as the characteristics table does now.
   Each step records its dice, modifiers, target and result as `Overridable` values.
 - `src/engine/policy.ts`: the generate-the-rest policy as a function that returns the next choice.
 - `src/engine/character.ts`: `Character` gains age, skills, career history, cash and benefits.
-- `src/storage/characters.ts`: saves choices, overrides and notes per seed in localStorage, with the
-  same failure handling as packs.
+- `src/storage/characters.ts`: saves choices, overrides, notes and the `?packs=` value per seed in
+  localStorage, with the same failure handling as packs.
 - `src/Career.tsx`: the Career section.
 - `e2e/fixtures/`: an invented pack with `rules` and with events that use each effect.
 
@@ -166,8 +194,18 @@ At 320px wide the term rows stack, as the characteristics table does now.
 - [ ] Overriding the survival dice of term 1 to a failing total shows a mishap instead of an event, and the
       advancement roll disappears.
 - [ ] Resetting that override brings back the original event and advancement roll.
-- [ ] Overriding the survival roll in term 1 does not change the skill roll in term 2.
+- [ ] Overriding the advancement roll in term 1 does not change the skill roll in term 2.
 - [ ] An event with a `skill` effect adds that skill to the character.
+- [ ] Reaching a rank with a `skill` effect adds that skill; a rank with only a `bonus` shows it as a note.
+- [ ] The first term adds the skills from the `basicTraining` table at the level in `rules`.
+- [ ] After a failed survival, the only button is Muster out.
+- [ ] A benefit roll whose total is above the table's highest roll uses the highest row and says so.
+- [ ] With two packs that have different `rules`, the notice names the pack whose rules are used, and
+      importing them in either order uses the same one.
+- [ ] Opening a saved seed with a different pack loaded shows the saved-choices notice, and Start over
+      clears the saved choices.
+- [ ] Importing a pack with `formatVersion` 1 that uses `effects` shows an alert saying it must be
+      version 2.
 - [ ] An event with no `effects` shows its summary and a notes field, and the character is unchanged until
       the player edits it.
 - [ ] Events with `connection: true` show a Connection marker in the term summary.
