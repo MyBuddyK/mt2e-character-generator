@@ -16,10 +16,38 @@ Planned: more than one career per character, and exporting to Foundry VTT.
 npm install
 npm run dev        # http://localhost:5173
 npm run check      # lint, typecheck, conventions check, unit tests
+npm run test:coverage   # unit tests with a coverage report in coverage/
+npm run test:mutation   # Stryker mutation testing of src/engine (slow: it reruns the unit tests for each mutant)
 npm run test:e2e   # Playwright (run `npx playwright install chromium` once first)
 ```
 
 Add `?seed=anything` to the URL to get the same character every time.
+
+## How this is tested
+
+| Layer | What it checks | Where |
+| --- | --- | --- |
+| Unit tests (Vitest) | The rules engine, pack parsing and storage, and the scripts, on invented data | `src/**/*.test.ts`, `scripts/*.test.ts` |
+| Seed sweeps | The same checks on a fixed list of 200 seeds: repeatability, characteristic ranges, how Finish career ends | `src/engine/invariants.test.ts` |
+| Browser tests (Playwright) | User flows on a production build, on a desktop Chrome and a Pixel 7 viewport, at `/` and at the Pages path | `e2e/*.spec.ts` |
+| Accessibility (axe-core) | WCAG A and AA rules that axe can detect, on five page states | `e2e/accessibility.spec.ts` |
+| Mutation testing (Stryker) | Which small edits to the engine no unit test fails on | `stryker.config.json`, `.github/workflows/mutation.yml` |
+| Conventions check | Comments on exports and tests, no skipped tests, no evaluative phrases, and a test for every ticked acceptance criterion | `scripts/check-conventions.ts` |
+
+- **Reproducible results.** Every roll comes from the seed in the URL (`src/engine/dice.ts`), so each
+  test loads a fixed `?seed=` and gets the same character every run.
+- **From spec to test.** Each feature spec in `docs/features/` lists acceptance criteria with ids such as
+  `CT-4`. Each test names the criteria it checks in a `// Criteria:` comment, and `npm run check` fails
+  when a ticked criterion has no test. Test plans in `specs/` map criteria to tests;
+  [`specs/career-terms.md`](specs/career-terms.md) is one.
+- **Claude Code agents.** `.claude/agents` holds a feature designer that writes specs with acceptance
+  criteria, and Playwright's planner, generator and healer agents, edited to follow the rules in
+  `CLAUDE.md`, plus a monitor that sorts failures into regressions, broken tests and flaky tests. The
+  healer and monitor may not skip a test or weaken an assertion to get a green run.
+- **CI.** Every pull request runs lint, typecheck, the conventions check, the unit tests with a coverage
+  report, and the browser suite. A weekly workflow repeats each browser test three times with no retries
+  to find flaky tests, and a monthly workflow runs mutation testing. The site deploys only after CI passes
+  on `main`.
 
 ## Career packs
 

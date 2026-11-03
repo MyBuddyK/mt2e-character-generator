@@ -12,6 +12,10 @@ also the owner's portfolio project.
 - `npm run test:coverage`: the unit tests with a v8 coverage report of `src/engine`, `src/storage` and
   `scripts` in `coverage/` (git-ignored). CI runs it and shows the totals on the run's summary page. No
   threshold is set.
+- `npm run test:mutation`: Stryker mutation testing of `src/engine` (`stryker.config.json`, with
+  `vitest.stryker.config.ts`, which leaves out the seed sweeps). Reports go to the git-ignored
+  `reports/mutation/`. `.github/workflows/mutation.yml` runs it monthly and by hand;
+  `.github/workflows/flaky.yml` runs the browser suite three times with no retries every week.
 - `npm run test:e2e`: Playwright against a production build. In a sandbox with a preinstalled browser,
   set `PW_CHROMIUM_PATH` to its `chrome` binary.
 
