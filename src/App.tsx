@@ -138,7 +138,8 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
  * errors, and a footer with Mongoose Publishing's Fair Use disclaimer. The current seed is kept in
  * the URL's ?seed= value and the loaded packs in ?packs=. Reroll picks a new seed and rolls a new
  * character. When the page was opened with a ?packs= value that differs from the loaded packs, a
- * notice lists both; rolling still works.
+ * notice lists both and the address bar keeps the link's ?packs= value until they match; rolling
+ * still works.
  */
 export default function App() {
   const [character, setCharacter] = useState<Character>(() => newCharacter(initialSeed()))
@@ -146,9 +147,14 @@ export default function App() {
   const packs = useCareerPacks(bundledCareers)
   const showingSample = packs.entries.length === 0
 
+  const mismatch = expectedPacks !== undefined && expectedPacks !== packs.packsParam
+  // While the loaded packs differ from the link's ?packs=, the link's value stays in the address bar,
+  // so a reload or bookmark still shows the notice.
+  const urlPacks = mismatch ? expectedPacks : packs.packsParam
+
   useEffect(() => {
-    writeParamsToUrl(character.seed, packs.packsParam)
-  }, [character.seed, packs.packsParam])
+    writeParamsToUrl(character.seed, urlPacks)
+  }, [character.seed, urlPacks])
 
   return (
     <>
@@ -169,12 +175,12 @@ export default function App() {
           </section>
         )}
 
-        {expectedPacks !== undefined && expectedPacks !== packs.packsParam && (
+        {mismatch && (
           <section className="notice" data-testid="pack-mismatch" aria-labelledby="mismatch-heading">
             <h2 id="mismatch-heading">Different career packs</h2>
             <p>
               This link was made with other career packs than the ones loaded here, so results may not match the
-              referee's.
+              referee's. The link keeps its pack list until the loaded packs match it.
             </p>
             <p>
               Link: <code>{expectedPacks || 'none'}</code>

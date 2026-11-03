@@ -65,11 +65,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Returns a career's `id` or `name` for use in messages, or an empty string when it has neither. */
+/**
+ * Returns " (<label>)" for use in messages, where the label is the career's `id` when that is a
+ * string, otherwise its `name` when that is a string. Returns an empty string when neither is.
+ */
 function careerLabel(data: unknown): string {
   if (!isRecord(data)) return ''
-  const label = data['id'] ?? data['name']
-  return typeof label === 'string' ? ` (${label})` : ''
+  const id = data['id']
+  const name = data['name']
+  const label = typeof id === 'string' ? id : typeof name === 'string' ? name : undefined
+  return label === undefined ? '' : ` (${label})`
 }
 
 /**
@@ -157,7 +162,7 @@ export interface LoadedPack {
   careers: CareerDefinition[]
 }
 
-/** The result of combineCareers: the careers to list, sorted by name, and one message per duplicate id. */
+/** The result of combineCareers: the careers to list, and one message per duplicate id. */
 export interface CombinedCareers {
   careers: CareerDefinition[]
   problems: string[]
@@ -170,7 +175,8 @@ function compareCodeUnits(a: string, b: string): number {
 
 /**
  * Returns the careers to offer. With no packs, that is `bundled`. With one or more packs, the
- * bundled careers are left out and the packs' careers are used instead. Packs are read in order of
+ * bundled careers are left out and the packs' careers are used instead, sorted by name and then id
+ * using UTF-16 code unit order, so the order is the same in every locale. Packs are read in order of
  * their `id`, not the order they were imported, and a career whose id was already taken by an
  * earlier pack is left out and reported as "<pack name>: career id "<id>" is already used by
  * <other pack name>".
@@ -191,7 +197,7 @@ export function combineCareers(bundled: CareerDefinition[], packs: LoadedPack[])
       careers.push(career)
     }
   }
-  careers.sort((a, b) => a.name.localeCompare(b.name))
+  careers.sort((a, b) => compareCodeUnits(a.name, b.name) || compareCodeUnits(a.id, b.id))
   return { careers, problems }
 }
 

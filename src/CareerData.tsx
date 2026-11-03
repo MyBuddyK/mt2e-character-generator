@@ -103,7 +103,7 @@ export function CareerData({ packs }: { packs: CareerPacks }) {
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => packs.remove(entry)}
+                  onClick={() => packs.remove(entry.stored, entry.pack.name)}
                   aria-label={`Remove ${entry.pack.name}`}
                 >
                   Remove
@@ -129,9 +129,35 @@ export function CareerData({ packs }: { packs: CareerPacks }) {
           <MessageDetails details={packs.duplicates} />
         </div>
       )}
-      {packs.unreadable.length > 0 && (
+      {packs.broken.length > 0 && (
+        <div className="notice" data-testid="broken-packs">
+          <p>Some saved packs can no longer be loaded:</p>
+          <ul>
+            {packs.broken.map((b, i) => (
+              <li key={`${b.stored.importedAt}-${i}`}>
+                {b.reason}{' '}
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => packs.remove(b.stored, `saved pack ${i + 1}`)}
+                  aria-label={`Remove saved pack ${i + 1} that can't be loaded`}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {packs.unreadableCount > 0 && (
         <div className="notice" data-testid="unreadable-packs">
-          <MessageDetails details={packs.unreadable} />
+          <p>
+            {packs.unreadableCount} saved entr{packs.unreadableCount === 1 ? 'y' : 'ies'} could not be read. They are
+            kept in this browser until you delete them.{' '}
+            <button type="button" className="secondary" onClick={packs.discardUnreadable}>
+              Delete unreadable data
+            </button>
+          </p>
         </div>
       )}
       {!packs.storageAvailable && (

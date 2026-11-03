@@ -46,40 +46,44 @@ export function browserStorage(): Storage | undefined {
   }
 }
 
-/** The result of readStoredPacks: the saved packs, and how many saved entries had an unknown shape and were left out. */
+/**
+ * The result of readStoredPacks: the saved packs, and the saved values that don't match
+ * StoredPackSchema. The app passes `unreadable` back to writeStoredPacks so they are kept until the
+ * player discards them.
+ */
 export interface ReadResult {
   packs: StoredPack[]
-  unreadable: number
+  unreadable: unknown[]
 }
 
 /**
- * Reads the saved packs from `storage`. Returns no packs when `storage` is undefined, nothing is
- * saved, the value is not a JSON array, or reading throws. Array entries that don't match
- * StoredPackSchema are left out and counted in `unreadable`; a value that is not an array counts as
- * one unreadable entry.
+ * Reads the saved packs from `storage`. Returns nothing when `storage` is undefined, nothing is
+ * saved, or reading throws. Array entries that don't match StoredPackSchema go into `unreadable`.
+ * When the saved text is not JSON, the text itself is the one unreadable entry; when it is JSON but
+ * not an array, the parsed value is.
  */
 export function readStoredPacks(storage: Storage | undefined): ReadResult {
-  if (!storage) return { packs: [], unreadable: 0 }
+  if (!storage) return { packs: [], unreadable: [] }
   let text: string | null
   try {
     text = storage.getItem(STORAGE_KEY)
   } catch {
-    return { packs: [], unreadable: 0 }
+    return { packs: [], unreadable: [] }
   }
-  if (text === null) return { packs: [], unreadable: 0 }
+  if (text === null) return { packs: [], unreadable: [] }
   let value: unknown
   try {
     value = JSON.parse(text)
   } catch {
-    return { packs: [], unreadable: 1 }
+    return { packs: [], unreadable: [text] }
   }
-  if (!Array.isArray(value)) return { packs: [], unreadable: 1 }
+  if (!Array.isArray(value)) return { packs: [], unreadable: [value] }
   const packs: StoredPack[] = []
-  let unreadable = 0
+  const unreadable: unknown[] = []
   for (const entry of value) {
     const result = StoredPackSchema.safeParse(entry)
     if (result.success) packs.push(result.data)
-    else unreadable += 1
+    else unreadable.push(entry)
   }
   return { packs, unreadable }
 }
@@ -92,14 +96,20 @@ export function readStoredPacks(storage: Storage | undefined): ReadResult {
 export type WriteResult = 'saved' | 'unavailable' | 'failed'
 
 /**
- * Saves `packs` to `storage` under STORAGE_KEY, replacing what was saved. Removes the key when
- * `packs` is empty. Returns how the write went; it does not throw.
+ * Saves `packs` followed by `unreadable` (values readStoredPacks could not read, kept as they are)
+ * to `storage` under STORAGE_KEY as one JSON array, replacing what was saved. Removes the key when
+ * both are empty. Returns how the write went; it does not throw.
  */
-export function writeStoredPacks(storage: Storage | undefined, packs: StoredPack[]): WriteResult {
+export function writeStoredPacks(
+  storage: Storage | undefined,
+  packs: StoredPack[],
+  unreadable: unknown[] = [],
+): WriteResult {
   if (!storage) return 'unavailable'
   try {
-    if (packs.length === 0) storage.removeItem(STORAGE_KEY)
-    else storage.setItem(STORAGE_KEY, JSON.stringify(packs))
+    const entries: unknown[] = [...packs, ...unreadable]
+    if (entries.length === 0) storage.removeItem(STORAGE_KEY)
+    else storage.setItem(STORAGE_KEY, JSON.stringify(entries))
     return 'saved'
   } catch {
     return 'failed'

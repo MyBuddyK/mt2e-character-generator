@@ -239,6 +239,84 @@ test.describe('career pack storage', () => {
     await expect(page.getByTestId('pack-list').getByRole('listitem')).toHaveCount(1)
     await expect(page.getByTestId('pack-test-core')).toBeVisible()
   })
+
+  // Imports valid-pack.json, makes writes and removals of the pack key throw, clicks Remove, and
+  // expects an alert saying the pack will come back, and the pack listed again after a reload.
+  test('when a removal cannot be saved, an alert says the pack will come back', async ({ page }) => {
+    await page.addInitScript(() => {
+      const fails = () => document.documentElement.dataset['failPackWrites'] === 'yes'
+      const setItem = Storage.prototype.setItem
+      const removeItem = Storage.prototype.removeItem
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (key === 'mt2e.careerPacks.v1' && fails()) throw new DOMException('full', 'QuotaExceededError')
+        setItem.call(this, key, value)
+      }
+      Storage.prototype.removeItem = function (key: string) {
+        if (key === 'mt2e.careerPacks.v1' && fails()) throw new DOMException('blocked', 'SecurityError')
+        removeItem.call(this, key)
+      }
+    })
+    await page.goto('./?seed=packs')
+    await importFixture(page, 'valid-pack.json')
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+    await page.evaluate(() => {
+      document.documentElement.dataset['failPackWrites'] = 'yes'
+    })
+    await page.getByRole('button', { name: 'Remove Test core pack' }).click()
+    await expect(page.getByRole('alert')).toContainText('it will come back after a reload')
+    await page.reload()
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+  })
+
+  // Removes crypto.subtle, imports valid-pack.json, and expects an alert explaining that fingerprints
+  // need https or localhost, with no pack added.
+  test('without crypto.subtle, an import shows an alert', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window.crypto, 'subtle', { get: () => undefined })
+    })
+    await page.goto('./?seed=packs')
+    await importFixture(page, 'valid-pack.json')
+    await expect(page.getByRole('alert')).toContainText("can't compute a pack fingerprint")
+    await expect(page.getByTestId('no-packs')).toBeVisible()
+  })
+})
+
+// Browser tests for saved data the app can't load, which it keeps until the player removes it.
+test.describe('saved packs the app cannot load', () => {
+  // Saves one value that isn't a stored pack, reloads, imports valid-pack.json, reloads again, and
+  // expects the unreadable notice still shown; then deletes it and expects it gone after a reload.
+  test('unreadable saved data survives an import until it is deleted', async ({ page }) => {
+    await page.goto('./?seed=packs')
+    await page.evaluate(() => localStorage.setItem('mt2e.careerPacks.v1', JSON.stringify([{ data: 1 }])))
+    await page.reload()
+    await expect(page.getByTestId('unreadable-packs')).toContainText('1 saved entry could not be read')
+    await importFixture(page, 'valid-pack.json')
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+    await page.reload()
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+    await expect(page.getByTestId('unreadable-packs')).toBeVisible()
+    await page.getByRole('button', { name: 'Delete unreadable data' }).click()
+    await page.reload()
+    await expect(page.getByTestId('unreadable-packs')).toHaveCount(0)
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+  })
+
+  // Saves a pack with formatVersion 2, reloads, and expects it listed as a pack that can't be
+  // loaded; then removes it and expects it gone after a reload.
+  test('a saved pack that no longer loads can be removed', async ({ page }) => {
+    const data = fixture('later-version-pack.json')
+    await page.goto('./?seed=packs')
+    await page.evaluate((pack) => {
+      const stored = { data: pack, fingerprint: '00000000', importedAt: '2026-11-03T00:00:00.000Z', origin: { kind: 'file', fileName: 'x.json' } }
+      localStorage.setItem('mt2e.careerPacks.v1', JSON.stringify([stored]))
+    }, data)
+    await page.reload()
+    await expect(page.getByTestId('broken-packs')).toContainText('this app supports version 1')
+    await page.getByRole('button', { name: "Remove saved pack 1 that can't be loaded" }).click()
+    await page.reload()
+    await expect(page.getByTestId('broken-packs')).toHaveCount(0)
+    await expect(page.getByTestId('no-packs')).toBeVisible()
+  })
 })
 
 // Browser tests for loading packs from https links, with every request served by page.route.
@@ -342,6 +420,53 @@ test.describe('career packs from URLs', () => {
   })
 })
 
+// Browser tests for URL loads that finish after other changes, or that change the pack id.
+test.describe('career pack URL timing and ids', () => {
+  // Holds the URL response, imports overlap-pack.json from a file while it waits, then releases the
+  // response, and expects both packs loaded and both still listed after a reload.
+  test('a slow URL load does not undo a file import made while it ran', async ({ page }) => {
+    let release: () => void = () => undefined
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await page.route(PACK_URL, async (route) => {
+      await released
+      await fulfillJson(route, fixture('valid-pack.json'))
+    })
+    await page.goto('./?seed=packs')
+    await loadUrl(page, PACK_URL)
+    await expect(page.getByRole('button', { name: 'Loading…' })).toBeDisabled()
+    await importFixture(page, 'overlap-pack.json')
+    await expect(page.getByTestId('pack-test-another')).toBeVisible()
+    release()
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+    await expect(page.getByTestId('pack-test-another')).toBeVisible()
+    await page.reload()
+    await expect(page.getByTestId('pack-list').getByRole('listitem')).toHaveCount(2)
+  })
+
+  // Loads the pack from the URL, serves it again with a new id, clicks Check for update, and expects
+  // the confirmation to name both ids; accepting it leaves one pack, with the new id.
+  test('check for update replaces the checked pack when the id changes', async ({ page }) => {
+    let served = fixture('valid-pack.json')
+    await page.route(PACK_URL, (route) => fulfillJson(route, served))
+    await page.goto('./?seed=packs')
+    await loadUrl(page, PACK_URL)
+    await expect(page.getByTestId('pack-test-core')).toBeVisible()
+
+    served = { ...served, id: 'test-core-2', revision: 2 }
+    const accepted = page.waitForEvent('dialog').then(async (dialog) => {
+      const message = dialog.message()
+      await dialog.accept()
+      return message
+    })
+    await page.getByRole('button', { name: 'Check Test core pack for update' }).click()
+    expect(await accepted).toContain('The pack id changes from "test-core" to "test-core-2".')
+    await expect(page.getByTestId('pack-test-core-2')).toBeVisible()
+    await expect(page.getByTestId('pack-list').getByRole('listitem')).toHaveCount(1)
+  })
+})
+
 // Browser tests for the ?packs= value in shared links.
 test.describe('shared links with packs', () => {
   // Opens a link whose ?packs= names a pack that isn't loaded and expects the mismatch notice listing
@@ -353,6 +478,16 @@ test.describe('shared links with packs', () => {
     await expect(notice).toContainText('Loaded: none')
     await page.getByRole('button', { name: 'Reroll' }).click()
     await expect(page.getByTestId('seed')).not.toHaveText('packs')
+  })
+
+  // Opens a link with a ?packs= value that isn't loaded, rerolls and reloads, and expects the link's
+  // ?packs= value still in the address bar and the notice still shown.
+  test("the link's pack list stays in the address bar while the packs differ", async ({ page }) => {
+    await page.goto('./?seed=packs&packs=other-pack%4012345678')
+    await page.getByRole('button', { name: 'Reroll' }).click()
+    await expect(page).toHaveURL(/[?&]packs=other-pack%4012345678/)
+    await page.reload()
+    await expect(page.getByTestId('pack-mismatch')).toContainText('other-pack@12345678')
   })
 
   // Imports valid-pack.json, opens a link with the matching ?packs= value, and expects no mismatch notice.

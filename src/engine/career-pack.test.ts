@@ -148,6 +148,14 @@ describe('parseCareerPack', () => {
     expect(result.problems).toContainEqual(expect.stringMatching(/^careers\.1: id: /))
   })
 
+  // Gives the second career a numeric id and expects its problems labelled with its name instead.
+  it('labels a skipped career by name when its id is not a string', () => {
+    const data = pack()
+    const [first, second] = validPack.careers
+    data['careers'] = [first, { ...second, id: 5 }]
+    expect(parseCareerPack(data).problems).toContainEqual(expect.stringMatching(/^careers\.1 \(Test Surveyor\): id: /))
+  })
+
   // Lists the first career twice and expects the second copy to be skipped and reported.
   it('skips a career whose id is used earlier in the same pack', () => {
     const data = pack()
@@ -224,12 +232,23 @@ describe('combineCareers', () => {
     }
   })
 
-  // Passes a pack whose careers are out of name order and expects them sorted by name.
-  it('sorts the combined careers by name', () => {
+  // Passes careers named Zeta, alpha, Alpha and Ångström and expects UTF-16 code unit order
+  // (capitals before lower case, Å after z), which does not depend on the locale.
+  it('sorts the combined careers by name in code unit order', () => {
     const [career] = validCareers()
     if (!career) fail()
-    const careers = [renamed(career, 'z', 'Zeta'), renamed(career, 'a', 'Alpha')]
-    expect(combineCareers([], [{ id: 'p', name: 'P', careers }]).careers.map((c) => c.name)).toEqual(['Alpha', 'Zeta'])
+    const careers = [
+      renamed(career, 'z', 'Zeta'),
+      renamed(career, 'a2', 'alpha'),
+      renamed(career, 'a1', 'Alpha'),
+      renamed(career, 'o', 'Ångström'),
+    ]
+    expect(combineCareers([], [{ id: 'p', name: 'P', careers }]).careers.map((c) => c.name)).toEqual([
+      'Alpha',
+      'Zeta',
+      'alpha',
+      'Ångström',
+    ])
   })
 })
 
@@ -264,7 +283,7 @@ describe('pack storage', () => {
     const storage = new MemoryStorage()
     expect(writeStoredPacks(storage, [storedPack('11111111')])).toBe('saved')
     expect(storage.items.has(STORAGE_KEY)).toBe(true)
-    expect(readStoredPacks(storage)).toEqual({ packs: [storedPack('11111111')], unreadable: 0 })
+    expect(readStoredPacks(storage)).toEqual({ packs: [storedPack('11111111')], unreadable: [] })
   })
 
   // Saves one pack, makes writes throw QuotaExceededError, tries to save two, and expects "failed"
@@ -287,18 +306,27 @@ describe('pack storage', () => {
 
   // Passes undefined storage and expects no packs on read and "unavailable" on write.
   it('reports unavailable storage', () => {
-    expect(readStoredPacks(undefined)).toEqual({ packs: [], unreadable: 0 })
+    expect(readStoredPacks(undefined)).toEqual({ packs: [], unreadable: [] })
     expect(writeStoredPacks(undefined, [storedPack('11111111')])).toBe('unavailable')
   })
 
-  // Stores text that is not JSON, then an array with one valid and one invalid entry, and expects
-  // the invalid parts counted as unreadable.
-  it('counts saved entries it cannot read', () => {
+  // Stores text that is not JSON, then a JSON object, then an array with one valid and one invalid
+  // entry, and expects the parts it can't read returned as unreadable values.
+  it('returns the saved values it cannot read', () => {
     const storage = new MemoryStorage()
     storage.items.set(STORAGE_KEY, 'not json')
-    expect(readStoredPacks(storage)).toEqual({ packs: [], unreadable: 1 })
+    expect(readStoredPacks(storage)).toEqual({ packs: [], unreadable: ['not json'] })
+    storage.items.set(STORAGE_KEY, '{"a":1}')
+    expect(readStoredPacks(storage)).toEqual({ packs: [], unreadable: [{ a: 1 }] })
     storage.items.set(STORAGE_KEY, JSON.stringify([storedPack('11111111'), { data: 1 }]))
-    expect(readStoredPacks(storage)).toEqual({ packs: [storedPack('11111111')], unreadable: 1 })
+    expect(readStoredPacks(storage)).toEqual({ packs: [storedPack('11111111')], unreadable: [{ data: 1 }] })
+  })
+
+  // Saves one pack with one unreadable value, reads back, and expects the unreadable value kept.
+  it('writes unreadable values back so a save does not delete them', () => {
+    const storage = new MemoryStorage()
+    writeStoredPacks(storage, [storedPack('11111111')], [{ data: 1 }])
+    expect(readStoredPacks(storage)).toEqual({ packs: [storedPack('11111111')], unreadable: [{ data: 1 }] })
   })
 })
 
@@ -373,15 +401,22 @@ describe('fetchCareerPack', () => {
 describe('replaceQuestion', () => {
   // Builds the question for revision 1 to 2 and expects both revisions and fingerprints with no warning.
   it('names both revisions and fingerprints', () => {
-    const text = replaceQuestion('Core', { revision: 1, fingerprint: 'aaaaaaaa' }, { revision: 2, fingerprint: 'bbbbbbbb' })
+    const text = replaceQuestion('Core', { id: 'core', revision: 1, fingerprint: 'aaaaaaaa' }, { id: 'core', revision: 2, fingerprint: 'bbbbbbbb' })
     expect(text).toContain('Loaded: revision 1 (fingerprint aaaaaaaa)')
     expect(text).toContain('New: revision 2 (fingerprint bbbbbbbb)')
     expect(text).not.toContain('was not raised')
+    expect(text).not.toContain('pack id changes')
+  })
+
+  // Builds the question for a pack whose id changes from core to core-2 and expects a line naming both ids.
+  it('names both ids when the pack id changes', () => {
+    const text = replaceQuestion('Core', { id: 'core', revision: 1, fingerprint: 'aaaaaaaa' }, { id: 'core-2', revision: 2, fingerprint: 'bbbbbbbb' })
+    expect(text).toContain('The pack id changes from "core" to "core-2".')
   })
 
   // Builds the question for changed content at the same revision and expects the warning line.
   it('warns when the content changed but the revision was not raised', () => {
-    const text = replaceQuestion('Core', { revision: 3, fingerprint: 'aaaaaaaa' }, { revision: 3, fingerprint: 'bbbbbbbb' })
+    const text = replaceQuestion('Core', { id: 'core', revision: 3, fingerprint: 'aaaaaaaa' }, { id: 'core', revision: 3, fingerprint: 'bbbbbbbb' })
     expect(text).toContain('the revision was not raised')
   })
 })

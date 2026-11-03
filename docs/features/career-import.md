@@ -51,7 +51,11 @@ either from their device or from a link, and keep it between visits.
      the app says so.
    - If a write fails after storage has worked, for example with `QuotaExceededError`, the value already saved
      under the key is left as it was, the new pack stays loaded for that visit only, and the app says the pack
-     could not be saved and names it.
+     could not be saved and names it. A removal that can't be saved shows an alert saying the pack will come
+     back after a reload.
+   - Saved values the app can't read, and saved packs that no longer pass the schema (for example after a
+     format change), are kept in storage and listed. The player can remove each pack, or delete the
+     unreadable values.
 
 4. **The sample career is hidden once a pack is loaded.** With nothing loaded, the site lists the invented
    sample career (`sample-sanitation.json`, an orbital sanitation job), marked "Sample", so it can be used
@@ -65,7 +69,8 @@ either from their device or from a link, and keep it between visits.
    - A pack loaded from a URL is saved with its URL. A **Check for update** button fetches it again and, if
      its fingerprint differs from the saved copy, offers to replace it, showing both revisions and
      fingerprints. If the fingerprint changed but the `revision` did not go up, the offer also says the
-     referee may have forgotten to raise it.
+     referee may have forgotten to raise it. The pack being checked is the one replaced, even if the pack at
+     the URL now has a different `id`; the confirmation then names both ids.
    - A browser can only read a file from another site when that site's server allows it, through the CORS
      `Access-Control-Allow-Origin` header. Some file hosts send that header for raw file links and some
      don't. When the request is blocked, the app says the host doesn't allow loading from other sites, and
@@ -80,6 +85,8 @@ either from their device or from a link, and keep it between visits.
    SHA-256 of the pack's JSON in a fixed key order. The fingerprint is added to the shared URL as
    `?packs=<id>@<fingerprint>,...`. When someone opens a link and their loaded packs differ, the app warns that
    the results may not match the referee's. It still rolls with the packs that are loaded; it never refuses.
+   While the packs differ, the address bar keeps the link's `?packs=` value, so a reload still shows the
+   notice.
 
 7. **Authoring help for the referee.**
    - A JSON Schema generated from the zod schemas with `z.toJSONSchema`, published with the site as

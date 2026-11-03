@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   combineCareers,
   formatPackRefs,
@@ -24,6 +24,12 @@ export interface PackEntry {
   problems: string[]
 }
 
+/** One saved pack that no longer passes parseCareerPack, with the reason, so the player can remove it. */
+export interface BrokenPack {
+  stored: StoredPack
+  reason: string
+}
+
 /** A message from the last import, update check or removal. "error" messages are shown as alerts. */
 export interface PackMessage {
   kind: 'error' | 'info'
@@ -35,12 +41,14 @@ export interface PackMessage {
 export interface CareerPacks {
   /** The saved packs that passed parseCareerPack, in import order. */
   entries: PackEntry[]
+  /** The saved packs that fail parseCareerPack, for example after a format change. */
+  broken: BrokenPack[]
   /** The careers to list: the bundled careers when no pack is loaded, otherwise the packs' careers. */
   careers: CareerDefinition[]
   /** Duplicate career id messages from combineCareers. */
   duplicates: string[]
-  /** Messages about saved data that could not be read back, for example after a schema change. */
-  unreadable: string[]
+  /** How many saved values could not be read at all. They are kept in storage until discarded. */
+  unreadableCount: number
   /** False when the browser does not allow this site to use localStorage. */
   storageAvailable: boolean
   /** Names of packs that are loaded but whose last save failed. */
@@ -57,101 +65,151 @@ export interface CareerPacks {
   importUrl: (url: string) => Promise<void>
   /** Downloads a URL pack again and offers to replace it when its fingerprint has changed. */
   checkForUpdate: (entry: PackEntry) => Promise<void>
-  /** Removes a pack and saves the remaining ones. */
-  remove: (entry: PackEntry) => void
+  /** Removes a saved pack (valid or broken) and saves the remaining ones. `name` is used in messages. */
+  remove: (stored: StoredPack, name: string) => void
+  /** Deletes the saved values that could not be read. */
+  discardUnreadable: () => void
 }
 
-/** Returns "revision N (fingerprint)" for use in confirmation messages. */
-function revisionText(revision: number, fingerprint: string): string {
-  return `revision ${revision} (fingerprint ${fingerprint})`
+/** The loaded and incoming sides of a replacement, as shown in replaceQuestion. */
+export interface ReplaceSide {
+  id: string
+  revision: number
+  fingerprint: string
 }
 
 /**
- * Returns the text of the confirmation shown before a pack replaces a loaded pack with the same id.
- * It names both revisions and fingerprints, and adds a line when the content changed but the new
- * revision is not higher than the loaded one.
+ * Returns the text of the confirmation shown before a pack replaces a loaded pack. It names both
+ * revisions and fingerprints. It adds a line when the content changed but the new revision is not
+ * higher than the loaded one, and a line when the pack id changes.
  */
-export function replaceQuestion(
-  name: string,
-  loaded: { revision: number; fingerprint: string },
-  incoming: { revision: number; fingerprint: string },
-): string {
+export function replaceQuestion(name: string, loaded: ReplaceSide, incoming: ReplaceSide): string {
   const lines = [
     `Replace the career pack "${name}"?`,
-    `Loaded: ${revisionText(loaded.revision, loaded.fingerprint)}`,
-    `New: ${revisionText(incoming.revision, incoming.fingerprint)}`,
+    `Loaded: revision ${loaded.revision} (fingerprint ${loaded.fingerprint})`,
+    `New: revision ${incoming.revision} (fingerprint ${incoming.fingerprint})`,
   ]
   if (incoming.fingerprint !== loaded.fingerprint && incoming.revision <= loaded.revision) {
     lines.push('The content changed but the revision was not raised. The referee may have forgotten to raise it.')
   }
+  if (incoming.id !== loaded.id) lines.push(`The pack id changes from "${loaded.id}" to "${incoming.id}".`)
   return lines.join('\n')
+}
+
+/** Splits saved packs into the ones that pass parseCareerPack and the ones that don't. */
+function describePacks(stored: StoredPack[]): { entries: PackEntry[]; broken: BrokenPack[] } {
+  const entries: PackEntry[] = []
+  const broken: BrokenPack[] = []
+  for (const s of stored) {
+    const result = parseCareerPack(s.data)
+    if (result.ok) entries.push({ stored: s, pack: result.pack, careers: result.careers, problems: result.problems })
+    else broken.push({ stored: s, reason: result.reason })
+  }
+  return { entries, broken }
 }
 
 /**
  * React hook that holds the imported career packs. It reads the saved packs from localStorage once
  * on first render, and after each import, replacement or removal it writes them back with
- * writeStoredPacks. Replacing a loaded pack asks for confirmation with window.confirm. `bundled` is
- * the list of careers built into the app; it is shown only while no pack is loaded.
+ * writeStoredPacks, together with any saved values it could not read. Each change starts from the
+ * packs as they are when the change is applied, not when the request that led to it began, so a
+ * slow download doesn't undo an import or removal made while it ran. Replacing a loaded pack asks
+ * for confirmation with window.confirm. `bundled` is the list of careers built into the app; it is
+ * shown only while no pack is loaded.
  */
 export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
   const [storage] = useState(() => browserStorage())
   const [initial] = useState(() => readStoredPacks(storage))
   const [stored, setStored] = useState<StoredPack[]>(initial.packs)
+  const [unreadable, setUnreadable] = useState<unknown[]>(initial.unreadable)
+  const storedRef = useRef(stored)
+  const unreadableRef = useRef(unreadable)
   const [unsaved, setUnsaved] = useState<string[]>([])
   const [message, setMessage] = useState<PackMessage | undefined>(undefined)
   const [busy, setBusy] = useState(false)
 
-  const entries: PackEntry[] = []
-  const unreadable: string[] = []
-  if (initial.unreadable > 0) {
-    unreadable.push(`${initial.unreadable} saved entr${initial.unreadable === 1 ? 'y' : 'ies'} could not be read.`)
-  }
-  for (const s of stored) {
-    const result = parseCareerPack(s.data)
-    if (result.ok) entries.push({ stored: s, pack: result.pack, careers: result.careers, problems: result.problems })
-    else unreadable.push(`A saved pack could not be loaded: ${result.reason}`)
-  }
-  const combined = combineCareers(
-    bundled,
-    entries.map((e) => ({ id: e.pack.id, name: e.pack.name, careers: e.careers })),
-  )
-  const packsParam = formatPackRefs(entries.map((e) => ({ id: e.pack.id, fingerprint: e.stored.fingerprint })))
+  const derived = useMemo(() => {
+    const { entries, broken } = describePacks(stored)
+    const combined = combineCareers(
+      bundled,
+      entries.map((e) => ({ id: e.pack.id, name: e.pack.name, careers: e.careers })),
+    )
+    const packsParam = formatPackRefs(entries.map((e) => ({ id: e.pack.id, fingerprint: e.stored.fingerprint })))
+    return { entries, broken, combined, packsParam }
+  }, [stored, bundled])
 
-  /** Sets the saved packs to `next`, writes them, and records `name` as unsaved when the write fails. */
-  const save = (next: StoredPack[], name: string | undefined) => {
-    setStored(next)
-    const result = writeStoredPacks(storage, next)
+  /** Applies new saved packs and unreadable values to state and storage, and returns the write result. */
+  const commit = (nextStored: StoredPack[], nextUnreadable: unknown[]) => {
+    storedRef.current = nextStored
+    unreadableRef.current = nextUnreadable
+    setStored(nextStored)
+    setUnreadable(nextUnreadable)
+    const result = writeStoredPacks(storage, nextStored, nextUnreadable)
     if (result === 'saved') setUnsaved([])
-    else if (result === 'failed' && name !== undefined) setUnsaved((u) => (u.includes(name) ? u : [...u, name]))
+    return result
   }
 
-  /** Checks `data` as a pack and adds it, or replaces the loaded pack with the same id after confirmation. */
-  const addPack = async (data: unknown, origin: PackOrigin, label: string) => {
+  /**
+   * Checks `data` as a pack and adds it. When `replacing` is given (Check for update), that saved
+   * pack is the one replaced; otherwise a loaded pack with the same id is. A replacement asks first.
+   */
+  const addPack = async (data: unknown, origin: PackOrigin, label: string, replacing?: StoredPack) => {
     const result = parseCareerPack(data)
     if (!result.ok) {
       setMessage({ kind: 'error', text: `${label}: ${result.reason}`, details: result.problems })
       return
     }
-    const fingerprint = await packFingerprint(data)
-    const existing = entries.find((e) => e.pack.id === result.pack.id)
-    if (existing) {
+    let fingerprint: string
+    try {
+      fingerprint = await packFingerprint(data)
+    } catch {
+      setMessage({
+        kind: 'error',
+        text: `${label}: this page can't compute a pack fingerprint. Browsers allow it only on https:// pages and localhost.`,
+        details: [],
+      })
+      return
+    }
+    const current = describePacks(storedRef.current).entries
+    let target: PackEntry | undefined
+    if (replacing) {
+      target = current.find((e) => e.stored === replacing)
+      if (!target) {
+        setMessage({ kind: 'info', text: `${label}: the pack was removed while it was being checked.`, details: [] })
+        return
+      }
+      const clash = current.find((e) => e.pack.id === result.pack.id && e !== target)
+      if (clash) {
+        setMessage({
+          kind: 'error',
+          text: `${label}: the pack now has the id "${result.pack.id}", which another loaded pack ("${clash.pack.name}") uses.`,
+          details: [],
+        })
+        return
+      }
+    } else {
+      target = current.find((e) => e.pack.id === result.pack.id)
+    }
+    if (target) {
       const question = replaceQuestion(
-        existing.pack.name,
-        { revision: existing.pack.revision, fingerprint: existing.stored.fingerprint },
-        { revision: result.pack.revision, fingerprint },
+        target.pack.name,
+        { id: target.pack.id, revision: target.pack.revision, fingerprint: target.stored.fingerprint },
+        { id: result.pack.id, revision: result.pack.revision, fingerprint },
       )
       if (!window.confirm(question)) {
-        setMessage({ kind: 'info', text: `Kept the loaded copy of "${existing.pack.name}".`, details: [] })
+        setMessage({ kind: 'info', text: `Kept the loaded copy of "${target.pack.name}".`, details: [] })
         return
       }
     }
     const entry: StoredPack = { data, fingerprint, importedAt: new Date().toISOString(), origin }
-    const next = existing ? stored.map((s) => (s === existing.stored ? entry : s)) : [...stored, entry]
-    save(next, result.pack.name)
+    const old = target?.stored
+    const next = old ? storedRef.current.map((s) => (s === old ? entry : s)) : [...storedRef.current, entry]
+    const name = result.pack.name
+    if (commit(next, unreadableRef.current) === 'failed') setUnsaved((u) => (u.includes(name) ? u : [...u, name]))
     const count = result.careers.length
     setMessage({
       kind: 'info',
-      text: `Loaded "${result.pack.name}" revision ${result.pack.revision}: ${count} career${count === 1 ? '' : 's'}.`,
+      text: `Loaded "${name}" revision ${result.pack.revision}: ${count} career${count === 1 ? '' : 's'}.`,
       details: result.problems,
     })
   }
@@ -191,38 +249,63 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
         setMessage({ kind: 'error', text: describeFetchError(url, fetched.error), details: [] })
         return
       }
-      if ((await packFingerprint(fetched.data)) === entry.stored.fingerprint) {
+      let fingerprint: string | undefined
+      try {
+        fingerprint = await packFingerprint(fetched.data)
+      } catch {
+        fingerprint = undefined
+      }
+      if (fingerprint === entry.stored.fingerprint) {
         setMessage({ kind: 'info', text: `"${entry.pack.name}" has not changed.`, details: [] })
         return
       }
-      await addPack(fetched.data, entry.stored.origin, url)
+      await addPack(fetched.data, entry.stored.origin, url, entry.stored)
     } finally {
       setBusy(false)
     }
   }
 
-  const remove = (entry: PackEntry) => {
-    save(
-      stored.filter((s) => s !== entry.stored),
-      undefined,
+  const remove = (target: StoredPack, name: string) => {
+    const result = commit(
+      storedRef.current.filter((s) => s !== target),
+      unreadableRef.current,
     )
-    setUnsaved((u) => u.filter((n) => n !== entry.pack.name))
-    setMessage({ kind: 'info', text: `Removed "${entry.pack.name}".`, details: [] })
+    setUnsaved((u) => u.filter((n) => n !== name))
+    if (result === 'failed') {
+      setMessage({
+        kind: 'error',
+        text: `Removed "${name}" for this visit, but the change could not be saved, so it will come back after a reload.`,
+        details: [],
+      })
+    } else {
+      setMessage({ kind: 'info', text: `Removed "${name}".`, details: [] })
+    }
+  }
+
+  const discardUnreadable = () => {
+    const result = commit(storedRef.current, [])
+    setMessage(
+      result === 'failed'
+        ? { kind: 'error', text: 'The unreadable saved data could not be deleted.', details: [] }
+        : { kind: 'info', text: 'Deleted the unreadable saved data.', details: [] },
+    )
   }
 
   return {
-    entries,
-    careers: combined.careers,
-    duplicates: combined.problems,
-    unreadable,
+    entries: derived.entries,
+    broken: derived.broken,
+    careers: derived.combined.careers,
+    duplicates: derived.combined.problems,
+    unreadableCount: unreadable.length,
     storageAvailable: storage !== undefined,
     unsaved,
     message,
     busy,
-    packsParam,
+    packsParam: derived.packsParam,
     importFile,
     importUrl,
     checkForUpdate,
     remove,
+    discardUnreadable,
   }
 }
