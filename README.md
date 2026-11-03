@@ -114,6 +114,12 @@ The top level of a pack:
 - `effects` can also be `promote` (the advancement roll passes without a roll), on a mishap
   `stay-in-career` and `keep-benefit`, and `wager`, which lets the player bet benefit rolls earned so far
   on a skill roll (`skills`, `target`, optional `maxWager` and `gainUsedSkill`).
+- A `choice` effect asks the player to pick one of its `options`, each a `label` and the `effects` applied
+  when it is picked: `{ "type": "choice", "options": [{ "label": "Tactics 1", "effects": [...] }, { "label":
+  "DM +4 to the next advancement roll", "effects": [{ "type": "dm-next", "roll": "advancement", "dm": 4 }] }] }`.
+  `dm-next` can name `advancement`, `qualification` or `survival`, and the app applies it to the next such
+  roll. `dm-later` (`dm`, optional `rolls`) is a DM the player applies by hand to a later roll they pick. See
+  [`docs/features/event-choices.md`](docs/features/event-choices.md).
 - An entry such as `"Drive or Vacc Suit"` asks the player to pick one. `" or "` inside parentheses, as in
   `"Pilot (small craft or spacecraft)"`, doesn't split the entry.
 - Mark an event or mishap with `"connection": true` to list it as a connection opportunity.

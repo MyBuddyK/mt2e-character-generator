@@ -41,7 +41,7 @@ also the owner's portfolio project.
 - `src/engine/invariants.test.ts`: seed sweeps that run the same check on a fixed list of seeds, for rules
   that should hold for any seed (repeatability, characteristic ranges, how Finish career ends).
 - `src/App.tsx`: UI.
-- `e2e/`: Playwright specs. `e2e/accessibility.spec.ts` runs axe-core (WCAG A and AA rules) on five page states. `e2e/fixtures/` holds invented career packs used by the specs and unit tests. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
+- `e2e/`: Playwright specs. `e2e/accessibility.spec.ts` runs axe-core (WCAG A and AA rules) on seven page states. `e2e/fixtures/` holds invented career packs used by the specs and unit tests. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
   relative URLs (`./?seed=x`) so they run under any `BASE_PATH`; CI runs them at `/` and at the Pages path.
 - `specs/`: test plans from the planner agent. `docs/features/`: feature specs from `feature-designer`.
 
@@ -87,7 +87,7 @@ phrases from its `BANNED_PHRASES` list. Whether a comment is accurate is left to
 ## Acceptance criteria and tests
 
 Each acceptance criterion in `docs/features/` starts with an id: `PK-n` (career-import), `CT-n`
-(career-terms), `CR-n` (career-rules) or `TR-n` (term-removal). A test that checks a criterion names it on the last line of its
+(career-terms), `CR-n` (career-rules), `TR-n` (term-removal) or `EC-n` (event-choices). A test that checks a criterion names it on the last line of its
 comment, `// Criteria: CT-4, CT-6.` `npm run check:conventions` fails when a criterion has no id, an id is
 used twice, a test names an id that doesn't exist, or a ticked (`[x]`) criterion is named by no test.
 Don't renumber ids; add new ones after the last.

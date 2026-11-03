@@ -55,4 +55,27 @@ test.describe('accessibility', () => {
     await expect(page.getByRole('alert')).toBeVisible()
     expect(await violations(page)).toEqual([])
   })
+
+  // Imports the choices fixture pack, starts its career with survival 12 and event 7, and expects no
+  // violations with the event choice shown; then picks Admin 1, continues, sets term 2 survival to 12 and
+  // the event to 9, and expects no violations with the held DM select shown.
+  test('an event choice and a held DM have no axe violations', async ({ page }) => {
+    await page.goto('./?seed=terms')
+    await page.getByLabel('Import from file').setInputFiles('e2e/fixtures/choices-pack.json')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Choices career' })
+    await page.getByRole('button', { name: 'Start career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await page.getByLabel('Term 1 Survival dice').fill('12')
+    await page.getByLabel('Term 1 Event dice').fill('7')
+    await expect(page.getByRole('group', { name: 'Choose an option' })).toBeVisible()
+    expect(await violations(page)).toEqual([])
+
+    await page.getByRole('button', { name: 'Admin 1' }).click()
+    await page.getByRole('button', { name: 'Continue in career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await page.getByLabel('Term 2 Survival dice').fill('12')
+    await page.getByLabel('Term 2 Event dice').fill('9')
+    await expect(page.getByRole('combobox', { name: 'Term 2 Event DM +2 applies to' })).toBeVisible()
+    expect(await violations(page)).toEqual([])
+  })
 })

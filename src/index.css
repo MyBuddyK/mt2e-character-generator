@@ -341,12 +341,14 @@ input[type='number'] {
 }
 
 .step-outcome select,
+.step-later select,
 .career-start select {
   font: inherit;
 }
 
 .step-applied,
 .step-reason,
+.step-later,
 .step-note {
   font-size: 0.875rem;
   color: var(--muted);

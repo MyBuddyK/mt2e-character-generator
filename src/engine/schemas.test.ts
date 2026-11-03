@@ -123,12 +123,29 @@ describe('career and effect limits', () => {
     expect(careerPasses({ officerRanks: [] })).toBe(false)
   })
 
-  // Checks each effect field at its lowest allowed value (pass) and one below it (rejection).
+  // Checks each effect field at its lowest allowed value (pass) and one below it (rejection). For
+  // dm-next, dm-later and choice it checks an allowed value against one the schema rejects: an unknown
+  // roll kind, an empty kind list, one option, a label used twice and a choice inside a choice.
+  // Criteria: EC-1.
   it('accepts each effect field at its limit and rejects one past it', () => {
     const cases: [unknown, unknown][] = [
       [{ type: 'skill', options: ['Pilot'] }, { type: 'skill', options: [' '] }],
       [{ type: 'extra-benefit', count: 1 }, { type: 'extra-benefit', count: 0 }],
-      [{ type: 'dm-next', roll: 'qualification', dm: 1 }, { type: 'dm-next', roll: 'survival', dm: 1 }],
+      [{ type: 'dm-next', roll: 'survival', dm: 1 }, { type: 'dm-next', roll: 'aging', dm: 1 }],
+      [{ type: 'dm-later', dm: 4, rolls: ['advancement'] }, { type: 'dm-later', dm: 4, rolls: [] }],
+      [{ type: 'dm-later', dm: 4 }, { type: 'dm-later', dm: 4, rolls: ['event'] }],
+      [
+        { type: 'choice', options: [{ label: 'A' }, { label: 'B' }] },
+        { type: 'choice', options: [{ label: 'A' }] },
+      ],
+      [
+        { type: 'choice', options: [{ label: 'A' }, { label: 'B' }] },
+        { type: 'choice', options: [{ label: 'A' }, { label: 'A' }] },
+      ],
+      [
+        { type: 'choice', options: [{ label: 'A', effects: [{ type: 'promote' }] }, { label: 'B' }] },
+        { type: 'choice', options: [{ label: 'A', effects: [{ type: 'choice', options: [{ label: 'C' }, { label: 'D' }] }] }, { label: 'B' }] },
+      ],
       [{ type: 'reduce', characteristics: ['STR'], amounts: [1] }, { type: 'reduce', characteristics: [], amounts: [1] }],
       [{ type: 'reduce', characteristics: ['STR'], amounts: [1] }, { type: 'reduce', characteristics: ['STR'], amounts: [] }],
       [{ type: 'reduce', characteristics: ['STR'], amounts: [1] }, { type: 'reduce', characteristics: ['STR'], amounts: [0] }],
