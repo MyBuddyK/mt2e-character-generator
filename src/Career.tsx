@@ -140,19 +140,6 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
           </>
         )}
       </div>
-      {step.ignore && (
-        <label className="step-ignore">
-          <input
-            type="checkbox"
-            checked={step.ignore.ignored}
-            onChange={(e) => {
-              const key = step.ignore?.key
-              if (key !== undefined) onChange({ ...input, choices: setKey(input.choices, key, e.target.checked ? 'ignore' : undefined) })
-            }}
-          />{' '}
-          Ignore this aging result<span className="visually-hidden"> ({name})</span>
-        </label>
-      )}
       {step.applied.length > 0 && <div className="step-applied">Applied: {step.applied.join(', ')}</div>}
       {step.reasons.map((r, i) => (
         <div className="step-reason" key={`${i}-${r}`} data-testid="step-reason">
@@ -363,7 +350,7 @@ function Pending({ pending, input, onChange, onGenerate }: PendingProps) {
           <p data-testid="ageing-crisis-notice">
             Ageing crisis: {pending.characteristics.join(', ')} at 0 or below. Medical care costs {pending.costDice}D × Cr
             {pending.costPerDie}, taken from cash (a debt if cash runs out); it brings them back to 1, and every later
-            qualification roll fails. Without it the character dies. You can also ignore or override the aging roll.
+            qualification roll fails. Without it the character dies. You can also override the aging dice.
           </p>
           <button type="button" onClick={() => choose(pending.key, 'care')}>
             Pay for medical care

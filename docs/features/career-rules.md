@@ -221,8 +221,9 @@ browser.
 
 ## Aging
 
-Buddy asked for the aging rules to be applied, with the player told what to adjust and able to ignore or
-override aging or take anagathics. Medical care follows the book only (Buddy's call): it pays for an ageing
+Buddy asked for the aging rules to be applied, with the player told what to adjust and able to
+override aging or take anagathics. Buddy later asked for the Ignore checkbox to be removed; overriding the
+aging dice remains. Medical care follows the book only (Buddy's call): it pays for an ageing
 crisis, not for points lost to ordinary aging.
 
 | Field | What the app does |
@@ -231,7 +232,7 @@ crisis, not for points lost to ordinary aging.
 | `rules.aging.crisis` `{ "costDice": 1, "costPerDie": 10000 }` | When aging takes a characteristic to 0 or below, the player picks Pay for medical care (the cost is rolled and taken from cash, the characteristics in the crisis go back to 1, and every later qualification roll fails) or The character dies (the character is finished, with no mustering out). Without this field the crisis is noted for the player to resolve by hand, as before. |
 | `rules.anagathics` `{ "characteristic": "SOC", "target": 10, "costDice": 1, "costPerDie": 200000, "prisonOnNatural": 2 }` | Each term has an Anagathics checkbox. Starting needs the check; while taken, each term rolls the cost (taken from cash), rolls survival twice (either failure is a mishap), and adds the number of terms taken in a row to the aging roll. A term without them after a term with them rolls aging at once, with the DM for the terms served and no anagathics DM; a death in that roll gives the age at the start of the term. Dice at or below `prisonOnNatural` on the starting check add a note (the Prisoner career isn't built). |
 
-- Every aging roll has an Ignore this aging result checkbox. Its dice can be overridden like any roll.
+- Aging dice can be overridden like any roll.
 - Cash in the summary is mustering-out cash less anagathics and medical costs; below 0 it is shown as a debt.
 - Finish career picks characteristics to reduce at random, takes no anagathics, and stops at an ageing
   crisis for the player to decide.

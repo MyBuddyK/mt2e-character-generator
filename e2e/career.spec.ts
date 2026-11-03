@@ -346,18 +346,20 @@ test.describe('aging and anagathics', () => {
     await page.getByRole('button', { name: 'Service skills' }).click()
   }
 
-  // Sets the term 1 aging dice to 2 (reduce two physical characteristics by 2 and 1), expects the
-  // characteristic choice, then ticks Ignore and expects the choice gone and the after-term choice shown.
-  test('aging asks which characteristic to reduce, and can be ignored', async ({ page }) => {
+  // Sets the term 1 aging dice to 2 (reduce two physical characteristics by 2 and 1), picks DEX for the
+  // reduction by 2 and END for the reduction by 1, and expects the after-term choice and both reductions applied.
+  test('aging asks which characteristic to reduce', async ({ page }) => {
     await startWanderer(page)
     await setDice(page, 'Term 1 Survival', 12)
     await setDice(page, 'Term 1 Advancement', 2)
     await setDice(page, 'Term 1 Aging', 2)
     const pick = page.getByRole('group', { name: 'Choose a characteristic' })
     await expect(pick).toContainText('Reduce which characteristic by 2?')
-    await page.getByRole('checkbox', { name: /Ignore this aging result/ }).check()
-    await expect(pick).toHaveCount(0)
+    await pick.getByRole('button', { name: 'DEX' }).click()
+    await expect(pick).toContainText('Reduce which characteristic by 1?')
+    await pick.getByRole('button', { name: 'END' }).click()
     await expect(page.getByRole('group', { name: 'After this term' })).toBeVisible()
+    await expect(page.getByTestId('step-term-1.aging')).toContainText('DEX -2, END -1')
   })
 
   // Ticks Anagathics for term 1, sets the SOC roll to 12, and expects the cost roll and a second survival roll.
