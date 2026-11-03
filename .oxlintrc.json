@@ -42,6 +42,12 @@
       }
     ],
     "vitest/valid-title": "error",
-    "vitest/no-identical-title": "error"
+    "vitest/no-identical-title": "error",
+    "vitest/valid-expect": [
+      "error",
+      {
+        "maxArgs": 2
+      }
+    ]
   }
 }

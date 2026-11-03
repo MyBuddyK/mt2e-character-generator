@@ -56,7 +56,8 @@ also the owner's portfolio project.
 `noPropertyAccessFromIndexSignature`; `tsconfig.e2e.json` sets the same for `e2e/`. Don't loosen these,
 and don't use `any`, `@ts-ignore`, `@ts-expect-error`, non-null `!` or `as` casts to get past them.
 `.oxlintrc.json` makes each of those a lint error (`as const` is allowed), and also fails on skipped or
-focused tests, tests with no `expect`, and two tests with the same title.
+focused tests, tests with no `expect`, and two tests with the same title. `npm run lint` passes
+`--deny-warnings`, so a warning fails it too.
 
 ## Documentation rules
 

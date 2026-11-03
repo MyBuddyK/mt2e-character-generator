@@ -7,7 +7,7 @@
     "dev": "npm run schema && vite",
     "build": "tsc -b && npm run schema && vite build",
     "preview": "vite preview",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",

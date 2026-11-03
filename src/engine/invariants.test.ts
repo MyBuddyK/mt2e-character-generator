@@ -80,15 +80,18 @@ describe('seed sweep invariants', () => {
         const result = buildCareer(seed, base, input, data)
         expect(buildCareer(seed, base, input, data), label).toEqual(result)
 
-        if (!result.finished) {
-          expect(result.pending, label).toMatchObject({ kind: 'start', failedQualification: true })
-          expect(result.terms, label).toHaveLength(0)
-          continue
+        const terms = result.terms.length
+        const observed = {
+          label,
+          pending: result.pending?.kind,
+          failedQualification: result.pending?.kind === 'start' && result.pending.failedQualification,
+          termsInRange: result.finished ? terms >= 1 && terms <= sampleRules.termLimit : terms === 0,
+          age: result.age,
         }
-        expect(result.pending, label).toBeUndefined()
-        expect(result.terms.length, label).toBeGreaterThanOrEqual(1)
-        expect(result.terms.length, label).toBeLessThanOrEqual(sampleRules.termLimit)
-        expect(result.age, label).toBe(sampleRules.startingAge + result.terms.length * sampleRules.termLength)
+        const expected = result.finished
+          ? { pending: undefined, failedQualification: false, termsInRange: true, age: sampleRules.startingAge + terms * sampleRules.termLength }
+          : { pending: 'start', failedQualification: true, termsInRange: true, age: sampleRules.startingAge }
+        expect(observed).toEqual({ label, ...expected })
       }
     }
   })
