@@ -30,7 +30,7 @@ test.describe('career terms', () => {
       const context = await browser.newContext()
       const page = await context.newPage()
       await startTerm1(page)
-      texts.push((await page.getByTestId('term-1').locator('.steps').textContent()) ?? '')
+      texts.push((await page.getByTestId('term-1').getByTestId('term-steps').textContent()) ?? '')
       await context.close()
     }
     expect(texts[0]).not.toBe('')
@@ -344,7 +344,7 @@ test.describe('more than one career', () => {
     await expect(page.getByTestId('career-summary')).toBeVisible()
     const next = page.getByTestId('next-career')
     const select = next.getByRole('combobox', { name: 'Career', exact: true })
-    await expect(select.locator('option', { hasText: 'Test wanderer' })).toHaveCount(0)
+    await expect(select.getByRole('option', { name: 'Test wanderer' })).toHaveCount(0)
     await select.selectOption({ label: 'Test fleet' })
     await next.getByRole('button', { name: 'Start next career' }).click()
     await expect(page.getByTestId('career-run-2')).toContainText('Test fleet')
