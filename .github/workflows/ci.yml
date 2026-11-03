@@ -1,6 +1,6 @@
 name: CI
 
-# Runs lint, typecheck and unit tests, then the Playwright suite at the site root and under the
+# Runs lint, typecheck, the conventions check and unit tests, then the Playwright suite at the site root and under the
 # GitHub Pages path. Runs on pull requests and on pushes to main. A new push cancels the
 # in-progress run for the same branch.
 on:
@@ -27,6 +27,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run check:conventions
       - run: npm test
 
   e2e:

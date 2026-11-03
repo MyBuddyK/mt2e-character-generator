@@ -403,3 +403,138 @@ test.describe('aging and anagathics', () => {
     await expect(tip).toHaveCount(0)
   })
 })
+
+// Browser tests written from the test plan in specs/career-terms.md. Each test names its plan scenario,
+// and the plan's "Criteria coverage" table lists the acceptance criterion it checks.
+test.describe('career terms plan', () => {
+  /** Passes term `term`'s survival with dice 12, sets its event dice to `event`, and fails advancement with dice 2. */
+  async function plainTerm(page: Page, term: number, event = 9): Promise<void> {
+    await setDice(page, `Term ${term} Survival`, 12)
+    await setDice(page, `Term ${term} Event`, event)
+    await setDice(page, `Term ${term} Advancement`, 2)
+  }
+
+  /** Clicks Continue in career and picks Service skills for the next term's skill roll. */
+  async function nextTerm(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'Continue in career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+  }
+
+  // Plan 1.1. Starts the sample career and expects term 1's basic training step to apply the six service
+  // skills at level 0; then plays term 1 and continues, and expects no basic training step in term 2.
+  test('1.1 basic training applies in the first term only', async ({ page }) => {
+    await startTerm1(page)
+    await expect(page.getByTestId('step-term-1.training')).toContainText(
+      'Applied: Vacc Suit 0, Pilot 0, Mechanic 0, Electronics 0, Broker 0, Steward 0',
+    )
+    await plainTerm(page, 1)
+    await nextTerm(page)
+    await expect(page.getByTestId('step-term-2.survival')).toBeVisible()
+    await expect(page.getByTestId('step-term-2.training')).toHaveCount(0)
+  })
+
+  // Plan 1.2. Passes term 1 survival and advancement with dice 12, and expects rank 1 Tug Pilot with
+  // its Pilot 1 skill effect applied.
+  test('1.2 a rank with a skill effect applies the skill', async ({ page }) => {
+    await startTerm1(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Advancement', 12)
+    await expect(page.getByTestId('term-1').getByTestId('term-rank')).toHaveText('rank 1 Tug Pilot')
+    await expect(page.getByTestId('step-term-1.rank-1')).toContainText('Applied: Pilot 1')
+  })
+
+  // Plan 1.3. Imports valid-pack.json (ranks with a bonus and no effects), starts its first career,
+  // passes survival and advancement with dice 12, and expects the rank 1 bonus as an apply-by-hand note.
+  test('1.3 a rank with only a bonus is shown as a note', async ({ page }) => {
+    await page.goto('./?seed=terms')
+    await importFixture(page, 'valid-pack.json')
+    await page.getByRole('button', { name: 'Start career' }).click()
+    await page.getByRole('button', { name: 'Service skills' }).click()
+    await setDice(page, 'Term 1 Survival', 12)
+    await setDice(page, 'Term 1 Advancement', 12)
+    const rank = page.getByTestId('step-term-1.rank-1')
+    await expect(rank).toContainText('Apply by hand: Pilot 1')
+    await expect(rank).not.toContainText('Applied: Pilot 1')
+  })
+
+  // Plan 1.4. Plays term 1 with advancement dice 2 in one context and 12 in another, continues to term 2
+  // in each, and expects the same term 2 skill roll dice and skill in both.
+  test('1.4 overriding term 1 advancement does not move the term 2 skill roll', async ({ browser }) => {
+    const rolls: string[] = []
+    for (const advancement of [2, 12]) {
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      await startTerm1(page)
+      await setDice(page, 'Term 1 Survival', 12)
+      await setDice(page, 'Term 1 Advancement', advancement)
+      if (advancement === 12) await page.getByRole('button', { name: 'Service skills' }).click()
+      await nextTerm(page)
+      const skill = page.getByTestId('step-term-2.skill-0')
+      await expect(skill).toBeVisible()
+      rolls.push(`${await page.getByLabel('Term 2 Skill roll: Service skills dice').inputValue()} ${await skill.getByTestId('step-result').textContent()}`)
+      await context.close()
+    }
+    expect(rolls[0]).toBe(rolls[1])
+  })
+
+  // Plan 1.5. Plays three terms with passing survival, a plain event (9) and failed advancement, and
+  // expects an aging step in term 3 only (the sample rules age from term 3).
+  test('1.5 aging is rolled from term 3, not before', async ({ page }) => {
+    await startTerm1(page)
+    for (const term of [1, 2, 3]) {
+      if (term > 1) await nextTerm(page)
+      await plainTerm(page, term)
+    }
+    await expect(page.getByTestId('step-term-1.aging')).toHaveCount(0)
+    await expect(page.getByTestId('step-term-2.aging')).toHaveCount(0)
+    await expect(page.getByTestId('step-term-3.aging')).toBeVisible()
+    await expect(page.getByLabel('Term 3 Aging dice')).toBeVisible()
+  })
+
+  // Plan 1.6. Plays term 1 with event 8 (not a connection), leaves and takes a benefit, and expects the
+  // empty Connection opportunities line and no list.
+  test('1.6 a character with no connection events shows the empty line', async ({ page }) => {
+    await startTerm1(page)
+    await plainTerm(page, 1, 8)
+    await page.getByRole('button', { name: 'Leave career' }).click()
+    await page.getByRole('button', { name: 'Benefit', exact: true }).click()
+    await expect(page.getByTestId('connections-empty')).toHaveText(
+      'No events in these careers were marked as connection opportunities.',
+    )
+    await expect(page.getByTestId('connections')).toHaveCount(0)
+  })
+
+  // Plan 1.7. Plays three terms, leaves, takes two cash rolls, and expects Cash disabled with the limit
+  // text on roll 3 of 3; then takes a benefit, sets the cash dice to 1 and 6, and expects Cr11000.
+  test('1.7 the cash roll limit disables Cash and the cash total adds up', async ({ page }) => {
+    await startTerm1(page)
+    for (const term of [1, 2, 3]) {
+      if (term > 1) await nextTerm(page)
+      await plainTerm(page, term)
+    }
+    await page.getByRole('button', { name: 'Leave career' }).click()
+    await page.getByRole('button', { name: 'Cash' }).click()
+    await page.getByRole('button', { name: 'Cash' }).click()
+    const mustering = page.getByRole('group', { name: 'Mustering out' })
+    await expect(mustering).toContainText('Benefit roll 3 of 3')
+    await expect(mustering.getByRole('button', { name: 'Cash' })).toBeDisabled()
+    await expect(mustering).toContainText('The cash roll limit has been reached.')
+    await mustering.getByRole('button', { name: 'Benefit', exact: true }).click()
+    const cashDice = page.getByLabel('Mustering out Cash roll dice')
+    await cashDice.nth(0).fill('1')
+    await cashDice.nth(1).fill('6')
+    await expect(page.getByTestId('summary-cash')).toHaveText('Cr11000')
+  })
+
+  // Plan 1.8. Sets term 1 survival dice to 12 and the result to Fail, and expects Overridden, a mishap,
+  // no event and Muster out.
+  test('1.8 overriding a survival result to Fail gives a mishap', async ({ page }) => {
+    await startTerm1(page)
+    await setDice(page, 'Term 1 Survival', 12)
+    await page.getByLabel('Term 1 Survival result').selectOption('fail')
+    await expect(page.getByTestId('step-term-1.survival')).toContainText('Overridden')
+    await expect(page.getByTestId('step-term-1.mishap')).toBeVisible()
+    await expect(page.getByTestId('step-term-1.event')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Muster out' })).toBeVisible()
+  })
+})

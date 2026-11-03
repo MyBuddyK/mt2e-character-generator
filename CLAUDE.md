@@ -7,7 +7,8 @@ also the owner's portfolio project.
 ## Commands
 
 - `npm run dev`: local dev server
-- `npm run check`: lint (oxlint), typecheck (tsc) and unit tests (Vitest). Run before every commit.
+- `npm run check`: lint (oxlint), typecheck (tsc), the conventions check (`npm run check:conventions`) and unit
+  tests (Vitest). Run before every commit.
 - `npm run test:e2e`: Playwright against a production build. In a sandbox with a preinstalled browser,
   set `PW_CHROMIUM_PATH` to its `chrome` binary.
 
@@ -28,8 +29,10 @@ also the owner's portfolio project.
   Finish career policy. `src/engine/effects.ts` and `src/engine/rules-schema.ts`: event effects and the
   `rules` values. `src/data/rules/sample-rules.json`: invented rules. `src/use-career.ts` and
   `src/Career.tsx`: the Career section; `src/storage/characters.ts` saves career input per seed.
-- `scripts/`: `validate-pack` and `schema` (writes the git-ignored `public/career-pack.schema.json`), run with
-  tsx and typechecked by `tsconfig.scripts.json`.
+- `scripts/`: `validate-pack`, `schema` (writes the git-ignored `public/career-pack.schema.json`) and
+  `check-conventions` (see Documentation rules), run with tsx and typechecked by `tsconfig.scripts.json`.
+- `src/engine/invariants.test.ts`: seed sweeps that run the same check on a fixed list of seeds, for rules
+  that should hold for any seed (repeatability, characteristic ranges, how Finish career ends).
 - `src/App.tsx`: UI.
 - `e2e/`: Playwright specs. `e2e/fixtures/` holds invented career packs used by the specs and unit tests. `e2e/seed.spec.ts` is the starting page for the Playwright agents. Specs use
   relative URLs (`./?seed=x`) so they run under any `BASE_PATH`; CI runs them at `/` and at the Pages path.
@@ -52,6 +55,9 @@ also the owner's portfolio project.
 `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns` and
 `noPropertyAccessFromIndexSignature`; `tsconfig.e2e.json` sets the same for `e2e/`. Don't loosen these,
 and don't use `any`, `@ts-ignore`, `@ts-expect-error`, non-null `!` or `as` casts to get past them.
+`.oxlintrc.json` makes each of those a lint error (`as const` is allowed), and also fails on skipped or
+focused tests, tests with no `expect`, and two tests with the same title. `npm run lint` passes
+`--deny-warnings`, so a warning fails it too.
 
 ## Documentation rules
 
@@ -66,6 +72,11 @@ plans.
   setup, the action and the expected result.
 - No self-congratulatory or evaluative language: no "robust", "elegant", "clean", "powerful",
   "comprehensive", "best practice", or similar.
+
+`npm run check:conventions` (`scripts/check-conventions.ts`) checks the parts a script can find: an
+exported declaration or a test block with no comment above it, a skipped, focused or todo test, and
+phrases from its `BANNED_PHRASES` list. Whether a comment is
+accurate is left to review.
 
 ## Other rules
 
