@@ -78,4 +78,14 @@ test.describe('accessibility', () => {
     await expect(page.getByRole('combobox', { name: 'Term 2 Event DM +2 applies to' })).toBeVisible()
     expect(await violations(page)).toEqual([])
   })
+
+  // Imports the species pack, picks Sample Ursine, and expects no violations with the Species column and
+  // traits shown.
+  test('a picked species has no axe violations', async ({ page }) => {
+    await page.goto('./?seed=terms')
+    await page.getByLabel('Import from file').setInputFiles('e2e/fixtures/species-pack.json')
+    await page.getByRole('combobox', { name: 'Species', exact: true }).selectOption('Sample Ursine')
+    await expect(page.getByTestId('species-traits')).toBeVisible()
+    expect(await violations(page)).toEqual([])
+  })
 })

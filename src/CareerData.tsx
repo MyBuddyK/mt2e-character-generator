@@ -115,8 +115,8 @@ export function CareerData({ packs }: { packs: CareerPacks }) {
               {entry.problems.length > 0 && (
                 <details>
                   <summary>
-                    {entry.problems.length} problem{entry.problems.length === 1 ? '' : 's'}: some careers were
-                    skipped
+                    {entry.problems.length} problem{entry.problems.length === 1 ? '' : 's'}: some careers or
+                    species were skipped
                   </summary>
                   <MessageDetails details={entry.problems} />
                 </details>
@@ -128,7 +128,10 @@ export function CareerData({ packs }: { packs: CareerPacks }) {
 
       {packs.duplicates.length > 0 && (
         <div className="notice" data-testid="duplicate-careers">
-          <p>Some career ids are used by more than one pack. The career from the pack whose id sorts first is used.</p>
+          <p>
+            Some career or species ids are used more than once. The one from the pack whose id sorts first is used, and
+            the built-in Human is always kept.
+          </p>
           <MessageDetails details={packs.duplicates} />
         </div>
       )}

@@ -5,7 +5,8 @@ import { newCharacter } from './character'
 import { CHARACTERISTICS, type Characteristic } from './characteristics'
 import { current } from './overridable'
 import { finishCareer } from './policy'
-import { buildCareer, EMPTY_INPUT, type CareerData, type CareerInput } from './terms'
+import { applySpecies, speciesBase, type SpeciesDefinition } from './species'
+import { buildCareer, EMPTY_INPUT, type CareerData, type CareerInput, type CareerResult } from './terms'
 import { sampleRules } from '../data/rules'
 import sampleCareerJson from '../data/careers/sample-sanitation.json'
 import validPack from '../../e2e/fixtures/valid-pack.json'
@@ -111,5 +112,47 @@ describe('seed sweep invariants', () => {
       expect(keys, seed).toContain('term-1.mishap')
       expect(keys, seed).not.toContain('term-1.event')
     }
+  })
+
+  // For each seed, rolls the characteristics and runs Finish career in the sample career with base
+  // values for Human and for an invented species with STR +3, DEX -2 and END -4 (at least 1). Expects the
+  // same characteristic dice totals, and the same dice total for every roll step key built in both runs.
+  // Criteria: SP-5.
+  it('picking a species changes no dice total for the same seed', () => {
+    const species: SpeciesDefinition = {
+      id: 'sweep-species',
+      name: 'Sweep species',
+      source: 'Invented',
+      summary: 'Invented.',
+      modifiers: { STR: 3, DEX: -2, END: -4 },
+      minCharacteristic: 1,
+      traits: [],
+    }
+    const data: CareerData = { careers: [sampleCareer()], rules: sampleRules }
+    /** Returns the dice total of every roll step in `result`, keyed by step key. */
+    const diceByKey = (result: CareerResult) => {
+      const steps = [...result.terms.flatMap((t) => t.steps), ...result.benefits.map((b) => b.step)]
+      if (result.qualification) steps.push(result.qualification)
+      return new Map(steps.flatMap((s) => (s.dice ? [[s.key, s.dice.rolled] as const] : [])))
+    }
+    let compared = 0
+    for (const seed of sweepSeeds()) {
+      const chars = newCharacter(seed).characteristics
+      const applied = applySpecies(chars, species)
+      for (const key of CHARACTERISTICS) expect(chars[key].rolled, `${seed} ${key}`).toBe(newCharacter(seed).characteristics[key].rolled)
+      expect(applied.STR.rolled, seed).toBe(chars.STR.rolled + 3)
+
+      const human = baseFor(seed)
+      const alien = speciesBase(chars, species)
+      const humanDice = diceByKey(buildCareer(seed, human, finishCareer(seed, human, startOf(sampleCareer()), data), data))
+      const alienDice = diceByKey(buildCareer(seed, alien, finishCareer(seed, alien, startOf(sampleCareer()), data), data))
+      for (const [key, total] of humanDice) {
+        const other = alienDice.get(key)
+        if (other === undefined) continue
+        compared += 1
+        expect(other, `${seed} ${key}`).toBe(total)
+      }
+    }
+    expect(compared).toBeGreaterThan(SWEEP_SIZE)
   })
 })

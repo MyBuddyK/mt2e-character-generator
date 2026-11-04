@@ -5,7 +5,7 @@ import {
   type Characteristic,
   type Characteristics,
 } from './characteristics'
-import { withOverride } from './overridable'
+import { HUMAN, speciesValue, type SpeciesDefinition } from './species'
 
 /**
  * The character being built. It currently holds the seed, name and characteristics; career terms
@@ -30,19 +30,23 @@ export function newCharacter(seed: string): Character {
 /**
  * Returns a copy of `character` with one characteristic's override set to `value`, rounded and
  * clamped by normalizeCharacteristic. Passing undefined or NaN removes the override. Setting the
- * override equal to the rolled value also removes it.
+ * override equal to the value `species` gives the roll (speciesValue; the rolled value for Human, the
+ * default) also removes it.
  */
 export function overrideCharacteristic(
   character: Character,
   key: Characteristic,
   value: number | undefined,
+  species: SpeciesDefinition = HUMAN,
 ): Character {
   const normalized = value === undefined ? undefined : normalizeCharacteristic(value)
+  const entry = character.characteristics[key]
+  const unchanged = normalized === undefined || normalized === speciesValue(entry.rolled, species, key)
   return {
     ...character,
     characteristics: {
       ...character.characteristics,
-      [key]: withOverride(character.characteristics[key], normalized),
+      [key]: unchanged ? { rolled: entry.rolled } : { rolled: entry.rolled, override: normalized },
     },
   }
 }

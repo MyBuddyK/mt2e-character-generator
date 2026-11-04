@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { CareerSchema, parseCareer, type CareerDefinition } from './career-schema'
 import { RulesSchema, type Rules } from './rules-schema'
+import { parseSpecies, SpeciesSchema, type SpeciesDefinition } from './species'
 
 /**
  * Career packs: one JSON file that holds any number of careers, which a referee shares with their
@@ -11,10 +12,11 @@ import { RulesSchema, type Rules } from './rules-schema'
 export const PACK_FORMAT = 'mt2e-career-pack'
 
 /**
- * The latest `formatVersion` this app reads. The app reads versions 1 and 2; a pack with any other
- * version is rejected. Version 2 adds the optional `rules` object and `effects` on careers.
+ * The latest `formatVersion` this app reads. The app reads versions 1, 2 and 3; a pack with any other
+ * version is rejected. Version 2 adds the optional `rules` object and `effects` on careers. Version 3
+ * adds the optional `species` array.
  */
-export const PACK_FORMAT_VERSION = 2
+export const PACK_FORMAT_VERSION = 3
 
 /** Every `formatVersion` this app reads: 1 up to PACK_FORMAT_VERSION. */
 export const SUPPORTED_FORMAT_VERSIONS: readonly number[] = Array.from({ length: PACK_FORMAT_VERSION }, (_, i) => i + 1)
@@ -46,12 +48,15 @@ const packFields = {
 export const CareerPackSchema = z.strictObject({
   ...packFields,
   careers: z.array(CareerSchema).min(1, 'must have at least one career'),
+  /** Species the pack defines (version 3 only). See species.ts. */
+  species: z.array(SpeciesSchema).optional(),
 })
 
 /** The pack fields with each career left unchecked, so careers can be checked one at a time. */
 const PackEnvelopeSchema = z.strictObject({
   ...packFields,
   careers: z.array(z.unknown()).min(1, 'must have at least one career'),
+  species: z.array(z.unknown()).optional(),
 })
 
 /** The identifying fields of a pack that passed parseCareerPack. */
@@ -68,7 +73,14 @@ export interface PackInfo {
  * the messages behind it.
  */
 export type PackParseResult =
-  | { ok: true; pack: PackInfo; careers: CareerDefinition[]; rules: Rules | undefined; problems: string[] }
+  | {
+      ok: true
+      pack: PackInfo
+      careers: CareerDefinition[]
+      rules: Rules | undefined
+      species: SpeciesDefinition[]
+      problems: string[]
+    }
   | { ok: false; reason: string; problems: string[] }
 
 /** Returns true when `value` is a plain object (not null and not an array). */
@@ -76,11 +88,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** Returns `items` joined for a message: "1", "1 and 2", "1, 2 and 3". */
+function listText(items: readonly (string | number)[]): string {
+  const text = items.map(String)
+  const last = text.pop()
+  if (last === undefined) return ''
+  return text.length === 0 ? last : `${text.join(', ')} and ${last}`
+}
+
 /**
- * Returns " (<label>)" for use in messages, where the label is the career's `id` when that is a
+ * Returns " (<label>)" for use in messages, where the label is the career or species entry's `id` when that is a
  * string, otherwise its `name` when that is a string. Returns an empty string when neither is.
  */
-function careerLabel(data: unknown): string {
+function entryLabel(data: unknown): string {
   if (!isRecord(data)) return ''
   const id = data['id']
   const name = data['name']
@@ -103,10 +123,12 @@ function usesEffects(careers: unknown[]): boolean {
  * Checks parsed JSON as a career pack. It rejects the pack when it is not an object, when `format`
  * is not PACK_FORMAT, when `formatVersion` is not one of SUPPORTED_FORMAT_VERSIONS (with a message
  * naming them), when a version 1 pack uses `rules` or `effects` (with a message that it must say
- * version 2), when another pack field fails, or when no career passes. Otherwise it checks
- * each career with parseCareer and skips the ones that fail, and also skips a career whose id was
- * used by an earlier career in the same pack. Each skipped career adds messages of the form
- * "careers.<index> (<id>): <path>: <message>". It does not throw for any input.
+ * version 2), when a version 1 or 2 pack lists `species` (with a message that it must say version 3),
+ * when another pack field fails, or when no career passes. Otherwise it checks each career with
+ * parseCareer and skips the ones that fail, and also skips a career whose id was used by an earlier
+ * career in the same pack. Each skipped career adds messages of the form
+ * "careers.<index> (<id>): <path>: <message>". Species are checked the same way with parseSpecies, and
+ * each skipped species adds messages starting "species.<index> (<id>)". It does not throw for any input.
  */
 export function parseCareerPack(data: unknown): PackParseResult {
   if (!isRecord(data)) {
@@ -120,7 +142,7 @@ export function parseCareerPack(data: unknown): PackParseResult {
     const got = typeof version === 'number' ? `format version ${version}` : 'no valid "formatVersion"'
     return {
       ok: false,
-      reason: `this pack has ${got}; this app supports versions ${SUPPORTED_FORMAT_VERSIONS.join(' and ')}`,
+      reason: `this pack has ${got}; this app supports versions ${listText(SUPPORTED_FORMAT_VERSIONS)}`,
       problems: [],
     }
   }
@@ -138,6 +160,9 @@ export function parseCareerPack(data: unknown): PackParseResult {
       }
     }
   }
+  if (version < 3 && 'species' in data) {
+    return { ok: false, reason: 'this pack uses "species", so its "formatVersion" must be 3', problems: [] }
+  }
   const envelope = PackEnvelopeSchema.safeParse(data)
   if (!envelope.success) {
     return {
@@ -146,12 +171,12 @@ export function parseCareerPack(data: unknown): PackParseResult {
       problems: envelope.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`),
     }
   }
-  const { careers: rawCareers, id, name, revision, source, rules } = envelope.data
+  const { careers: rawCareers, species: rawSpecies = [], id, name, revision, source, rules } = envelope.data
   const careers: CareerDefinition[] = []
   const problems: string[] = []
   const seen = new Set<string>()
   rawCareers.forEach((raw, index) => {
-    const prefix = `careers.${index}${careerLabel(raw)}`
+    const prefix = `careers.${index}${entryLabel(raw)}`
     const result = parseCareer(raw)
     if (!result.ok) {
       problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
@@ -167,7 +192,23 @@ export function parseCareerPack(data: unknown): PackParseResult {
   if (careers.length === 0) {
     return { ok: false, reason: 'no career in the pack is valid', problems }
   }
-  return { ok: true, pack: { id, name, revision, source }, careers, rules, problems }
+  const species: SpeciesDefinition[] = []
+  const speciesIds = new Set<string>()
+  rawSpecies.forEach((raw, index) => {
+    const prefix = `species.${index}${entryLabel(raw)}`
+    const result = parseSpecies(raw)
+    if (!result.ok) {
+      problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
+      return
+    }
+    if (speciesIds.has(result.species.id)) {
+      problems.push(`${prefix}: id "${result.species.id}" is used by an earlier species in this pack`)
+      return
+    }
+    speciesIds.add(result.species.id)
+    species.push(result.species)
+  })
+  return { ok: true, pack: { id, name, revision, source }, careers, rules, species, problems }
 }
 
 /**

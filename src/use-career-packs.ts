@@ -11,6 +11,7 @@ import {
 import type { Rules } from './engine/rules-schema'
 import { sampleRules } from './data/rules'
 import type { CareerDefinition } from './engine/career-schema'
+import { combineSpecies, type SpeciesDefinition } from './engine/species'
 import {
   browserStorage,
   readStoredPacks,
@@ -26,6 +27,7 @@ export interface PackEntry {
   pack: PackInfo
   careers: CareerDefinition[]
   rules: Rules | undefined
+  species: SpeciesDefinition[]
   problems: string[]
 }
 
@@ -52,7 +54,9 @@ export interface CareerPacks {
   careers: CareerDefinition[]
   /** The rules to use (see selectRules), with the sample rules when no loaded pack has any. */
   rules: SelectedRules
-  /** Duplicate career id messages from combineCareers. */
+  /** The species to offer (see combineSpecies): Human first, then the loaded packs' species. */
+  species: SpeciesDefinition[]
+  /** Duplicate career id messages from combineCareers, then duplicate species id messages from combineSpecies. */
   duplicates: string[]
   /** How many saved values could not be read at all. They are kept in storage until discarded. */
   unreadableCount: number
@@ -110,7 +114,14 @@ function describePacks(stored: StoredPack[]): { entries: PackEntry[]; broken: Br
   for (const s of stored) {
     const result = parseCareerPack(s.data)
     if (result.ok) {
-      entries.push({ stored: s, pack: result.pack, careers: result.careers, rules: result.rules, problems: result.problems })
+      entries.push({
+        stored: s,
+        pack: result.pack,
+        careers: result.careers,
+        rules: result.rules,
+        species: result.species,
+        problems: result.problems,
+      })
     }
     else broken.push({ stored: s, reason: result.reason })
   }
@@ -148,7 +159,8 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
       entries.map((e) => ({ id: e.pack.id, name: e.pack.name, rules: e.rules })),
       sampleRules,
     )
-    return { entries, broken, combined, packsParam, rules }
+    const species = combineSpecies(entries.map((e) => ({ id: e.pack.id, name: e.pack.name, species: e.species })))
+    return { entries, broken, combined, species, packsParam, rules }
   }, [stored, bundled])
 
   /** Applies new saved packs and unreadable values to state and storage, and returns the write result. */
@@ -309,7 +321,8 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
     broken: derived.broken,
     careers: derived.combined.careers,
     rules: derived.rules,
-    duplicates: derived.combined.problems,
+    species: derived.species.species,
+    duplicates: [...derived.combined.problems, ...derived.species.problems],
     unreadableCount: unreadable.length,
     storageAvailable: storage !== undefined,
     unsaved,

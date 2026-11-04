@@ -175,7 +175,7 @@ part of this spec.
 - [x] **PK-4** After a reload, the imported pack is still listed.
 - [x] **PK-5** Clicking Remove on a pack removes its careers from the list, and they stay removed after a reload.
 - [x] **PK-6** Importing a file that isn't JSON shows an alert naming the file, and nothing is saved.
-- [x] **PK-7** Importing a pack with a later `formatVersion` than the app reads shows an alert naming the versions it supports. (Written for version 2 at first; the app reads versions 1 and 2 since the career terms work.)
+- [x] **PK-7** Importing a pack with a later `formatVersion` than the app reads shows an alert naming the versions it supports. (Written for version 2 at first; the app reads versions 1 and 2 since the career terms work, and 1 to 3 since species.)
 - [x] **PK-8** Importing a pack with one invalid career loads the others and lists the invalid one by index and field.
 - [x] **PK-9** Importing a pack with an `id` that's already loaded asks for confirmation and shows both revisions.
       Cancelling keeps the old pack.

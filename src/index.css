@@ -461,3 +461,17 @@ input[type='number'] {
 .seed-status {
   flex-basis: 100%;
 }
+
+.species-pick {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  max-width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.species-pick select {
+  font: inherit;
+  max-width: 100%;
+  font-weight: normal;
+}
