@@ -119,7 +119,9 @@ The top level of a pack:
 - A career can also set `"entry": "forced"` (not listed at the career pick; only a `next-career` effect or a
   Draft row sends a character there), `parole` (`dice`, `plus`, `max`: a Parole Threshold rolled in term 1;
   the career ends only when an advancement total is above it, or by an effect, and a failed survival doesn't
-  end it), `"anagathics": false` and `"assignmentEachTerm": true`. See
+  end it), `"anagathics": false`, `"assignmentEachTerm": true`, `"entry": "psi-tested"` (listed only once PSI
+  is tested) and `talents` (`target`, `attemptDM`, optional `automaticFirst`, and a `list` of `name` and `dm`,
+  rolled in term 1). A check can name `PSI`, which counts as 0 until it is tested. See
   [`docs/features/prisoner-psion.md`](docs/features/prisoner-psion.md).
 - A skill table entry that is a characteristic name changes that characteristic instead of giving a skill:
   `"DEX"` or `"DEX +1"` adds 1, and `"SOC -1"` subtracts 1. Basic training skips these entries.
@@ -135,6 +137,8 @@ The top level of a pack:
   same term. `ship-shares` (`count`) adds ship shares to the character, as does `shipShares` on a
   mustering-out row when it is taken as a benefit. See
   [`docs/features/life-events.md`](docs/features/life-events.md).
+- `psi-test` rolls the character's PSI (2D minus the terms served) once; `characteristic` and skill table
+  entries such as "PSI +1" change it after the test.
 - `parole` (`change`), `parole-reroll` and `parole-lower-dice` (`dice`) change the Parole Threshold of a career
   with `parole`; elsewhere they are notes.
 - A `check` effect (`options`, `target`, optional `pass` and `fail` effect lists) rolls 2D with one of its

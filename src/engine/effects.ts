@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CHARACTERISTICS } from './characteristics'
+import { CHARACTERISTICS, CHECK_CHARACTERISTICS } from './characteristics'
 
 /**
  * Structured effects that the career engine applies for an event, mishap, rank or aging result.
@@ -36,7 +36,8 @@ export type RollKind = (typeof ROLL_KINDS)[number]
  *   (any kind in ROLL_KINDS when left out). Until the player picks a roll it is not applied.
  * - `benefit-dm`: a DM on the next mustering-out benefit roll.
  * - `extra-benefit`: extra mustering-out benefit rolls (one when `count` is left out).
- * - `characteristic`: add `change` (which may be negative) to one characteristic.
+ * - `characteristic`: add `change` (which may be negative) to one characteristic, or to PSI once it is
+ *   tested (lowest 0; before a test it is a note).
  * - `leave-career`: the character leaves the career at the end of the term.
  * - `mishap`: roll on the mishap table without leaving the career.
  * - `promote`: this term's advancement roll passes without being rolled.
@@ -62,8 +63,10 @@ export type RollKind = (typeof ROLL_KINDS)[number]
  * - `parole`: add `change` (which may be negative) to the Parole Threshold of a career with `parole`, capped
  *   at the career's `parole.max`. `parole-reroll` rolls the threshold again with the career's `parole` dice;
  *   `parole-lower-dice` lowers it by `dice`D. Outside a career with `parole` each is a note.
+ * - `psi-test`: roll the character's PSI, 2D minus the terms finished before the current term (lowest 0),
+ *   when it isn't tested yet; a second one is a note. Careers with `"entry": "psi-tested"` are then offered.
  * - `check`: a 2D roll with one of `options` against `target`. An option that is a characteristic name in
- *   capitals (STR, DEX, END, INT, EDU or SOC) uses that characteristic's DM; a characteristic name in any
+ *   capitals (STR, DEX, END, INT, EDU, SOC or PSI) uses that characteristic's DM; a characteristic name in any
  *   other case fails the schema. Any other option is a skill, with its level as the DM (-3 untrained). With
  *   several options the player picks one. The `pass` or `fail` effects are then applied, each under its
  *   own key; they can be any effect but `check` and `choice`.
@@ -87,7 +90,7 @@ const BASIC_EFFECTS = [
   }),
   z.strictObject({ type: z.literal('benefit-dm'), dm: z.int() }),
   z.strictObject({ type: z.literal('extra-benefit'), count: z.int().min(1).optional() }),
-  z.strictObject({ type: z.literal('characteristic'), characteristic: z.enum(CHARACTERISTICS), change: z.int() }),
+  z.strictObject({ type: z.literal('characteristic'), characteristic: z.enum(CHECK_CHARACTERISTICS), change: z.int() }),
   z.strictObject({ type: z.literal('leave-career') }),
   z.strictObject({ type: z.literal('mishap') }),
   z.strictObject({ type: z.literal('promote') }),
@@ -115,6 +118,7 @@ const BASIC_EFFECTS = [
   z.strictObject({ type: z.literal('parole'), change: z.int() }),
   z.strictObject({ type: z.literal('parole-reroll') }),
   z.strictObject({ type: z.literal('parole-lower-dice'), dice: z.int().min(1).max(3) }),
+  z.strictObject({ type: z.literal('psi-test') }),
 ] as const
 
 /** One effect other than `check` and `choice`: the effects a `check` can apply on a pass or a fail. */
@@ -131,8 +135,8 @@ const PLAIN_EFFECTS = [
       .min(1, 'must list at least one skill or characteristic')
       .refine((list) => new Set(list).size === list.length, 'must not list an option twice')
       .refine(
-        (list) => list.every((o) => CHARACTERISTICS.some((c) => c === o) || !CHARACTERISTICS.some((c) => c === o.toUpperCase())),
-        'must write a characteristic in capitals (STR, DEX, END, INT, EDU or SOC)',
+        (list) => list.every((o) => CHECK_CHARACTERISTICS.some((c) => c === o) || !CHECK_CHARACTERISTICS.some((c) => c === o.toUpperCase())),
+        'must write a characteristic in capitals (STR, DEX, END, INT, EDU, SOC or PSI)',
       ),
     target: z.int().min(0).max(20),
     pass: z.array(BasicEffectSchema).optional(),

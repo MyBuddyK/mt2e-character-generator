@@ -9,7 +9,7 @@ import { buildCareer, type CareerData, type CareerInput, type CareerResult, type
 
 /** A one-line description of what policyChoice picks, shown next to the Finish career button. */
 export const POLICY_SUMMARY =
-  'Finish career keeps this career and assignment, rolls on the last skill table the character can use, picks at random (from the seed) when an event, mishap, rank or table entry offers a choice of skills or of options, aging asks which characteristics to reduce, or a wager asks how many benefit rolls to bet, tries for a commission whenever one is allowed, and continues term after term until the character is forced out (by a mishap, an event or the advancement roll) or reaches the term limit in the rules; in a career with a Parole Threshold it continues until the sentence ends. It does not apply DMs that the player applies by hand to a later roll. It takes no anagathics, and stops at an ageing crisis and when qualification fails. When the career ends it takes cash for the first benefit roll and benefits after that, and stops before the next career.'
+  'Finish career keeps this career and assignment, rolls on the last skill table the character can use, picks at random (from the seed) when an event, mishap, rank or table entry offers a choice of skills or of options, aging asks which characteristics to reduce, or a wager asks how many benefit rolls to bet, tries for a commission whenever one is allowed, tries psionic talents in the order the career lists them, and continues term after term until the character is forced out (by a mishap, an event or the advancement roll) or reaches the term limit in the rules; in a career with a Parole Threshold it continues until the sentence ends. It does not apply DMs that the player applies by hand to a later roll. It takes no anagathics, and stops at an ageing crisis and when qualification fails. When the career ends it takes cash for the first benefit roll and benefits after that, and stops before the next career.'
 
 /**
  * Returns the answer the policy gives to `pending`, given the career so far, the term limit and the
@@ -19,7 +19,7 @@ export const POLICY_SUMMARY =
  * the first benefit roll when cash is allowed ("benefit" otherwise), a wager from 0 to its maximum
  * picked the same way, and "try" for a commission. The term limit counts the terms of the current career.
  * The same seed and key always give the same pick. For an assignment asked at the start of a term it
- * keeps the current one (`keep`). Returns undefined for the start choice, the Draft or fallback choice and
+ * keeps the current one (`keep`), and it picks the first talent left in the career's list. Returns undefined for the start choice, the Draft or fallback choice and
  * the assignment after them, and the ageing crisis choice, which the player must make. Characteristics to reduce and options of an event or mishap choice are picked like
  * skill options. DMs the player applies by hand (`dm-later`) are left unapplied.
  */
@@ -27,6 +27,8 @@ export function policyChoice(pending: PendingChoice, result: CareerResult, termL
   switch (pending.kind) {
     case 'assignment':
       return pending.keep
+    case 'talent':
+      return pending.options[0]
     case 'start':
     case 'fallback':
     case 'ageing-crisis':

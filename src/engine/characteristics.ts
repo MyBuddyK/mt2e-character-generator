@@ -6,6 +6,14 @@ export const CHARACTERISTICS = ['STR', 'DEX', 'END', 'INT', 'EDU', 'SOC'] as con
 /** One of the six characteristic codes. */
 export type Characteristic = (typeof CHARACTERISTICS)[number]
 
+/**
+ * The six characteristics and PSI, the seventh value a character has only once an event tests it
+ * (docs/features/prisoner-psion.md). Checks and characteristic changes can name any of them.
+ */
+export const CHECK_CHARACTERISTICS = [...CHARACTERISTICS, 'PSI'] as const
+/** One of the six characteristic codes, or PSI. */
+export type CheckCharacteristic = (typeof CHECK_CHARACTERISTICS)[number]
+
 /** A character's six characteristics, each with its rolled value and optional override. */
 export type Characteristics = Record<Characteristic, Overridable<number>>
 
