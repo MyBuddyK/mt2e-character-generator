@@ -17,6 +17,12 @@
       { "roll": 3, "summary": "No effect." }
     ]
   },
+  "lifeEvents": {
+    "dice": 2,
+    "table": [
+      { "roll": 7, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] }
+    ]
+  },
   "benefits": {
     "perTerm": 1,
     "rankExtra": [{ "minRank": 2, "extra": 1 }],

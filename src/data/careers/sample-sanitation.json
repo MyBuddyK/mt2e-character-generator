@@ -263,7 +263,12 @@
     },
     {
       "roll": 7,
-      "summary": "Life event."
+      "summary": "Life event.",
+      "effects": [
+        {
+          "type": "life-event"
+        }
+      ]
     },
     {
       "roll": 8,

@@ -244,6 +244,8 @@ export interface CareerResult {
   laterDMs: LaterDM[]
   /** Cash from mustering out, less `costs`. Below 0 is a debt. */
   cash: number
+  /** Ship shares gained from `ship-shares` effects. Ship shares named only in a benefit's text are not counted. */
+  shipShares: number
   /** Credits spent on anagathics and on medical care after an ageing crisis. */
   costs: number
   /** True when the character died in an ageing crisis. The character is then finished. */
@@ -653,6 +655,41 @@ export function buildCareer(
     rollOnTable(key, table, termSteps)
   }
 
+  let shipShares = 0
+  let lifeEventDepth = 0
+  /**
+   * Rolls on rules.lifeEvents under `key` and adds the step after the step that gave it, then rolls the
+   * entry's 1D sub-table when it has one, and applies the effects of each. A `life-event` effect inside a
+   * Life Event is a note, so one entry rolls the table at most once.
+   */
+  const lifeEvent = (key: string, from: Step, termSteps: Step[], term: TermResult | undefined) => {
+    const table = rules.lifeEvents
+    if (!table) {
+      from.notes.push('Roll on the Life Events table by hand: the rules have no Life Events table.')
+      return
+    }
+    if (lifeEventDepth > 0) {
+      from.notes.push('Roll another Life Event by hand. The app rolls one Life Event per entry.')
+      return
+    }
+    lifeEventDepth += 1
+    const { step, row } = tableRoll(key, 'Life Event', table.dice, 0, table.table)
+    step.result = row?.summary ?? ''
+    if (row?.connection) step.connection = true
+    if (row && !row.effects && !row.subTable) step.notes.push(row.summary)
+    termSteps.push(step)
+    if (row) applyEffects(row.effects, key, step, termSteps, term)
+    if (row?.subTable) {
+      const sub = tableRoll(`${key}.sub`, `Life Event: ${row.summary}`, 1, 0, row.subTable)
+      sub.step.result = sub.row?.summary ?? ''
+      if (sub.row?.connection) sub.step.connection = true
+      if (sub.row && !sub.row.effects) sub.step.notes.push(sub.row.summary)
+      termSteps.push(sub.step)
+      if (sub.row) applyEffects(sub.row.effects, `${key}.sub`, sub.step, termSteps, term)
+    }
+    lifeEventDepth -= 1
+  }
+
   let mishapDepth = 0
   /**
    * While a mishap's effects are applied: whether it ended the career and whether it cost the term's
@@ -811,6 +848,13 @@ export function buildCareer(
           })
           break
         }
+        case 'life-event':
+          lifeEvent(`${effectKey}.life-event`, step, termSteps, term)
+          break
+        case 'ship-shares':
+          shipShares += effect.count
+          step.applied.push(`${effect.count} ship share${effect.count === 1 ? '' : 's'}`)
+          break
         case 'mishap':
           if (career && mishapDepth === 0) {
             mishapDepth += 1
@@ -1298,6 +1342,7 @@ export function buildCareer(
     unusedNextDMs: { advancement: nextDM.advancement, survival: nextDM.survival },
     laterDMs: later.map((l) => l.dm),
     cash: benefits.reduce((total, b) => total + b.cash, 0) - costs,
+    shipShares,
     costs,
     dead,
     connections,

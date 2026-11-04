@@ -117,6 +117,10 @@ The top level of a pack:
 - `effects` can also be `promote` (the advancement roll passes without a roll), on a mishap
   `stay-in-career` and `keep-benefit`, and `wager`, which lets the player bet benefit rolls earned so far
   on a skill roll (`skills`, `target`, optional `maxWager` and `gainUsedSkill`).
+- A `life-event` effect rolls on the Life Events table in `rules.lifeEvents` (`dice` and a `table` of rows
+  with `roll`, `summary`, optional `effects`, `connection` and a 1D `subTable`) and applies the entry in the
+  same term. `ship-shares` (`count`) adds ship shares to the character. See
+  [`docs/features/life-events.md`](docs/features/life-events.md).
 - A `choice` effect asks the player to pick one of its `options`, each a `label` and the `effects` applied
   when it is picked: `{ "type": "choice", "options": [{ "label": "Tactics 1", "effects": [...] }, { "label":
   "DM +4 to the next advancement roll", "effects": [{ "type": "dm-next", "roll": "advancement", "dm": 4 }] }] }`.
