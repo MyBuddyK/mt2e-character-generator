@@ -122,6 +122,11 @@ The top level of a pack:
   same term. `ship-shares` (`count`) adds ship shares to the character, as does `shipShares` on a
   mustering-out row when it is taken as a benefit. See
   [`docs/features/life-events.md`](docs/features/life-events.md).
+- A `check` effect (`options`, `target`, optional `pass` and `fail` effect lists) rolls 2D with one of its
+  options: a characteristic name uses that characteristic's DM, and a skill uses its level (-3 untrained).
+  `next-career` (`career`, a career id or `"draft"`) ends the career after the term and starts that career, or
+  the Draft, next with no qualification roll. `fail-graduation` is for education terms (planned) and is a note
+  in a career. See [`docs/features/education.md`](docs/features/education.md).
 - A `choice` effect asks the player to pick one of its `options`, each a `label` and the `effects` applied
   when it is picked: `{ "type": "choice", "options": [{ "label": "Tactics 1", "effects": [...] }, { "label":
   "DM +4 to the next advancement roll", "effects": [{ "type": "dm-next", "roll": "advancement", "dm": 4 }] }] }`.

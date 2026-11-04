@@ -51,7 +51,8 @@ export function policyChoice(pending: PendingChoice, result: CareerResult, termL
 /**
  * Returns `input` with the remaining choices made by policyChoice, by building the career and
  * answering its pending choice until the current career has mustered out or the player must choose. It
- * stops early, leaving the after-term choice open, when that term's aging caused an ageing crisis.
+ * stops early, leaving the after-term choice open, when that term's aging caused an ageing crisis. It
+ * also stops once a `next-career` effect has started the next career, before answering anything in it.
  * Stops after 1000 choices as a guard against data that never finishes.
  */
 export function finishCareer(
@@ -61,8 +62,11 @@ export function finishCareer(
   data: CareerData,
 ): CareerInput {
   let next: CareerInput = input
+  let startRuns: number | undefined
   for (let i = 0; i < 1000; i += 1) {
     const result = buildCareer(seed, base, next, data)
+    startRuns ??= result.runs.length
+    if (result.runs.length > startRuns) return next
     if (!result.pending) return next
     if (result.pending.kind === 'next' && result.terms[result.terms.length - 1]?.ageingCrisis) return next
     const answer = policyChoice(result.pending, result, data.rules.termLimit, seed)
