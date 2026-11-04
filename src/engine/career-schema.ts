@@ -158,6 +158,21 @@ export const CareerSchema = z.strictObject({
   mishaps: z.array(EventEntrySchema).superRefine(coversRolls(1, 6)),
   /** Mustering-out table: one entry for each roll from 1 to 7. */
   musteringOut: z.array(MusterOutEntrySchema).superRefine(coversRolls(1, 7)),
+  /**
+   * Optional. "forced" leaves the career out of the career pick: only a `next-career` effect or a Draft row
+   * sends a character there (docs/features/prisoner-psion.md).
+   */
+  entry: z.literal('forced').optional(),
+  /**
+   * Optional. The Parole Threshold, rolled in term 1 as `dice`D + `plus` and capped at `max`. A career with it
+   * ends only when an advancement total is above the threshold, or by an effect, and survival failures don't
+   * end it.
+   */
+  parole: z.strictObject({ dice: z.int().min(1).max(3), plus: z.int(), max: z.int() }).optional(),
+  /** Optional. false offers no anagathics in this career. */
+  anagathics: z.literal(false).optional(),
+  /** Optional. true asks for the assignment at the start of each term after the first. */
+  assignmentEachTerm: z.literal(true).optional(),
 })
 /** A validated career, as described by CareerSchema. */
 export type CareerDefinition = z.infer<typeof CareerSchema>

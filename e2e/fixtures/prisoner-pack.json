@@ -1,0 +1,952 @@
+{
+  "format": "mt2e-career-pack",
+  "formatVersion": 3,
+  "id": "test-prisoner",
+  "name": "Prisoner test pack",
+  "revision": 1,
+  "source": "Invented test data for the e2e suite",
+  "rules": {
+    "source": "Invented sample values to show the data format. Not taken from any published rules. Replace with values from your own books in a career pack.",
+    "startingAge": 18,
+    "termLength": 4,
+    "termLimit": 5,
+    "skillRolls": {
+      "perTerm": 1,
+      "onAdvancement": 1
+    },
+    "basicTraining": {
+      "table": "serviceSkills",
+      "level": 0
+    },
+    "advancedEducationMinEDU": 9,
+    "aging": {
+      "fromTerm": 3,
+      "dice": 2,
+      "dmPerTerm": -1,
+      "table": [
+        {
+          "roll": 0,
+          "summary": "Joints creak in zero-g. STR -1 and DEX -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "STR",
+              "change": -1
+            },
+            {
+              "type": "characteristic",
+              "characteristic": "DEX",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 1,
+          "summary": "Years of hauling show. END -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "END",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 2,
+          "summary": "A little slower. DEX -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "DEX",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 3,
+          "summary": "No effect."
+        }
+      ]
+    },
+    "preCareer": {
+      "lastTerm": 3
+    },
+    "lifeEvents": {
+      "dice": 2,
+      "table": [
+        {
+          "roll": 2,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 3,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 4,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 5,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 6,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 7,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 8,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 9,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 10,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 11,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "roll": 12,
+          "summary": "Passes Go! Collects two ship shares.",
+          "effects": [
+            {
+              "type": "ship-shares",
+              "count": 2
+            }
+          ]
+        }
+      ]
+    },
+    "benefits": {
+      "perTerm": 1,
+      "rankExtra": [
+        {
+          "minRank": 2,
+          "extra": 1
+        }
+      ],
+      "rankBenefitDM": [
+        {
+          "minRank": 3,
+          "dm": 1
+        }
+      ],
+      "cashRollLimit": 2
+    },
+    "anagathics": {
+      "characteristic": "END",
+      "target": 7,
+      "costDice": 1,
+      "costPerDie": 1000
+    }
+  },
+  "careers": [
+    {
+      "id": "test-sending",
+      "name": "Sending career",
+      "source": "Invented test data for the e2e suite",
+      "summary": "Invented test career whose roll 8 event sends the character to the Holding career.",
+      "qualification": {
+        "characteristic": "END",
+        "target": 5
+      },
+      "skillTables": {
+        "personalDevelopment": [
+          "STR",
+          "END",
+          "DEX",
+          "Carouse",
+          "Athletics",
+          "Melee"
+        ],
+        "serviceSkills": [
+          "Vacc Suit",
+          "Pilot",
+          "Mechanic",
+          "Electronics",
+          "Broker",
+          "Steward"
+        ],
+        "advancedEducation": [
+          "Engineer",
+          "Science",
+          "Medic",
+          "Admin",
+          "Investigate",
+          "Diplomat"
+        ]
+      },
+      "assignments": [
+        {
+          "id": "debris-sweep",
+          "name": "Debris sweep",
+          "survival": {
+            "characteristic": "DEX",
+            "target": 6
+          },
+          "advancement": {
+            "characteristic": "INT",
+            "target": 7
+          },
+          "skills": [
+            "Pilot",
+            "Vacc Suit",
+            "Gunner",
+            "Sensors",
+            "Astrogation",
+            "Zero-G"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Sweeper"
+            },
+            {
+              "rank": 1,
+              "title": "Tug Pilot",
+              "bonus": "Pilot 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Pilot"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Shift Lead"
+            },
+            {
+              "rank": 3,
+              "title": "Sector Boss",
+              "bonus": "Leadership 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Leadership"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "salvage-barge",
+          "name": "Salvage barge",
+          "survival": {
+            "characteristic": "END",
+            "target": 7
+          },
+          "advancement": {
+            "characteristic": "EDU",
+            "target": 6
+          },
+          "skills": [
+            "Mechanic",
+            "Engineer",
+            "Broker",
+            "Vacc Suit",
+            "Electronics",
+            "Streetwise"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Scrapper"
+            },
+            {
+              "rank": 1,
+              "title": "Cutter",
+              "bonus": "Mechanic 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Mechanic"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Yard Foreman"
+            },
+            {
+              "rank": 3,
+              "title": "Barge Master",
+              "bonus": "Broker 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Broker"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hazmat",
+          "name": "Hazardous waste",
+          "survival": {
+            "characteristic": "INT",
+            "target": 7
+          },
+          "advancement": {
+            "characteristic": "EDU",
+            "target": 8
+          },
+          "skills": [
+            "Science",
+            "Medic",
+            "Vacc Suit",
+            "Investigate",
+            "Admin",
+            "Recon"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Handler"
+            },
+            {
+              "rank": 1,
+              "title": "Certified Handler",
+              "bonus": "Vacc Suit 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Vacc Suit"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 2,
+              "title": "Containment Officer"
+            },
+            {
+              "rank": 3,
+              "title": "Disposal Inspector",
+              "bonus": "Admin 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Admin"
+                  ],
+                  "level": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "roll": 2,
+          "summary": "Roll on the mishap table, but you keep your job.",
+          "effects": [
+            {
+              "type": "mishap"
+            }
+          ]
+        },
+        {
+          "roll": 3,
+          "summary": "You pull an escape pod out of a junk field. Someone inside owes you their life.",
+          "connection": true,
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Medic",
+                "Vacc Suit"
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 4,
+          "summary": "A quiet term hauling the same route. Gain one service skill.",
+          "effects": [
+            {
+              "type": "roll-table",
+              "table": "serviceSkills"
+            }
+          ]
+        },
+        {
+          "roll": 5,
+          "summary": "You and another traveller are trapped together on a drifting hulk for a week.",
+          "connection": true
+        },
+        {
+          "roll": 6,
+          "summary": "Recycling-plant training. Gain one level in Mechanic or Engineer.",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Mechanic",
+                "Engineer"
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 7,
+          "summary": "A supervisor takes an interest. Gain Admin 1 or DM+4 to your next advancement roll.",
+          "effects": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "label": "Admin 1",
+                  "effects": [
+                    {
+                      "type": "skill",
+                      "options": [
+                        "Admin"
+                      ],
+                      "level": 1
+                    }
+                  ]
+                },
+                {
+                  "label": "DM +4 to the next advancement roll",
+                  "effects": [
+                    {
+                      "type": "dm-next",
+                      "roll": "advancement",
+                      "dm": 4
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 8,
+          "summary": "An invented inspection goes badly. You are sent to the Holding career next term.",
+          "effects": [
+            {
+              "type": "next-career",
+              "career": "test-holding"
+            }
+          ]
+        },
+        {
+          "roll": 9,
+          "summary": "A favour owed. DM+2 to one later advancement roll of your choice.",
+          "effects": [
+            {
+              "type": "dm-later",
+              "dm": 2,
+              "rolls": [
+                "advancement"
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 10,
+          "summary": "You dispose of something a client wanted gone, no questions asked. Gain a contact.",
+          "connection": true
+        },
+        {
+          "roll": 11,
+          "summary": "A station administrator notices your work. Gain an ally.",
+          "connection": true
+        },
+        {
+          "roll": 12,
+          "summary": "You clear a debris field that was closing a busy lane. You are promoted automatically."
+        }
+      ],
+      "mishaps": [
+        {
+          "roll": 1,
+          "summary": "A compacted debris bale ruptures your suit. Severely injured."
+        },
+        {
+          "roll": 2,
+          "summary": "You report a client for illegal dumping and lose the contract.",
+          "connection": true
+        },
+        {
+          "roll": 3,
+          "summary": "A salvage claim goes to court and you lose. Gain an enemy.",
+          "connection": true
+        },
+        {
+          "roll": 4,
+          "summary": "The station automates your route and lets the crew go. Gain one level in Admin from the paperwork.",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Admin"
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 5,
+          "summary": "A crewmate's mistake vents your tug, and you take the blame.",
+          "connection": true
+        },
+        {
+          "roll": 6,
+          "summary": "Injured by a tumbling hull plate."
+        }
+      ],
+      "musteringOut": [
+        {
+          "roll": 1,
+          "cash": 1000,
+          "benefit": "Contact"
+        },
+        {
+          "roll": 2,
+          "cash": 2000,
+          "benefit": "END +1"
+        },
+        {
+          "roll": 3,
+          "cash": 5000,
+          "benefit": "Vacc suit"
+        },
+        {
+          "roll": 4,
+          "cash": 5000,
+          "benefit": "Tool kit"
+        },
+        {
+          "roll": 5,
+          "cash": 10000,
+          "benefit": "Ship share"
+        },
+        {
+          "roll": 6,
+          "cash": 10000,
+          "benefit": "INT +1"
+        },
+        {
+          "roll": 7,
+          "cash": 20000,
+          "benefit": "Two ship shares"
+        }
+      ]
+    },
+    {
+      "id": "test-holding",
+      "name": "Holding career",
+      "source": "Invented test data for the e2e suite",
+      "summary": "Invented forced-entry test career with a Parole Threshold, no anagathics and an assignment each term.",
+      "qualification": {
+        "characteristic": "END",
+        "target": 0,
+        "automatic": true
+      },
+      "entry": "forced",
+      "parole": {
+        "dice": 1,
+        "plus": 2,
+        "max": 12
+      },
+      "anagathics": false,
+      "assignmentEachTerm": true,
+      "skillTables": {
+        "personalDevelopment": [
+          "STR",
+          "END",
+          "DEX",
+          "Carouse",
+          "Athletics",
+          "Melee"
+        ],
+        "serviceSkills": [
+          "Athletics",
+          "Deception",
+          "Streetwise",
+          "Melee",
+          "Persuade",
+          "Stealth"
+        ]
+      },
+      "assignments": [
+        {
+          "id": "cellblock",
+          "name": "Cellblock",
+          "survival": {
+            "characteristic": "END",
+            "target": 7
+          },
+          "advancement": {
+            "characteristic": "STR",
+            "target": 7
+          },
+          "skills": [
+            "Stealth",
+            "Melee",
+            "Streetwise",
+            "Survival",
+            "Athletics",
+            "Mechanic"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Holdee",
+              "bonus": "Athletics 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Athletics"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 1
+            },
+            {
+              "rank": 2,
+              "title": "Trusty"
+            }
+          ]
+        },
+        {
+          "id": "workshop",
+          "name": "Workshop",
+          "survival": {
+            "characteristic": "INT",
+            "target": 7
+          },
+          "advancement": {
+            "characteristic": "END",
+            "target": 6
+          },
+          "skills": [
+            "Mechanic",
+            "Electronics",
+            "Broker",
+            "Admin",
+            "Engineer",
+            "Steward"
+          ],
+          "ranks": [
+            {
+              "rank": 0,
+              "title": "Hand",
+              "bonus": "Athletics 1",
+              "effects": [
+                {
+                  "type": "skill",
+                  "options": [
+                    "Athletics"
+                  ],
+                  "level": 1
+                }
+              ]
+            },
+            {
+              "rank": 1
+            },
+            {
+              "rank": 2,
+              "title": "Foreman"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "roll": 2,
+          "summary": "Roll on the mishap table, but you keep your place.",
+          "effects": [
+            {
+              "type": "mishap"
+            }
+          ]
+        },
+        {
+          "roll": 3,
+          "summary": "A chance to slip out. Roll Stealth 10+: leave on a pass, Parole Threshold +2 on a fail.",
+          "effects": [
+            {
+              "type": "check",
+              "options": [
+                "Stealth"
+              ],
+              "target": 10,
+              "pass": [
+                {
+                  "type": "leave-career"
+                }
+              ],
+              "fail": [
+                {
+                  "type": "parole",
+                  "change": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 4,
+          "summary": "A dispute in the yard. Parole Threshold +1.",
+          "effects": [
+            {
+              "type": "parole",
+              "change": 1
+            }
+          ]
+        },
+        {
+          "roll": 5,
+          "summary": "Moved to another block. Roll the Parole Threshold again.",
+          "effects": [
+            {
+              "type": "parole-reroll"
+            }
+          ]
+        },
+        {
+          "roll": 6,
+          "summary": "A review board hears your case. Lower the Parole Threshold by 1D.",
+          "effects": [
+            {
+              "type": "parole-lower-dice",
+              "dice": 1
+            }
+          ]
+        },
+        {
+          "roll": 7,
+          "summary": "A quiet term."
+        },
+        {
+          "roll": 8,
+          "summary": "Good conduct. Parole Threshold -1.",
+          "effects": [
+            {
+              "type": "parole",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 9,
+          "summary": "Workshop training. Gain Mechanic.",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Mechanic"
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 10,
+          "summary": "Library duty. Gain Admin.",
+          "effects": [
+            {
+              "type": "skill",
+              "options": [
+                "Admin"
+              ]
+            }
+          ]
+        },
+        {
+          "roll": 11,
+          "summary": "A visitor speaks for you. Parole Threshold -2.",
+          "effects": [
+            {
+              "type": "parole",
+              "change": -2
+            }
+          ]
+        },
+        {
+          "roll": 12,
+          "summary": "You help in an emergency. Parole Threshold -2.",
+          "effects": [
+            {
+              "type": "parole",
+              "change": -2
+            }
+          ]
+        }
+      ],
+      "mishaps": [
+        {
+          "roll": 1,
+          "summary": "Hurt in a scuffle."
+        },
+        {
+          "roll": 2,
+          "summary": "Blamed for a fight. Parole Threshold +2.",
+          "effects": [
+            {
+              "type": "parole",
+              "change": 2
+            }
+          ]
+        },
+        {
+          "roll": 3,
+          "summary": "A gang leans on you."
+        },
+        {
+          "roll": 4,
+          "summary": "A warden dislikes you. Parole Threshold +1.",
+          "effects": [
+            {
+              "type": "parole",
+              "change": 1
+            }
+          ]
+        },
+        {
+          "roll": 5,
+          "summary": "Word reaches home. SOC -1.",
+          "effects": [
+            {
+              "type": "characteristic",
+              "characteristic": "SOC",
+              "change": -1
+            }
+          ]
+        },
+        {
+          "roll": 6,
+          "summary": "Injured."
+        }
+      ],
+      "musteringOut": [
+        {
+          "roll": 1,
+          "cash": 0,
+          "benefit": "Contact"
+        },
+        {
+          "roll": 2,
+          "cash": 0,
+          "benefit": "Blade"
+        },
+        {
+          "roll": 3,
+          "cash": 100,
+          "benefit": "Stealth"
+        },
+        {
+          "roll": 4,
+          "cash": 200,
+          "benefit": "Ally"
+        },
+        {
+          "roll": 5,
+          "cash": 500,
+          "benefit": "Streetwise"
+        },
+        {
+          "roll": 6,
+          "cash": 1000,
+          "benefit": "END +1"
+        },
+        {
+          "roll": 7,
+          "cash": 2500,
+          "benefit": "Persuade"
+        }
+      ]
+    }
+  ]
+}
