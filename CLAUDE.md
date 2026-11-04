@@ -89,7 +89,7 @@ phrases from its `BANNED_PHRASES` list. Whether a comment is accurate is left to
 ## Acceptance criteria and tests
 
 Each acceptance criterion in `docs/features/` starts with an id: `PK-n` (career-import), `CT-n`
-(career-terms), `CR-n` (career-rules), `TR-n` (term-removal), `SC-n` (seed-controls), `EC-n` (event-choices), `SP-n` (species) or `LE-n` (life-events). A test that checks a criterion names it on the last line of its
+(career-terms), `CR-n` (career-rules), `TR-n` (term-removal), `SC-n` (seed-controls), `EC-n` (event-choices), `SP-n` (species), `LE-n` (life-events) or `ED-n` (education). A test that checks a criterion names it on the last line of its
 comment, `// Criteria: CT-4, CT-6.` `npm run check:conventions` fails when a criterion has no id, an id is
 used twice, a test names an id that doesn't exist, or a ticked (`[x]`) criterion is named by no test.
 Don't renumber ids; add new ones after the last.

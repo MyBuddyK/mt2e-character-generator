@@ -203,6 +203,8 @@ export interface CareerRun extends RunState {
   assignment: Assignment | undefined
   /** How the career was entered. */
   entry: 'qualified' | 'draft' | 'fallback'
+  /** True when a `next-career` effect sent the character to this career or the Draft, with no qualification roll. */
+  forced: boolean
   qualification: Step
   /** The Draft roll, when the character took the Draft. */
   draft: Step | undefined
@@ -394,6 +396,11 @@ export function buildCareer(
   let deathAge: number | undefined
   let qualificationFails = false
   let promoteThisTerm = false
+  /**
+   * The next career set by a `next-career` effect: a loaded career, or the Draft. The next career start
+   * reads it and clears it.
+   */
+  let forcedNext: { kind: 'career'; career: CareerDefinition } | { kind: 'draft' } | undefined
   /** Terms on anagathics in a row, up to the current term. */
   let anagathicsStreak = 0
   const skillLimits = rules.skillLimits
@@ -844,6 +851,51 @@ export function buildCareer(
           if (effect.gainUsedSkill) gainSkill(skill, roll)
           break
         }
+        case 'fail-graduation':
+          step.notes.push('Fails graduation: this applies only in an education term, so nothing changes here.')
+          break
+        case 'next-career': {
+          if (!term) {
+            step.notes.push('Take the next career this names by hand: it applies only inside a career term.')
+            break
+          }
+          if (effect.career === 'draft') {
+            if (!rules.draft) {
+              step.notes.push('Take the Draft next term by hand: the rules have no Draft table.')
+              break
+            }
+            forcedNext = { kind: 'draft' }
+            term.endReason = 'An event sends the character to the Draft, so this career ends after this term.'
+            step.applied.push('The Draft next term')
+            break
+          }
+          const target = data.careers.find((c) => c.id === effect.career)
+          if (!target) {
+            step.notes.push(`Take the career "${effect.career}" next term by hand: no loaded career pack has it.`)
+            break
+          }
+          if (target.id === career?.id) {
+            step.notes.push(`The character is already in ${target.name}, so this changes nothing.`)
+            break
+          }
+          forcedNext = { kind: 'career', career: target }
+          term.endReason = `An event sends the character to ${target.name}, so this career ends after this term.`
+          step.applied.push(`${target.name} next term`)
+          break
+        }
+        case 'check': {
+          const option = pickOption(`${effectKey}.check-option`, effect.options)
+          const characteristic = CHARACTERISTICS.find((c) => c === option)
+          // A characteristic check uses the characteristic DM; a skill check uses the skill level, or -3 untrained.
+          const dm = characteristic ? characteristicDM(value(characteristic)) : (skills[option] ?? -3)
+          const roll = roll2D(`${effectKey}.check`, `Check: ${option}`, dm, effect.target)
+          roll.reasons.push(`${option} ${effect.target}+, DM ${signedText(dm)} from ${characteristic ? 'the characteristic' : 'the skill level'}.`)
+          termSteps.push(roll)
+          // Each outcome has its own key prefix, so a pick saved under one is never read by the other.
+          const outcome = passed(roll) ? 'pass' : 'fail'
+          applyEffects(outcome === 'pass' ? effect.pass : effect.fail, `${effectKey}.check.${outcome}`, roll, termSteps, term)
+          break
+        }
         case 'keep-benefit':
           // Inside a choice the mishap has already counted the lost benefit roll, so picking this option gives it back.
           restoreMishapTerm(step)
@@ -986,33 +1038,103 @@ export function buildCareer(
     for (let k = 1; ; k += 1) {
       const prefix = k === 1 ? '' : `career-${k}.`
       const exclude = previous ? [previous.id] : []
-      const careerId = choice(`${prefix}start.career`)
-      const named = data.careers.find((c) => c.id === careerId)
-      career = named !== undefined && !exclude.includes(named.id) ? named : undefined
-      if (careerId !== undefined && !named) problems.push(`The saved career "${careerId}" isn't loaded.`)
-      if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
-      const assignmentId = choice(`${prefix}start.assignment`)
-      assignment = career?.assignments.find((a) => a.id === assignmentId)
-      if (career && assignmentId !== undefined && !assignment) {
-        problems.push(`The saved assignment "${assignmentId}" isn't part of ${career.name}.`)
-      }
-      if (!career || !assignment) {
-        if (k === 1) throw new Stop({ kind: 'start', prefix, exclude, failedQualification: false })
-        finished = true
-        nextCareer = { prefix, exclude }
-        break
+      const forced = forcedNext
+      forcedNext = undefined
+
+      /**
+       * Rolls the Draft under this career's prefix and returns the step, the career it names and its
+       * assignment. Stops for a new career pick when that career isn't loaded.
+       */
+      const rollDraft = (draft: NonNullable<Rules['draft']>) => {
+        const { step, row } = tableRoll(`${prefix}draft`, 'Draft', 1, 0, draft)
+        const entered = data.careers.find((c) => c.id === row?.career)
+        step.result = entered?.name ?? row?.career ?? ''
+        if (!entered) {
+          problems.push(`The Draft career "${row?.career ?? ''}" isn't loaded.`)
+          throw new Stop({ kind: 'start', prefix, exclude, failedQualification: true })
+        }
+        return { step, entered, assignmentId: row?.assignment }
       }
 
-      const ageNow = rules.startingAge + terms.length * rules.termLength
-      const previousDM = (rules.qualification?.dmPerPreviousCareer ?? 0) * (k - 1)
-      const eventDM = nextDM.qualification
-      const qualification = qualify(`${prefix}qualification`, k === 1 ? 'Career' : `Career ${k}`, career.qualification, ageNow, eventDM + previousDM)
-      nextDM.qualification = 0
-      if (qualification.dice !== undefined) {
-        if (previousDM !== 0) {
-          qualification.reasons.push(`DM ${signedText(previousDM)} for ${k - 1} earlier career${k === 2 ? '' : 's'}.`)
+      /** Sets `assignment` for `entered`: `assignmentId`, its only assignment, or the player's pick. */
+      const pickAssignment = (entered: CareerDefinition, assignmentId: string | undefined) => {
+        assignment = entered.assignments.find((a) => a.id === assignmentId)
+        if (!assignment && entered.assignments.length === 1) assignment = entered.assignments[0]
+        if (assignment) return
+        const key = `${prefix}assignment`
+        const id = choice(key)
+        assignment = entered.assignments.find((a) => a.id === id)
+        if (assignment) return
+        throw new Stop({
+          kind: 'assignment',
+          key,
+          careerName: entered.name,
+          options: entered.assignments.map((a) => ({ id: a.id, name: a.name })),
+        })
+      }
+
+      let forcedDraft: ReturnType<typeof rollDraft> | undefined
+      let forcedTo = forced
+      if (forcedTo?.kind === 'draft' && rules.draft) {
+        try {
+          forcedDraft = rollDraft(rules.draft)
+          career = forcedDraft.entered
+          assignment = undefined
+        } catch (error) {
+          // The Draft named a career no pack has: rollDraft listed the problem, and the player picks the
+          // next career as usual instead.
+          if (!(error instanceof Stop)) throw error
+          problems.push('An event sent the character to the Draft, but the Draft named a career no pack has, so pick the next career.')
+          forcedTo = undefined
         }
-        if (eventDM !== 0) qualification.reasons.push(`DM ${signedText(eventDM)} from an event.`)
+      }
+      if (forcedTo?.kind === 'career') {
+        career = forcedTo.career
+        assignment = undefined
+      } else if (!forcedTo) {
+        const careerId = choice(`${prefix}start.career`)
+        const named = data.careers.find((c) => c.id === careerId)
+        career = named !== undefined && !exclude.includes(named.id) ? named : undefined
+        if (careerId !== undefined && !named) problems.push(`The saved career "${careerId}" isn't loaded.`)
+        if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
+        const assignmentId = choice(`${prefix}start.assignment`)
+        assignment = career?.assignments.find((a) => a.id === assignmentId)
+        if (career && assignmentId !== undefined && !assignment) {
+          problems.push(`The saved assignment "${assignmentId}" isn't part of ${career.name}.`)
+        }
+        if (!career || !assignment) {
+          if (k === 1) throw new Stop({ kind: 'start', prefix, exclude, failedQualification: false })
+          finished = true
+          nextCareer = { prefix, exclude }
+          break
+        }
+      }
+
+      // Every branch above sets the career or stops; this narrows its type.
+      if (!career) break
+      let qualification: Step
+      if (forcedTo) {
+        const where = forcedTo.kind === 'draft' ? 'the Draft' : career.name
+        qualification = {
+          key: `${prefix}qualification`,
+          label: 'Qualification',
+          result: 'not rolled',
+          applied: [],
+          notes: [],
+          reasons: [`No qualification roll: an event sent the character to ${where}.`],
+        }
+      } else {
+        const ageNow = rules.startingAge + terms.length * rules.termLength
+        const previousDM = (rules.qualification?.dmPerPreviousCareer ?? 0) * (k - 1)
+        const eventDM = nextDM.qualification
+        qualification = qualify(`${prefix}qualification`, k === 1 ? 'Career' : `Career ${k}`, career.qualification, ageNow, eventDM + previousDM)
+        nextDM.qualification = 0
+        if (qualification.dice !== undefined) {
+          if (previousDM !== 0) {
+            qualification.reasons.push(`DM ${signedText(previousDM)} for ${k - 1} earlier career${k === 2 ? '' : 's'}.`)
+          }
+          if (eventDM !== 0) qualification.reasons.push(`DM ${signedText(eventDM)} from an event.`)
+        }
       }
       rs = newRunState()
       const run: CareerRun = {
@@ -1022,14 +1144,22 @@ export function buildCareer(
         applied: career,
         career,
         assignment,
-        entry: 'qualified',
+        entry: forcedDraft ? 'draft' : 'qualified',
+        forced: forcedTo !== undefined,
         qualification,
-        draft: undefined,
+        draft: forcedDraft?.step,
       }
       rs = run
       runs.push(run)
 
-      if (!passed(qualification)) {
+      if (forcedTo) {
+        const entered = career
+        try {
+          pickAssignment(entered, forcedDraft?.assignmentId)
+        } finally {
+          run.assignment = assignment
+        }
+      } else if (!passed(qualification)) {
         const fallback = data.careers.find((c) => c.id === rules.fallbackCareer)
         const draftAllowed = rules.draft !== undefined && !runs.some((r) => r.entry === 'draft')
         if (!fallback && !draftAllowed) throw new Stop({ kind: 'start', prefix, exclude, failedQualification: true })
@@ -1038,16 +1168,11 @@ export function buildCareer(
         let entered: CareerDefinition | undefined
         let assignmentId: string | undefined
         if (picked === 'draft' && draftAllowed && rules.draft) {
-          const { step, row } = tableRoll(`${prefix}draft`, 'Draft', 1, 0, rules.draft)
-          run.draft = step
+          const drafted = rollDraft(rules.draft)
+          run.draft = drafted.step
           run.entry = 'draft'
-          entered = data.careers.find((c) => c.id === row?.career)
-          step.result = entered?.name ?? row?.career ?? ''
-          if (!entered) {
-            problems.push(`The Draft career "${row?.career ?? ''}" isn't loaded.`)
-            throw new Stop({ kind: 'start', prefix, exclude, failedQualification: true })
-          }
-          assignmentId = row?.assignment
+          entered = drafted.entered
+          assignmentId = drafted.assignmentId
         } else if (picked === 'fallback' && fallback) {
           run.entry = 'fallback'
           entered = fallback
@@ -1056,24 +1181,13 @@ export function buildCareer(
         }
         career = entered
         run.career = entered
-        assignment = entered.assignments.find((a) => a.id === assignmentId)
-        if (!assignment && entered.assignments.length === 1) assignment = entered.assignments[0]
-        if (!assignment) {
-          const key = `${prefix}assignment`
-          const id = choice(key)
-          assignment = entered.assignments.find((a) => a.id === id)
-          if (!assignment) {
-            run.assignment = undefined
-            throw new Stop({
-              kind: 'assignment',
-              key,
-              careerName: entered.name,
-              options: entered.assignments.map((a) => ({ id: a.id, name: a.name })),
-            })
-          }
+        try {
+          pickAssignment(entered, assignmentId)
+        } finally {
+          run.assignment = assignment
         }
-        run.assignment = assignment
       }
+      if (!assignment) break
 
       for (let n = 1; ; n += 1) {
         const termKey = `${prefix}term-${n}`

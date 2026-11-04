@@ -637,11 +637,17 @@ function Run({ run, anagathics, input, onChange, onRemoveLast, lastTerm }: RunPr
         <StepRow step={run.qualification} context={context} input={input} onChange={onChange} />
         {run.draft && <StepRow step={run.draft} context={context} input={input} onChange={onChange} />}
       </ul>
-      {run.entry !== 'qualified' && (
+      {run.forced ? (
         <p className="notice small" data-testid="career-entry">
-          Qualification for {run.applied.name} failed.{' '}
-          {run.entry === 'draft' ? `Drafted into ${run.career.name}.` : `Entered ${run.career.name} instead.`}
+          {run.entry === 'draft' ? `An event sent the character to the Draft: drafted into ${run.career.name}.` : `An event sent the character to ${run.career.name}.`}
         </p>
+      ) : (
+        run.entry !== 'qualified' && (
+          <p className="notice small" data-testid="career-entry">
+            Qualification for {run.applied.name} failed.{' '}
+            {run.entry === 'draft' ? `Drafted into ${run.career.name}.` : `Entered ${run.career.name} instead.`}
+          </p>
+        )
       )}
       {run.terms.length > 0 && (
         <ol className="terms">
