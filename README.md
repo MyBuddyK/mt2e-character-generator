@@ -116,6 +116,11 @@ The top level of a pack:
 - Each career has a qualification check, skill tables, assignments with survival and advancement checks and
   ranks, an events table covering 2 to 12, a mishaps table covering 1 to 6, and a mustering-out table
   covering 1 to 7.
+- A career can also set `"entry": "forced"` (not listed at the career pick; only a `next-career` effect or a
+  Draft row sends a character there), `parole` (`dice`, `plus`, `max`: a Parole Threshold rolled in term 1;
+  the career ends only when an advancement total is above it, or by an effect, and a failed survival doesn't
+  end it), `"anagathics": false` and `"assignmentEachTerm": true`. See
+  [`docs/features/prisoner-psion.md`](docs/features/prisoner-psion.md).
 - A skill table entry that is a characteristic name changes that characteristic instead of giving a skill:
   `"DEX"` or `"DEX +1"` adds 1, and `"SOC -1"` subtracts 1. Basic training skips these entries.
 - `effects` lists what the app applies for an entry. The types are `skill`, `roll-table`, `dm-next`,
@@ -130,6 +135,8 @@ The top level of a pack:
   same term. `ship-shares` (`count`) adds ship shares to the character, as does `shipShares` on a
   mustering-out row when it is taken as a benefit. See
   [`docs/features/life-events.md`](docs/features/life-events.md).
+- `parole` (`change`), `parole-reroll` and `parole-lower-dice` (`dice`) change the Parole Threshold of a career
+  with `parole`; elsewhere they are notes.
 - A `check` effect (`options`, `target`, optional `pass` and `fail` effect lists) rolls 2D with one of its
   options: a characteristic name uses that characteristic's DM, and a skill uses its level (-3 untrained).
   `next-career` (`career`, a career id or `"draft"`) ends the career after the term and starts that career, or

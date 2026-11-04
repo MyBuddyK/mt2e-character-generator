@@ -221,7 +221,7 @@ describe('the Draft and the fallback career', () => {
   it('Finish career leaves the fallback and assignment choices to the player', () => {
     const result = build(FAILED, DRAFT_RULES)
     expect(policyChoice({ kind: 'fallback', key: 'fallback', draftAllowed: true, fallback: 'Drift' }, result, 5, SEED)).toBeUndefined()
-    expect(policyChoice({ kind: 'assignment', key: 'assignment', careerName: 'Drift', options: [] }, result, 5, SEED)).toBeUndefined()
+    expect(policyChoice({ kind: 'assignment', key: 'assignment', careerName: 'Drift', options: [], keep: undefined }, result, 5, SEED)).toBeUndefined()
   })
 })
 

@@ -56,8 +56,12 @@ export type PendingChoice =
    * the career named `fallback`, when it is set).
    */
   | { kind: 'fallback'; key: string; draftAllowed: boolean; fallback: string | undefined }
-  /** Pick an assignment id from `options` for a career entered through the Draft or the fallback career. */
-  | { kind: 'assignment'; key: string; careerName: string; options: { id: string; name: string }[] }
+  /**
+   * Pick an assignment id from `options` for a career entered through the Draft, the fallback career or an
+   * event, or at the start of a term in a career with `assignmentEachTerm`. `keep` is the current assignment's
+   * id for the latter (the one Finish career keeps), undefined otherwise.
+   */
+  | { kind: 'assignment'; key: string; careerName: string; options: { id: string; name: string }[]; keep: string | undefined }
   /** "try" rolls for a commission this term; "skip" rolls advancement instead. */
   | { kind: 'commission'; key: string }
   | { kind: 'skill-table'; key: string; options: SkillTableKey[] }
@@ -197,6 +201,8 @@ export interface RunState {
   benefitCount: number
   /** How many terms gave no benefit roll because they ended in a mishap (rules.benefits.mishapLosesTerm). */
   lostBenefitTerms: number
+  /** The current Parole Threshold in a career with `parole`, or undefined before it is rolled and in other careers. */
+  parole: number | undefined
 }
 
 /**
@@ -406,6 +412,7 @@ function newRunState(): RunState {
     extraBenefits: 0,
     benefitCount: 0,
     lostBenefitTerms: 0,
+    parole: undefined,
   }
 }
 
@@ -622,6 +629,21 @@ export function buildCareer(
     const step = check(key, 'Qualification', q, extraDM + ageDM + held.dm)
     if (ageDM !== 0) step.reasons.push(`DM ${signedText(ageDM)} for age ${q.ageDM?.fromAge ?? ageStart} or more.`)
     step.reasons.push(...held.reasons)
+    return step
+  }
+
+  /**
+   * Rolls the current career's Parole Threshold at `key` (its `parole` dice + `plus`, capped at `max`), sets
+   * rs.parole and returns the step. Returns undefined, and changes nothing, for a career without `parole`.
+   */
+  const rollParole = (key: string): Step | undefined => {
+    const p = career?.parole
+    if (!p) return undefined
+    const d = dice(key, p.dice)
+    const raw = current(d) + p.plus
+    rs.parole = Math.min(raw, p.max)
+    const step: Step = { key, label: 'Parole Threshold', dice: d, diceCount: p.dice, dm: p.plus, total: raw, result: String(rs.parole), applied: [], notes: [], reasons: [] }
+    if (raw > p.max) step.reasons.push(`The Parole Threshold is capped at ${p.max}.`)
     return step
   }
 
@@ -959,6 +981,40 @@ export function buildCareer(
           forcedNext = { kind: 'career', career: target }
           term.endReason = `An event sends the character to ${target.name}, so this career ends after this term.`
           step.applied.push(`${target.name} next term`)
+          break
+        }
+        case 'parole':
+        case 'parole-reroll':
+        case 'parole-lower-dice': {
+          const p = career?.parole
+          if (!p || rs.parole === undefined) {
+            step.notes.push('Change the Parole Threshold by hand: the character has no Parole Threshold in this career.')
+            break
+          }
+          if (effect.type === 'parole') {
+            rs.parole = Math.min(p.max, rs.parole + effect.change)
+            step.applied.push(`Parole Threshold ${signedText(effect.change)} (now ${rs.parole})`)
+          } else if (effect.type === 'parole-reroll') {
+            const rolled = rollParole(`${effectKey}.parole`)
+            if (rolled) termSteps.push(rolled)
+            step.applied.push(`Parole Threshold rolled again (now ${rs.parole})`)
+          } else {
+            const d = dice(`${effectKey}.parole`, effect.dice)
+            rs.parole -= current(d)
+            termSteps.push({
+              key: `${effectKey}.parole`,
+              label: 'Parole Threshold',
+              dice: d,
+              diceCount: effect.dice,
+              dm: 0,
+              total: current(d),
+              result: `-${current(d)} (now ${rs.parole})`,
+              applied: [],
+              notes: [],
+              reasons: [],
+            })
+            step.applied.push(`Parole Threshold -${effect.dice}D (now ${rs.parole})`)
+          }
           break
         }
         case 'check': {
@@ -1391,6 +1447,7 @@ export function buildCareer(
           key,
           careerName: entered.name,
           options: entered.assignments.map((a) => ({ id: a.id, name: a.name })),
+          keep: undefined,
         })
       }
 
@@ -1427,9 +1484,10 @@ export function buildCareer(
           problems.push(`The saved education "${educationId}" can't be picked for this term.`)
         }
         const named = careerId?.startsWith('education:') ? undefined : data.careers.find((c) => c.id === careerId)
-        career = named !== undefined && !exclude.includes(named.id) ? named : undefined
+        career = named !== undefined && !exclude.includes(named.id) && named.entry !== 'forced' ? named : undefined
         if (careerId !== undefined && !named && !careerId.startsWith('education:')) problems.push(`The saved career "${careerId}" isn't loaded.`)
-        if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
+        if (named?.entry === 'forced') problems.push(`${named.name} can be entered only when an event sends the character there.`)
+        else if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
         const assignmentId = choice(`${prefix}start.assignment`)
         assignment = career?.assignments.find((a) => a.id === assignmentId)
         if (career && assignmentId !== undefined && !assignment) {
@@ -1539,6 +1597,28 @@ export function buildCareer(
       for (let n = 1; ; n += 1) {
         const termKey = `${prefix}term-${n}`
         const number = terms.length + 1
+        // A career with assignmentEachTerm asks for the assignment at the start of each term after the first.
+        let changedTo: Assignment | undefined
+        if (n > 1 && career.assignmentEachTerm && career.assignments.length > 1) {
+          const key = `${termKey}.assignment`
+          const id = choice(key)
+          changedTo = career.assignments.find((a) => a.id === id)
+          if (!changedTo) {
+            throw new Stop({
+              kind: 'assignment',
+              key,
+              careerName: career.name,
+              options: career.assignments.map((a) => ({ id: a.id, name: a.name })),
+              keep: assignment.id,
+            })
+          }
+          assignment = changedTo
+          run.assignment = changedTo
+          if (rs.officerRank === undefined) {
+            const held = rs.rank
+            rs.title = [...changedTo.ranks].filter((r) => r.rank <= held && r.title !== undefined).sort((a, b) => b.rank - a.rank)[0]?.title
+          }
+        }
         const ageStart = rules.startingAge + (number - 1) * rules.termLength
         const term: TermResult = {
           key: termKey,
@@ -1559,6 +1639,9 @@ export function buildCareer(
         terms.push(term)
         rs.terms.push(term)
         const steps = term.steps
+        if (changedTo) {
+          steps.push({ key: `${termKey}.assignment`, label: 'Assignment', result: changedTo.name, applied: [], notes: [], reasons: [] })
+        }
 
         if (n === 1) {
           const trainingTable: SkillTableKey = career.basicTraining === 'assignment' ? 'assignment' : rules.basicTraining.table
@@ -1588,12 +1671,15 @@ export function buildCareer(
             }
           }
           reachRank(0, steps, term, `${termKey}.rank-0`)
+          const parole = rollParole(`${termKey}.parole`)
+          if (parole) steps.push(parole)
           if (bonus) skipCommission = educationStart(bonus, career, steps, term, termKey)
         }
 
         const drugs = rules.anagathics
         if (drugs) {
-          if (choice(`${termKey}.anagathics`) === 'take') {
+          // A career with anagathics: false offers none; a character on them in the term before stops.
+          if (career.anagathics !== false && choice(`${termKey}.anagathics`) === 'take') {
             if (wasOnAnagathics) term.anagathics = true
             else {
               const start = check(`${termKey}.anagathics`, 'Anagathics', { characteristic: drugs.characteristic, target: drugs.target }, 0)
@@ -1643,7 +1729,8 @@ export function buildCareer(
           const { step, row } = tableRoll(`${termKey}.event`, 'Event', 2, 0, career.events)
           showRow(step, row, `${termKey}.event`, steps, term)
         } else {
-          mishap(`${termKey}.mishap`, steps, term, true)
+          // In a career with parole a failed survival doesn't end the career.
+          mishap(`${termKey}.mishap`, steps, term, career.parole === undefined)
         }
 
         let commissioned = false
@@ -1679,6 +1766,8 @@ export function buildCareer(
           }
         }
 
+        /** The advancement total this term, or undefined when no advancement roll was made. */
+        let advancementTotal: number | undefined
         if (survived && !commissioned) {
           const advancementKey = `${termKey}.advancement`
           let advancement: Step
@@ -1691,10 +1780,13 @@ export function buildCareer(
             const adv = rules.advancement
             const natural = advancement.dice === undefined ? 0 : current(advancement.dice)
             const total = advancement.total ?? 0
-            if (adv?.stayOnNatural !== undefined && natural >= adv.stayOnNatural && term.endReason === undefined) {
+            advancementTotal = total
+            // A career with parole ends only by the Parole Threshold or an effect (see below), so these rules skip it.
+            const usual = career.parole === undefined
+            if (usual && adv?.stayOnNatural !== undefined && natural >= adv.stayOnNatural && term.endReason === undefined) {
               term.stayReason = `Natural ${natural} on advancement: you must continue in this career.`
               advancement.reasons.push(term.stayReason)
-            } else if (adv?.leaveAtOrBelowTerms && total <= n && term.endReason === undefined) {
+            } else if (usual && adv?.leaveAtOrBelowTerms && total <= n && term.endReason === undefined) {
               term.endReason = `Advancement ${total} is at or below ${n} term${n === 1 ? '' : 's'} served, so this career ends after this term.`
               advancement.reasons.push(term.endReason)
             }
@@ -1709,6 +1801,22 @@ export function buildCareer(
             }
             for (let i = 0; i < rules.skillRolls.onAdvancement; i += 1) skillRoll(`${termKey}.advancement-skill-${i}`, steps)
           }
+        }
+
+        if (career.parole !== undefined && term.endReason === undefined) {
+          const threshold = rs.parole ?? 0
+          const ends = advancementTotal !== undefined && advancementTotal > threshold
+          const reason =
+            advancementTotal === undefined
+              ? survived
+                ? 'There was no advancement roll this term, so the character must continue.'
+                : 'Survival failed, so there is no advancement roll this term and the character must continue.'
+              : ends
+                ? `Advancement ${advancementTotal} is above the Parole Threshold ${threshold}, so the sentence ends after this term.`
+                : `Advancement ${advancementTotal} is not above the Parole Threshold ${threshold}, so the character must continue.`
+          if (ends) term.endReason = reason
+          else term.stayReason = reason
+          steps.find((st) => st.key === `${termKey}.advancement`)?.reasons.push(reason)
         }
 
         if (number >= rules.aging.fromTerm) {

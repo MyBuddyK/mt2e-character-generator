@@ -573,7 +573,7 @@ interface StartFormProps {
 function StartForm({ careers, education, prefix, exclude, input, onChange }: StartFormProps) {
   const [pickedCareer, setPickedCareer] = useState('')
   const [pickedAssignment, setPickedAssignment] = useState('')
-  const offered = careers.filter((c) => !exclude.includes(c.id))
+  const offered = careers.filter((c) => !exclude.includes(c.id) && c.entry !== 'forced')
   const school = education.find((e) => `education:${e.id}` === pickedCareer)
   const selected = school ? undefined : (offered.find((c) => c.id === pickedCareer) ?? offered[0])
   const assignment = selected?.assignments.find((a) => a.id === pickedAssignment) ?? selected?.assignments[0]

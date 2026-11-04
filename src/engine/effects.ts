@@ -59,6 +59,9 @@ export type RollKind = (typeof ROLL_KINDS)[number]
  *   before. It is a note when the career id is not loaded or is the current career, when "draft" has no
  *   Draft table in the rules, or when it is applied outside a career term. When the Draft names a career
  *   that is not loaded, the player picks the next career as usual.
+ * - `parole`: add `change` (which may be negative) to the Parole Threshold of a career with `parole`, capped
+ *   at the career's `parole.max`. `parole-reroll` rolls the threshold again with the career's `parole` dice;
+ *   `parole-lower-dice` lowers it by `dice`D. Outside a career with `parole` each is a note.
  * - `check`: a 2D roll with one of `options` against `target`. An option that is a characteristic name in
  *   capitals (STR, DEX, END, INT, EDU or SOC) uses that characteristic's DM; a characteristic name in any
  *   other case fails the schema. Any other option is a skill, with its level as the DM (-3 untrained). With
@@ -109,6 +112,9 @@ const BASIC_EFFECTS = [
   }),
   z.strictObject({ type: z.literal('fail-graduation') }),
   z.strictObject({ type: z.literal('next-career'), career: nonEmpty }),
+  z.strictObject({ type: z.literal('parole'), change: z.int() }),
+  z.strictObject({ type: z.literal('parole-reroll') }),
+  z.strictObject({ type: z.literal('parole-lower-dice'), dice: z.int().min(1).max(3) }),
 ] as const
 
 /** One effect other than `check` and `choice`: the effects a `check` can apply on a pass or a fail. */
