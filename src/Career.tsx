@@ -7,6 +7,7 @@ import type { Rules } from './engine/rules-schema'
 import { current } from './engine/overridable'
 import { POLICY_SUMMARY } from './engine/policy'
 import {
+  canPick,
   laterRollsText,
   skillTableName,
   stepOverridden,
@@ -573,7 +574,7 @@ interface StartFormProps {
 function StartForm({ careers, education, prefix, exclude, input, onChange }: StartFormProps) {
   const [pickedCareer, setPickedCareer] = useState('')
   const [pickedAssignment, setPickedAssignment] = useState('')
-  const offered = careers.filter((c) => !exclude.includes(c.id) && c.entry !== 'forced')
+  const offered = careers.filter((c) => canPick(c, exclude))
   const school = education.find((e) => `education:${e.id}` === pickedCareer)
   const selected = school ? undefined : (offered.find((c) => c.id === pickedCareer) ?? offered[0])
   const assignment = selected?.assignments.find((a) => a.id === pickedAssignment) ?? selected?.assignments[0]
@@ -760,7 +761,7 @@ function Run({ run, anagathics, input, onChange, onRemoveLast, lastTerm }: RunPr
             <Term
               key={t.number}
               term={t}
-              anagathics={anagathics}
+              anagathics={run.career.anagathics === false ? undefined : anagathics}
               input={input}
               onChange={onChange}
               onRemove={t.number === lastTerm ? onRemoveLast : undefined}

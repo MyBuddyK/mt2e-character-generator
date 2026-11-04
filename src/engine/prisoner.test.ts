@@ -114,8 +114,10 @@ describe('Parole Threshold', () => {
     expect(step(capped, 'career-2.term-1.parole').reasons).toEqual(['The Parole Threshold is capped at 5.'])
   })
 
-  // Sets event 7 to parole +3 with a threshold of 11 (dice 9, capped at 12), then to parole-reroll (dice
-  // 5) and to parole-lower-dice 1 (dice 3), and expects 12, 7 and 1.
+  // With a threshold of 8 (dice 6), sets event 7 to parole +3 and expects 11, then to parole +9 and expects
+  // 12 (the cap). With a threshold of 4, sets it to parole-reroll (dice 5) and expects 7 on a step labelled
+  // "Parole Threshold (rolled again)", then to parole-lower-dice 1 (dice 3) and expects 1 on a step labelled
+  // "Parole Threshold (lowered)".
   // Criteria: PP-4.
   it('the parole effects change the threshold', () => {
     const raise = build(SENT, { ...SENT_ROLLS, 'career-2.term-1.parole': 6 }, data(holdingWithEvent7([{ type: 'parole', change: 3 }])))
@@ -128,6 +130,7 @@ describe('Parole Threshold', () => {
       data(holdingWithEvent7([{ type: 'parole-reroll' }])),
     )
     expect(step(reroll, 'career-2.term-1.event.effect-0.parole').result).toBe('7')
+    expect(step(reroll, 'career-2.term-1.event.effect-0.parole').label).toBe('Parole Threshold (rolled again)')
     expect(reroll.runs[1]?.parole).toBe(7)
     const lower = build(
       SENT,
@@ -135,6 +138,7 @@ describe('Parole Threshold', () => {
       data(holdingWithEvent7([{ type: 'parole-lower-dice', dice: 1 }])),
     )
     expect(step(lower, 'career-2.term-1.event').applied).toEqual(['Parole Threshold -1D (now 1)'])
+    expect(step(lower, 'career-2.term-1.event.effect-0.parole').label).toBe('Parole Threshold (lowered)')
     expect(lower.runs[1]?.parole).toBe(1)
   })
 
@@ -188,6 +192,23 @@ describe('leaving a career with parole', () => {
   it('a leave-career effect ends a career with parole', () => {
     const result = build(SENT, { ...SENT_ROLLS, 'career-2.term-1.advancement': 2 }, data(holdingWithEvent7([{ type: 'leave-career' }])))
     expect(result.pending).toMatchObject({ kind: 'next', forced: 'muster', reason: 'An event ends the career after this term.' })
+  })
+
+  // Sets event 7 to promote, and expects an automatic advancement and a separate parole check: dice of 12
+  // force muster out with the reason on the parole check, and dice of 2 force continue.
+  // Criteria: PP-12.
+  it('an automatic promotion still rolls against the Parole Threshold', () => {
+    const d = data(holdingWithEvent7([{ type: 'promote' }]))
+    const choices = { ...SENT, 'career-2.term-1.advancement-skill-0.table': 'serviceSkills' }
+    const out = build(choices, { ...SENT_ROLLS, 'career-2.term-1.parole-check': 12 }, d)
+    expect(step(out, 'career-2.term-1.advancement').dice).toBeUndefined()
+    expect(step(out, 'career-2.term-1.advancement').reasons).toEqual(['Automatic promotion from an event this term.'])
+    const check = step(out, 'career-2.term-1.parole-check')
+    expect(check.label).toBe('Advancement (parole)')
+    expect(check.reasons).toContain('Advancement 12 is above the Parole Threshold 4, so the sentence ends after this term.')
+    expect(out.pending).toMatchObject({ kind: 'next', forced: 'muster' })
+    const stay = build(choices, { ...SENT_ROLLS, 'career-2.term-1.parole-check': 2 }, d)
+    expect(stay.pending).toMatchObject({ kind: 'next', forced: 'continue' })
   })
 })
 

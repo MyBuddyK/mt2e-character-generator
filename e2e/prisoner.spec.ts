@@ -13,11 +13,12 @@ test.describe('Prisoner career rules', () => {
     await expect(pick.locator('option', { hasText: 'Holding career' })).toHaveCount(0)
   })
 
-  // Plays the Sending career's roll 8 event into the Holding career, picks the Cellblock, sets the Parole
+  // Plays the Sending career's roll 8 event into the Holding career, picks the Cellblock, and expects the
+  // pack's anagathics offered in the Sending career's term but not in the Holding career's. Sets the Parole
   // Threshold dice to 2 (a threshold of 4) and advancement dice to 5 (a total of 4 with this seed's STR DM of
   // -1), and expects the Parole Threshold step and a forced continue; then dice of 12 (a total of 11), and
   // expects a forced muster out.
-  // Criteria: PP-2, PP-6.
+  // Criteria: PP-2, PP-6, PP-13.
   test('the Parole Threshold decides when the Holding career ends', async ({ page }) => {
     await page.goto('./?seed=terms')
     await page.getByLabel('Import from file').setInputFiles('e2e/fixtures/prisoner-pack.json')
@@ -31,6 +32,8 @@ test.describe('Prisoner career rules', () => {
     await page.getByRole('button', { name: 'Benefit', exact: true }).click()
     await page.getByRole('button', { name: 'Cellblock' }).click()
     await expect(page.getByTestId('career-run-2').getByTestId('career-entry')).toHaveText('An event sent the character to Holding career.')
+    await expect(page.getByRole('checkbox', { name: 'Anagathics in term 1' })).toHaveCount(1)
+    await expect(page.getByRole('checkbox', { name: 'Anagathics in term 2' })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Athletics' }).click()
     await page.getByLabel('Term 2 Parole Threshold dice').fill('2')

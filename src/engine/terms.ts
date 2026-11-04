@@ -636,23 +636,34 @@ export function buildCareer(
    * Rolls the current career's Parole Threshold at `key` (its `parole` dice + `plus`, capped at `max`), sets
    * rs.parole and returns the step. Returns undefined, and changes nothing, for a career without `parole`.
    */
-  const rollParole = (key: string): Step | undefined => {
+  const rollParole = (key: string, label = 'Parole Threshold'): Step | undefined => {
     const p = career?.parole
     if (!p) return undefined
-    const d = dice(key, p.dice)
-    const raw = current(d) + p.plus
+    const step = diceStep(key, label, p.dice, p.plus)
+    const raw = step.total ?? 0
     rs.parole = Math.min(raw, p.max)
-    const step: Step = { key, label: 'Parole Threshold', dice: d, diceCount: p.dice, dm: p.plus, total: raw, result: String(rs.parole), applied: [], notes: [], reasons: [] }
+    step.result = String(rs.parole)
     if (raw > p.max) step.reasons.push(`The Parole Threshold is capped at ${p.max}.`)
     return step
   }
 
+  /**
+   * Rolls `count` dice + `dm` at `key` with no target and returns the step labelled `label`, with its total
+   * as the result; the caller may replace the result.
+   */
+  const diceStep = (key: string, label: string, count: number, dm: number): Step => {
+    const d = dice(key, count)
+    const total = current(d) + dm
+    return { key, label, dice: d, diceCount: count, dm, total, result: String(total), applied: [], notes: [], reasons: [] }
+  }
+
   /** Rolls `count` dice for a cost of `count` D × `perDie` credits, adds it to `costs`, and returns the step. */
   const costRoll = (key: string, label: string, count: number, perDie: number): Step => {
-    const d = dice(key, count)
-    const amount = current(d) * perDie
+    const step = diceStep(key, label, count, 0)
+    const amount = (step.total ?? 0) * perDie
     costs += amount
-    return { key, label, dice: d, diceCount: count, dm: 0, total: current(d), result: `Cr${amount}`, applied: [], notes: [], reasons: [] }
+    step.result = `Cr${amount}`
+    return step
   }
 
   /** Rolls `count` dice + `dm` on a table, using the nearest row when the total is outside it. */
@@ -995,24 +1006,15 @@ export function buildCareer(
             rs.parole = Math.min(p.max, rs.parole + effect.change)
             step.applied.push(`Parole Threshold ${signedText(effect.change)} (now ${rs.parole})`)
           } else if (effect.type === 'parole-reroll') {
-            const rolled = rollParole(`${effectKey}.parole`)
+            const rolled = rollParole(`${effectKey}.parole`, 'Parole Threshold (rolled again)')
             if (rolled) termSteps.push(rolled)
             step.applied.push(`Parole Threshold rolled again (now ${rs.parole})`)
           } else {
-            const d = dice(`${effectKey}.parole`, effect.dice)
-            rs.parole -= current(d)
-            termSteps.push({
-              key: `${effectKey}.parole`,
-              label: 'Parole Threshold',
-              dice: d,
-              diceCount: effect.dice,
-              dm: 0,
-              total: current(d),
-              result: `-${current(d)} (now ${rs.parole})`,
-              applied: [],
-              notes: [],
-              reasons: [],
-            })
+            const lowered = diceStep(`${effectKey}.parole`, 'Parole Threshold (lowered)', effect.dice, 0)
+            const by = lowered.total ?? 0
+            rs.parole -= by
+            lowered.result = `-${by} (now ${rs.parole})`
+            termSteps.push(lowered)
             step.applied.push(`Parole Threshold -${effect.dice}D (now ${rs.parole})`)
           }
           break
@@ -1484,7 +1486,7 @@ export function buildCareer(
           problems.push(`The saved education "${educationId}" can't be picked for this term.`)
         }
         const named = careerId?.startsWith('education:') ? undefined : data.careers.find((c) => c.id === careerId)
-        career = named !== undefined && !exclude.includes(named.id) && named.entry !== 'forced' ? named : undefined
+        career = named !== undefined && canPick(named, exclude) ? named : undefined
         if (careerId !== undefined && !named && !careerId.startsWith('education:')) problems.push(`The saved career "${careerId}" isn't loaded.`)
         if (named?.entry === 'forced') problems.push(`${named.name} can be entered only when an event sends the character there.`)
         else if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
@@ -1805,18 +1807,26 @@ export function buildCareer(
 
         if (career.parole !== undefined && term.endReason === undefined) {
           const threshold = rs.parole ?? 0
+          // An automatic promotion or a commission has no advancement total, so the parole check is its own roll
+          // with the assignment's advancement check.
+          let paroleStepKey = `${termKey}.advancement`
+          if (survived && advancementTotal === undefined) {
+            paroleStepKey = `${termKey}.parole-check`
+            const roll = check(paroleStepKey, 'Advancement (parole)', assignment.advancement, 0)
+            roll.reasons.push('No advancement roll was made this term, so this roll is compared with the Parole Threshold.')
+            steps.push(roll)
+            advancementTotal = roll.total
+          }
           const ends = advancementTotal !== undefined && advancementTotal > threshold
           const reason =
             advancementTotal === undefined
-              ? survived
-                ? 'There was no advancement roll this term, so the character must continue.'
-                : 'Survival failed, so there is no advancement roll this term and the character must continue.'
+              ? 'Survival failed, so there is no advancement roll this term and the character must continue.'
               : ends
                 ? `Advancement ${advancementTotal} is above the Parole Threshold ${threshold}, so the sentence ends after this term.`
                 : `Advancement ${advancementTotal} is not above the Parole Threshold ${threshold}, so the character must continue.`
           if (ends) term.endReason = reason
           else term.stayReason = reason
-          steps.find((st) => st.key === `${termKey}.advancement`)?.reasons.push(reason)
+          steps.find((st) => st.key === paroleStepKey)?.reasons.push(reason)
         }
 
         if (number >= rules.aging.fromTerm) {
@@ -1937,6 +1947,14 @@ export function buildCareer(
     usedKeys,
     problems,
   }
+}
+
+/**
+ * Returns whether the career pick can offer `career`: false for a career in `exclude` (the career just left)
+ * and for a forced-entry career (`entry: "forced"`), which only an event can send a character to.
+ */
+export function canPick(career: CareerDefinition, exclude: string[]): boolean {
+  return !exclude.includes(career.id) && career.entry !== 'forced'
 }
 
 /** Returns `n` as text with its sign: "+1", "-2", "+0". */

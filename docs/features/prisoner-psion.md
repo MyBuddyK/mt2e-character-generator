@@ -29,7 +29,10 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
 - **Parole step**: labelled "Parole Threshold", with the dice, the added value and the result, and the cap as a
   reason when it applies.
 - **Parole effects**: the step that gave the effect lists "Parole Threshold +2 (now 7)" or similar. Rolling
-  again or lowering by dice adds its own "Parole Threshold" roll step.
+  again adds a "Parole Threshold (rolled again)" roll step, and lowering by dice a "Parole Threshold
+  (lowered)" step.
+- **Parole check**: after an automatic promotion or a commission, an "Advancement (parole)" roll.
+- **Anagathics**: a career with `anagathics: false` shows no Anagathics box on its terms.
 - **After the term**: the forced choice gives the reason: "Advancement 9 is above the Parole Threshold 7, so
   the sentence ends after this term." or "Advancement 5 is not above the Parole Threshold 7, so the character
   must continue." After a failed survival: "Survival failed, so there is no advancement roll this term and the
@@ -49,18 +52,20 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
    total above the Parole Threshold forces muster out; any other total forces continue. The natural-roll
    stay rule and the leave-at-or-below-terms rule in `rules.advancement` don't apply, and neither does the term
    limit Finish career uses. A `leave-career` or `next-career` effect still ends the career after the term.
-   Promotion still uses the assignment's advancement target.
+   Promotion still uses the assignment's advancement target. A term with an automatic promotion (`promote`)
+   or a commission has no advancement total, so it rolls the assignment's advancement check once more, at
+   `<term>.parole-check`, only to compare with the Parole Threshold.
 4. **A failed survival in a parole career doesn't end it.** The mishap is rolled as "Mishap (keeps the job)",
    the term keeps its benefit roll, there is no event and no advancement roll, and the character must
    continue.
 5. **Three parole effects.** `parole` (`change`, a whole number) adds to the threshold; `parole-reroll` rolls
    it again with the career's `parole` dice; `parole-lower-dice` (`dice`, 1 to 3) lowers it by that many D.
    Each result is capped at `max`; there is no lower limit. Outside a career with `parole` each is a note.
-6. **`anagathics: false` offers no anagathics in that career.** A character who took anagathics in the term
+6. **`anagathics: false` offers no anagathics in that career**, and its terms show no Anagathics box. A character who took anagathics in the term
    before stops, with the aging roll that stopping gives.
 7. **`assignmentEachTerm: true` asks for the assignment each term after the first**, at
-   `<term-n>.assignment`. The rank is kept; the title is the new assignment's title for that rank. Finish
-   career keeps the current assignment.
+   `<term-n>.assignment`. The rank is kept; the title is the new assignment's title of the highest rank at or
+   below it that has one, or none. Finish career keeps the current assignment.
 8. **Not covered**: a DM on every later survival roll in the career (the gang event) and the lawyer's cost.
    The pack keeps these in the entry's summary, for the player to apply by hand.
 
@@ -74,13 +79,15 @@ no roll, and basic training from the assignment table. Its criteria are added wh
 
 - `src/engine/career-schema.ts`: `entry`, `parole`, `anagathics` and `assignmentEachTerm` on `CareerSchema`.
 - `src/engine/effects.ts`: the `parole`, `parole-reroll` and `parole-lower-dice` effects.
-- `src/engine/terms.ts`: the career pick check, the parole roll, the parole effects, the end-of-term rule,
+- `src/engine/terms.ts`: `canPick`, the rule the engine and the career pick share for which careers can be
+  picked; the career pick check, the parole roll, the parole effects, the end-of-term rule,
   survival in a parole career, anagathics, and the assignment each term. `CareerRun.parole` holds the current
   Parole Threshold. The `assignment` pending choice has `keep`, the assignment Finish career keeps.
 - `src/engine/policy.ts`: Finish career answers an `assignment` choice that has `keep`.
-- `src/Career.tsx`: the career pick leaves out forced careers.
+- `src/Career.tsx`: the career pick leaves out forced careers (with `canPick`), and a career with
+  `anagathics: false` shows no Anagathics box.
 - `e2e/fixtures/prisoner-pack.json`: an invented career whose roll 8 event sends the character to an invented
-  prison career.
+  prison career, and the sample rules with invented anagathics values.
 
 ## Acceptance criteria
 
@@ -102,3 +109,7 @@ no roll, and basic training from the assignment table. Its criteria are added wh
 - [x] **PP-10** With `assignmentEachTerm`, each term after the first asks for the assignment, keeps the rank,
       and adds an Assignment step; Finish career keeps the current assignment. (Unit test.)
 - [x] **PP-11** Finish career in a parole career continues until the Parole Threshold is beaten. (Unit test.)
+- [x] **PP-12** In a career with `parole`, a term with an automatic promotion rolls an Advancement (parole)
+      check, and its total against the Parole Threshold ends or continues the career. (Unit test.)
+- [x] **PP-13** A career with `anagathics: false` shows no Anagathics box on its terms, while a career before it
+      does.
