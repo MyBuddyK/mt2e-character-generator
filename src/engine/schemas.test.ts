@@ -171,7 +171,7 @@ describe('career pack details', () => {
 
   // Parses packs that fail on format, version and type and expects each to list no problems.
   it('a rejected pack lists no per-career problems', () => {
-    for (const data of [[], { ...validPack, format: 'x' }, { ...validPack, formatVersion: 3 }]) {
+    for (const data of [[], { ...validPack, format: 'x' }, { ...validPack, formatVersion: 4 }]) {
       const result = parseCareerPack(data)
       expect(result.ok).toBe(false)
       expect(result.problems).toEqual([])

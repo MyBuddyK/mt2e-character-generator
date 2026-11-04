@@ -28,7 +28,7 @@ describe('validate-pack', () => {
   // Runs it on the later-version fixture and expects exit code 1 and the supported version message.
   it('exits 1 for a pack it rejects', () => {
     const { status, output } = validate('e2e/fixtures/later-version-pack.json')
-    expect(output).toContain('this app supports versions 1 and 2')
+    expect(output).toContain('this app supports versions 1, 2 and 3')
     expect(status).toBe(1)
   })
 })

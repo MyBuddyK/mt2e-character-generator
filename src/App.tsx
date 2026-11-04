@@ -17,6 +17,9 @@ import { Career } from './Career'
 import { useCareerPacks } from './use-career-packs'
 import { FAIR_USE_DISCLAIMER } from './legal'
 import { SeedBar } from './SeedBar'
+import { HUMAN, applySpecies, dropMatchingOverrides, speciesBase, speciesModifier } from './engine/species'
+import { browserStorage } from './storage/career-packs'
+import { readSavedSpecies, writeSavedSpecies } from './storage/species'
 
 /** Returns the trimmed ?seed= value from the page URL, or a new random seed when it is missing or empty. */
 function initialSeed(): string {
@@ -54,7 +57,12 @@ function formatDM(dm: number): string {
 
 interface CharacteristicRowProps {
   name: Characteristic
+  /** The characteristic after applySpecies: `rolled` is the modified value. */
   entry: Overridable<number>
+  /** The dice total. */
+  dice: number
+  /** The species modifier, or undefined when the Species column is hidden. */
+  modifier: number | undefined
   onOverride: (value: number | undefined) => void
 }
 
@@ -63,8 +71,9 @@ interface CharacteristicRowProps {
  * clear it and type a new number. Each in-range whole number typed is applied straight away. When the
  * field loses focus or Enter is pressed, any other number is applied after rounding and clamping, and
  * empty or non-numeric text is replaced by the current value. The Reset button removes the override.
+ * The Roll cell shows the dice total, and a Species cell shows the modifier when `modifier` is set.
  */
-function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) {
+function CharacteristicRow({ name, entry, dice, modifier, onOverride }: CharacteristicRowProps) {
   const value = current(entry)
   const overridden = isOverridden(entry)
   const [draft, setDraft] = useState(String(value))
@@ -89,7 +98,8 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
   return (
     <tr data-testid={`char-${name}`} className={overridden ? 'overridden' : undefined}>
       <th scope="row">{name}</th>
-      <td>{entry.rolled}</td>
+      <td>{dice}</td>
+      {modifier !== undefined && <td data-testid={`species-mod-${name}`}>{formatDM(modifier)}</td>}
       <td>
         <input
           type="number"
@@ -123,7 +133,7 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
             <button
               type="button"
               className="secondary"
-              aria-label={`Reset ${name} to rolled value`}
+              aria-label={modifier === undefined || modifier === 0 ? `Reset ${name} to rolled value` : `Reset ${name} to modified value`}
               onClick={() => onOverride(undefined)}
             >
               Reset
@@ -142,26 +152,49 @@ function CharacteristicRow({ name, entry, onOverride }: CharacteristicRowProps) 
  * random seed and roll a new character, as opening the page without a ?seed= value does; career input
  * saved for the old seed stays saved. When the page was opened with a ?packs= value that differs from the loaded packs, a
  * notice lists both and the address bar keeps the link's ?packs= value until they match; rolling
- * still works.
+ * still works. The Species select applies the picked species' modifiers to the characteristics shown
+ * and passed to the Career section; the species is saved per seed, and Reroll and Clear seed keep it.
  */
 export default function App() {
   const [character, setCharacter] = useState<Character>(() => newCharacter(initialSeed()))
   const [expectedPacks] = useState(initialPacksParam)
+  const [storage] = useState(() => browserStorage())
+  const [picked, setPicked] = useState(() => ({ seed: character.seed, id: readSavedSpecies(storage, character.seed) }))
   const packs = useCareerPacks(bundledCareers)
-  // Reroll and Clear seed both start a new character from a new random seed.
-  const rollNewCharacter = useCallback(() => setCharacter(newCharacter(randomSeed())), [])
+  let speciesId = picked.id
+  // A new seed reads the species saved for it.
+  if (picked.seed !== character.seed) {
+    speciesId = readSavedSpecies(storage, character.seed)
+    setPicked({ seed: character.seed, id: speciesId })
+  }
+  const found = packs.species.find((s) => s.id === speciesId)
+  const species = found ?? HUMAN
+  const missingSpecies = found === undefined ? speciesId : undefined
+  const showModifiers = CHARACTERISTICS.some((key) => speciesModifier(species, key) !== 0)
+  const [speciesSaveFailed, setSpeciesSaveFailed] = useState(false)
+  // When the species in use changes (a pick, or a pack that defines the saved species loading), overrides
+  // equal to the new modified values are removed, so no override is kept that the table doesn't show.
+  const [overridesSpecies, setOverridesSpecies] = useState(species.id)
+  if (overridesSpecies !== species.id) {
+    setOverridesSpecies(species.id)
+    setCharacter((c) => ({ ...c, characteristics: dropMatchingOverrides(c.characteristics, species) }))
+  }
+  const pickSpecies = (id: string) => {
+    setSpeciesSaveFailed(writeSavedSpecies(storage, character.seed, id) === 'failed')
+    setPicked({ seed: character.seed, id })
+  }
+  // Reroll and Clear seed both start a new character from a new random seed, keeping the species in use.
+  // A saved species that no loaded pack defines is not carried, since the character is shown as Human.
+  const speciesInUse = species.id
+  const rollNewCharacter = useCallback(() => {
+    const seed = randomSeed()
+    setSpeciesSaveFailed(writeSavedSpecies(storage, seed, speciesInUse) === 'failed')
+    setPicked({ seed, id: speciesInUse })
+    setCharacter(newCharacter(seed))
+  }, [storage, speciesInUse])
   const showingSample = packs.entries.length === 0
-  const base = useMemo(
-    () => ({
-      STR: current(character.characteristics.STR),
-      DEX: current(character.characteristics.DEX),
-      END: current(character.characteristics.END),
-      INT: current(character.characteristics.INT),
-      EDU: current(character.characteristics.EDU),
-      SOC: current(character.characteristics.SOC),
-    }),
-    [character.characteristics],
-  )
+  const shown = useMemo(() => applySpecies(character.characteristics, species), [character.characteristics, species])
+  const base = useMemo(() => speciesBase(character.characteristics, species), [character.characteristics, species])
 
   const mismatch = expectedPacks !== undefined && expectedPacks !== packs.packsParam
   // While the loaded packs differ from the link's ?packs=, the link's value stays in the address bar,
@@ -214,8 +247,30 @@ export default function App() {
               Reroll
             </button>
           </div>
+          <label className="species-pick">
+            Species
+            <select value={speciesId} onChange={(e) => pickSpecies(e.target.value)}>
+              {packs.species.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              {missingSpecies !== undefined && <option value={missingSpecies}>{missingSpecies} (not loaded)</option>}
+            </select>
+          </label>
+          {speciesSaveFailed && (
+            <p className="notice small" data-testid="species-save-failed">
+              The species could not be saved in this browser. It stays until the page closes.
+            </p>
+          )}
+          {missingSpecies !== undefined && (
+            <p className="notice" data-testid="missing-species">
+              The species "{missingSpecies}" saved for this seed is not in any loaded career pack. The character is
+              shown as Human until a pack that defines it is loaded.
+            </p>
+          )}
           <p aria-live="polite">
-            UPP <strong data-testid="upp">{upp(character.characteristics)}</strong>
+            UPP <strong data-testid="upp">{upp(shown)}</strong>
           </p>
           <div className="table-wrap">
             <table>
@@ -225,6 +280,7 @@ export default function App() {
                     <abbr title="Characteristic">Char</abbr>
                   </th>
                   <th scope="col">Roll</th>
+                  {showModifiers && <th scope="col">Species</th>}
                   <th scope="col">Value</th>
                   <th scope="col">DM</th>
                   <th scope="col">
@@ -237,13 +293,28 @@ export default function App() {
                   <CharacteristicRow
                     key={`${character.seed}-${key}`}
                     name={key}
-                    entry={character.characteristics[key]}
-                    onOverride={(value) => setCharacter((c) => overrideCharacteristic(c, key, value))}
+                    entry={shown[key]}
+                    dice={character.characteristics[key].rolled}
+                    modifier={showModifiers ? speciesModifier(species, key) : undefined}
+                    onOverride={(value) => setCharacter((c) => overrideCharacteristic(c, key, value, species))}
                   />
                 ))}
               </tbody>
             </table>
           </div>
+          {species.traits.length > 0 && (
+            <div data-testid="species-traits">
+              <h3>{species.name} traits</h3>
+              <ul>
+                {species.traits.map((t) => (
+                  <li key={t.name}>
+                    <strong>{t.name}:</strong> {t.summary}
+                  </li>
+                ))}
+              </ul>
+              <p className="muted">Source: {species.source}</p>
+            </div>
+          )}
         </section>
 
         <Career

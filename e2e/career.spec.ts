@@ -410,6 +410,20 @@ test.describe('aging and anagathics', () => {
     await expect(tip).toHaveCount(0)
   })
 
+  // Moves the mouse over the info button and waits for the tooltip, then clicks the button and expects the
+  // tooltip still shown; a second click hides it. A click on a tip shown by hover pins it.
+  test('a click on the anagathics tip shown by hover keeps it shown', async ({ page }) => {
+    await startWanderer(page)
+    const button = page.getByTestId('term-1').getByRole('button', { name: 'About anagathics' })
+    const tip = page.getByRole('tooltip')
+    await button.hover()
+    await expect(tip).toBeVisible()
+    await button.click()
+    await expect(tip).toBeVisible()
+    await button.click()
+    await expect(tip).toHaveCount(0)
+  })
+
   // Clicks the info button to show the tooltip, clicks it again and expects it hidden; shows it again,
   // clicks the term heading, and expects it hidden.
   test('a second click or a click elsewhere hides the anagathics tooltip', async ({ page }) => {
