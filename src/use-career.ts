@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Characteristic } from './engine/characteristics'
 import type { CareerDefinition } from './engine/career-schema'
+import type { EducationDefinition } from './engine/education-schema'
 import { finishCareer } from './engine/policy'
 import type { Rules } from './engine/rules-schema'
 import { buildCareer, EMPTY_INPUT, pruneInput, removeLastTerm, type CareerInput, type CareerResult } from './engine/terms'
@@ -61,7 +62,8 @@ function load(storage: Storage | undefined, seed: string, packs: string): Loaded
 
 /**
  * React hook that holds the career input for the character with `seed`, builds the career with
- * buildCareer, and saves the input in localStorage with the loaded packs' `packs` value. When the
+ * buildCareer, and saves the input in localStorage with the loaded packs' `packs` value. `careers`, `rules` and
+ * `education` (the education entries the career pick offers) are the data buildCareer reads. When the
  * seed or the loaded packs change, it loads the saved input for the new pair (see load).
  */
 export function useCareer(
@@ -69,6 +71,7 @@ export function useCareer(
   base: Record<Characteristic, number>,
   careers: CareerDefinition[],
   rules: Rules,
+  education: EducationDefinition[],
   packs: string,
 ): CareerState {
   const [storage] = useState(() => browserStorage())
@@ -78,7 +81,7 @@ export function useCareer(
     active = load(storage, seed, packs)
     setState(active)
   }
-  const data = useMemo(() => ({ careers, rules }), [careers, rules])
+  const data = useMemo(() => ({ careers, rules, education }), [careers, rules, education])
   const { choices, rolls, outcomes } = active.input
   // buildCareer does not read notes, so a notes change keeps the same choices, rolls and outcomes objects and skips the rebuild.
   const result = useMemo(

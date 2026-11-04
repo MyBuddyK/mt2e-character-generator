@@ -17,6 +17,7 @@
       { "roll": 3, "summary": "No effect." }
     ]
   },
+  "preCareer": { "lastTerm": 3 },
   "lifeEvents": {
     "dice": 2,
     "table": [

@@ -1,6 +1,6 @@
 # Pre-career education
 
-Status: the effects (`check`, `fail-graduation`, `next-career`) are built. The education term is planned.
+Status: built.
 
 ## Problem
 
@@ -14,16 +14,17 @@ entries use the last two as well, so they are built first as effects any entry c
 Rulebook values (entry and graduation targets, DMs, skill lists, the events table) go only in the private
 career pack. The repo has invented samples.
 
-## User flow (planned)
+## User flow
 
 1. While the term number is at or below `rules.preCareer.lastTerm`, the career pick also lists each education
-   entry the loaded packs define.
+   entry the loaded packs define, before any career and, after a failed entry, after a career.
 2. Picking one rolls entry. A failed entry returns to the career pick for that term.
 3. An entered education gives its skills, rolls once on its events table and then rolls graduation, unless an
    event failed graduation or sent the character to a set career.
 4. Graduation (with or without honours) gives its benefits. Some are bonuses that the next career start uses:
    a qualification DM, a commission roll before the first term, or automatic entry to a tied career.
-5. The next term is a career pick, as after any career.
+5. The next term is a career pick, as after any career. With no career pack loaded, two invented sample
+   schools are offered: a trade school (a `pick` education) and an academy tied to the sample career.
 
 ## UI
 
@@ -32,9 +33,14 @@ career pack. The repo has invented samples.
 - **Forced career**: the next career has a "not rolled" qualification step that says an event sent the
   character there, and a notice: "An event sent the character to <career>." For the Draft, the notice also
   names the career drafted into.
-- **Education term** (planned): the same step list as a career term, headed with the school's name and
-  Graduated, Graduated with honours or Did not graduate. Pending bonuses are listed under it until the next
-  career uses them.
+- **Career pick**: the Career select lists careers and, in an "Education" group, the education entries that
+  can be picked for the term. Picking one hides the Assignment select and the button reads "Start education".
+- **Education block**: an "Education" heading, the school's name, the entry roll, and when entry passed the
+  education term with the same step list as a career term (with the school's name in place of the rank). Under
+  it: "Graduated.", "Graduated with honours.", "Did not graduate." or, for a failed entry, "Entry to <school>
+  failed. Pick a career for this term." Bonuses graduation gives the next career are listed under "Bonuses for
+  the next career".
+- **Finished summary**: "Education: <school> (<outcome>)" for each education term.
 
 ## Decisions
 
@@ -56,15 +62,40 @@ career pack. The repo has invented samples.
    one term has two `next-career` effects, the last one applied is used.
 4. **Finish career stops at a forced career.** It plays out the career that rolled `next-career`, musters out,
    and stops when the forced career has started.
-5. **Education is pack data** (planned). Pack format version 3 gets an optional `education` array, checked by
-   an `EducationSchema`, and `rules.preCareer.lastTerm`. Each entry has its entry check with DMs for term
-   number and characteristics, its skills (a pick list or a tied career's Service Skills), its events table
-   (2 to 12), its graduation check with an honours total, and its benefits.
-6. **One graduation per character** (planned, Buddy, 2026-11-04). A failed entry or a failed graduation can try
-   again in a later term, up to `lastTerm`. An academy's "graduation rolled 2 or less" reads the dice before
-   DMs.
-7. **A pre-career commission** (planned) that succeeds starts the career at officer rank 1, and that career's
-   first-term commission roll is skipped.
+5. **Education is pack data.** Pack format version 3 has an optional `education` array, checked by
+   `EducationSchema`, and `rules.preCareer.lastTerm`. Each entry has its entry check with DMs for term number
+   and characteristics, its skills (a pick list or a tied career's Service Skills), optional `onEntry` effects,
+   its events table (2 to 12), its graduation check with an honours total and DMs, its benefits, and an
+   optional `tiedCareer`. Without `rules.preCareer` no education is offered. When a pack is loaded, the packs'
+   education entries replace the bundled samples, as careers do.
+6. **One graduation per character** (Buddy, 2026-11-04). A failed entry or a failed graduation can try again in
+   a later term, up to `lastTerm`. After a failed entry the career pick for the same term offers no education.
+   Education is pre-career: after a career term it is offered only when an earlier entry failed, since that
+   career was taken in place of the education.
+   An academy's "graduation rolled 2 or less" reads the dice before DMs.
+7. **A pre-career commission** that succeeds starts the career at officer rank 1, and that career's first-term
+   commission roll is skipped. It is rolled in term 1 of the next career, after basic training, when that
+   career is listed and has a commission check; with honours and `honoursAutomatic` it passes with no roll.
+   This roll, pass or fail, takes the place of that term's usual commission roll.
+8. **The education is a step in the career order.** An education attempt takes the next key prefix, as a
+   career does (`education.entry`, `education.skills.pick-<n>`, `education.event`, `education.graduation`, and
+   under `career-<n>.` after the first), and it is not a career: careers are still numbered from 1, and the
+   first career after education gets full basic training. Its choice is stored as "education:<id>" under
+   `start.career`.
+9. **Bonuses go to the next career only.** The qualification DM, the commission roll and the academy's entry
+   apply to the career started straight after the education term; any other career start clears them. An
+   academy graduate who enters the tied career picks its Service Skills to raise to 1 in term 1, after basic
+   training. A failed academy graduation whose dice are above `failedEntryUnlessAtOrBelow` keeps the entry
+   with no roll, but with no Service Skills and no commission roll in its first term. Graduation that an
+   event skipped gives no bonuses.
+10. **An education term has no after-term choice.** It ends with aging (from `rules.aging.fromTerm`, as a
+    career term) and no benefit rolls. Remove last term on the term after it removes that term's start choices,
+    so the career pick after the education term is pending again. When that career was forced by a
+    `next-career` event and has no start choices, the education term is removed with it.
+11. **Career effects are notes in an education term.** `roll-table`, `extra-benefit`, `leave-career`,
+    `mishap`, `promote`, `stay-in-career`, `keep-benefit` and `wager` need a career, so in an education term
+    each adds a note to apply it by hand. The education term starts a new run state, so its effects never
+    change an earlier career.
 
 ## Engine and data changes
 
@@ -73,38 +104,46 @@ career pack. The repo has invented samples.
 - `src/engine/terms.ts`: the effects, and a career start that uses the career a `next-career` effect set.
   `CareerRun.forced` is true for that career.
 - `src/engine/policy.ts`: Finish career stops when a forced career has started.
-- Planned: `EducationSchema`, the education term, and an invented sample school.
+- `src/engine/education-schema.ts`: `EducationSchema` and `parseEducation`.
+- `src/engine/career-pack.ts`: the pack's `education` array and `combineEducation`. `src/engine/rules-schema.ts`:
+  `rules.preCareer`.
+- `src/engine/terms.ts`: the education term, `CareerResult.educations`, education options on the career pick,
+  and the bonuses at the next career start. `src/engine/policy.ts` needs no change: Finish career stops at the
+  career pick.
+- `src/data/education/`: the invented sample schools. `src/data/rules/sample-rules.json`: `preCareer.lastTerm`
+  3.
+- `src/Career.tsx`: the career pick's Education group and the education block.
 
 ## Acceptance criteria
 
-- [ ] **ED-1** In terms 1 to `rules.preCareer.lastTerm` the career pick lists each education entry; after that
+- [x] **ED-1** In terms 1 to `rules.preCareer.lastTerm` the career pick lists each education entry; after that
       term it lists none.
-- [ ] **ED-2** Entry uses the entry check with the DM for the term number and the characteristic DMs, and the
+- [x] **ED-2** Entry uses the entry check with the DM for the term number and the characteristic DMs, and the
       step lists each DM's reason.
-- [ ] **ED-3** A failed entry returns to the career pick with education removed for that term, and the term is
+- [x] **ED-3** A failed entry returns to the career pick with education removed for that term, and the term is
       not counted.
-- [ ] **ED-4** A `pick` education asks for one skill per listed level and gives each at that level; a
+- [x] **ED-4** A `pick` education asks for one skill per listed level and gives each at that level; a
       `service-skills` education gives every Service Skill of the tied career at level 0.
-- [ ] **ED-5** Each education term rolls once on its events table and applies the entry's effects.
-- [ ] **ED-6** A `fail-graduation` or `next-career` effect in an education term skips the graduation roll and
+- [x] **ED-5** Each education term rolls once on its events table and applies the entry's effects.
+- [x] **ED-6** A `fail-graduation` or `next-career` effect in an education term skips the graduation roll and
       the term ends with no benefits.
-- [ ] **ED-7** A graduation total at or above `honoursAt` gives the honours benefits; a pass below it gives the
+- [x] **ED-7** A graduation total at or above `honoursAt` gives the honours benefits; a pass below it gives the
       normal benefits; a fail gives none and keeps the skills.
-- [ ] **ED-8** The qualification DM from graduation applies only to the listed careers and only to the first
+- [x] **ED-8** The qualification DM from graduation applies only to the listed careers and only to the first
       career after education.
-- [ ] **ED-9** A pre-career commission roll is offered before the first term of a listed career; success starts
+- [x] **ED-9** A pre-career commission roll is offered before the first term of a listed career; success starts
       the career at officer rank 1; with an honours rule of `automatic` it passes with no roll.
-- [ ] **ED-10** An academy graduate's first career start offers the tied career with no qualification roll, and
+- [x] **ED-10** An academy graduate's first career start offers the tied career with no qualification roll, and
       three Service Skills to raise to 1 when it is picked.
-- [ ] **ED-11** A failed academy graduation whose dice are above `failedEntryUnlessAtOrBelow` still offers the
+- [x] **ED-11** A failed academy graduation whose dice are above `failedEntryUnlessAtOrBelow` still offers the
       tied career with no roll and no commission roll in its first term.
-- [ ] **ED-12** A `next-career` effect naming the Draft in an education term rolls the Draft even when the
+- [x] **ED-12** A `next-career` effect naming the Draft in an education term rolls the Draft even when the
       character was drafted before.
-- [ ] **ED-13** Remove last term on an education term returns the character to the start of that term, and its
+- [x] **ED-13** Remove last term on an education term returns the character to the start of that term, and its
       pending bonuses are gone.
-- [ ] **ED-14** Finish career never picks an education entry, and plays an education term the player picked
+- [x] **ED-14** Finish career never picks an education entry, and plays an education term the player picked
       through to the next career start.
-- [ ] **ED-15** An education term adds `termLength` to the age and counts toward the aging start term.
+- [x] **ED-15** An education term adds `termLength` to the age and counts toward the aging start term.
 - [x] **ED-16** A `check` effect adds a "Check" step after the step that gave it, with a characteristic
       option's DM, and applies `pass` on a pass and `fail` on a fail. (Unit test.)
 - [x] **ED-17** A `check` with several options asks the player for one; a skill option uses the skill level as
@@ -131,3 +170,15 @@ career pack. The repo has invented samples.
       (Unit test.)
 - [x] **ED-28** A `check` option that is a characteristic name not in capitals, such as `Int`, fails
       `EffectSchema`. (Unit test.)
+- [x] **ED-29** A failed academy graduation that still enters the tied career gives no commission roll in that
+      career's first term, when the career has a commission check. (Unit test.)
+- [x] **ED-30** After a pre-career commission roll, passed or failed, term 1 of the career offers no usual
+      commission roll. (Unit test.)
+- [x] **ED-31** Remove last term on the first term of a career that a `next-career` event in an education term
+      forced also removes the education term. (Unit test.)
+- [x] **ED-32** After a career term, the career pick offers education only when an earlier education entry
+      failed. (Unit test.)
+- [x] **ED-33** A career-only effect in an education event adds a note and changes nothing else. (Unit test.)
+- [x] **ED-34** A saved education choice that can't be picked adds one problem. (Unit test.)
+- [x] **ED-35** Loading the bundled education files leaves out a file that fails `EducationSchema` and one whose
+      id an earlier file (by file name) used, with a message for each. (Unit test.)

@@ -218,7 +218,7 @@ describe('next-career effect', () => {
     const result = build(careers, MUSTER, {}, rules)
     expect(result.problems).toContain('An event sent the character to the Draft, but the Draft named a career no pack has, so pick the next career.')
     expect(result.finished).toBe(true)
-    expect(result.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'] })
+    expect(result.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'], education: [] })
     const picked = build(careers, { ...MUSTER, 'career-2.start.career': 'sample-recycling', 'career-2.start.assignment': 'debris-sweep' }, {}, rules)
     expect(picked.runs[1]?.forced).toBe(false)
     expect(picked.runs[1]?.qualification.dice).toBeDefined()

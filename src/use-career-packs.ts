@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
   combineCareers,
+  combineEducation,
   formatPackRefs,
   packFingerprint,
   parseCareerPack,
@@ -11,6 +12,7 @@ import {
 import type { Rules } from './engine/rules-schema'
 import { sampleRules } from './data/rules'
 import type { CareerDefinition } from './engine/career-schema'
+import type { EducationDefinition } from './engine/education-schema'
 import { combineSpecies, type SpeciesDefinition } from './engine/species'
 import {
   browserStorage,
@@ -28,6 +30,7 @@ export interface PackEntry {
   careers: CareerDefinition[]
   rules: Rules | undefined
   species: SpeciesDefinition[]
+  education: EducationDefinition[]
   problems: string[]
 }
 
@@ -56,7 +59,9 @@ export interface CareerPacks {
   rules: SelectedRules
   /** The species to offer (see combineSpecies): Human first, then the loaded packs' species. */
   species: SpeciesDefinition[]
-  /** Duplicate career id messages from combineCareers, then duplicate species id messages from combineSpecies. */
+  /** The education entries to offer (see combineEducation): the bundled ones when no pack is loaded, otherwise the packs' entries. */
+  education: EducationDefinition[]
+  /** Duplicate id messages from combineCareers, combineSpecies and combineEducation, in that order. */
   duplicates: string[]
   /** How many saved values could not be read at all. They are kept in storage until discarded. */
   unreadableCount: number
@@ -120,6 +125,7 @@ function describePacks(stored: StoredPack[]): { entries: PackEntry[]; broken: Br
         careers: result.careers,
         rules: result.rules,
         species: result.species,
+        education: result.education,
         problems: result.problems,
       })
     }
@@ -134,10 +140,10 @@ function describePacks(stored: StoredPack[]): { entries: PackEntry[]; broken: Br
  * writeStoredPacks, together with any saved values it could not read. Each change starts from the
  * packs as they are when the change is applied, not when the request that led to it began, so a
  * slow download doesn't undo an import or removal made while it ran. Replacing a loaded pack asks
- * for confirmation with window.confirm. `bundled` is the list of careers built into the app; it is
- * shown only while no pack is loaded.
+ * for confirmation with window.confirm. `bundled` is the list of careers built into the app, and
+ * `bundledEducation` the education entries built into it; each is shown only while no pack is loaded.
  */
-export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
+export function useCareerPacks(bundled: CareerDefinition[], bundledEducation: EducationDefinition[]): CareerPacks {
   const [storage] = useState(() => browserStorage())
   const [initial] = useState(() => readStoredPacks(storage))
   const [stored, setStored] = useState<StoredPack[]>(initial.packs)
@@ -160,8 +166,12 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
       sampleRules,
     )
     const species = combineSpecies(entries.map((e) => ({ id: e.pack.id, name: e.pack.name, species: e.species })))
-    return { entries, broken, combined, species, packsParam, rules }
-  }, [stored, bundled])
+    const education = combineEducation(
+      bundledEducation,
+      entries.map((e) => ({ id: e.pack.id, name: e.pack.name, education: e.education })),
+    )
+    return { entries, broken, combined, species, education, packsParam, rules }
+  }, [stored, bundled, bundledEducation])
 
   /** Applies new saved packs and unreadable values to state and storage, and returns the write result. */
   const commit = (nextStored: StoredPack[], nextUnreadable: unknown[]) => {
@@ -322,7 +332,8 @@ export function useCareerPacks(bundled: CareerDefinition[]): CareerPacks {
     careers: derived.combined.careers,
     rules: derived.rules,
     species: derived.species.species,
-    duplicates: [...derived.combined.problems, ...derived.species.problems],
+    education: derived.education.education,
+    duplicates: [...derived.combined.problems, ...derived.species.problems, ...derived.education.problems],
     unreadableCount: unreadable.length,
     storageAvailable: storage !== undefined,
     unsaved,

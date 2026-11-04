@@ -79,7 +79,7 @@ export type Rank = z.infer<typeof RankSchema>
  * Returns a zod check that adds an issue when the `roll` values in an array are not exactly the
  * integers from `min` to `max`, each appearing once.
  */
-function coversRolls(min: number, max: number) {
+export function coversRolls(min: number, max: number) {
   return (entries: { roll: number }[], ctx: z.RefinementCtx) => {
     const rolls = entries.map((e) => e.roll).sort((a, b) => a - b)
     const expected = Array.from({ length: max - min + 1 }, (_, i) => min + i)

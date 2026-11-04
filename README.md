@@ -101,10 +101,18 @@ The top level of a pack:
 - `id` names the pack. Importing a pack with an `id` that is already loaded replaces it, after a
   confirmation.
 - Raise `revision` each time you change the pack, so players can tell copies apart.
-- `rules` and `effects` need `formatVersion` 2 or later, and `species` needs 3. A pack without them may say 1.
+- `rules` and `effects` need `formatVersion` 2 or later, and `species` and `education` need 3. A pack without
+  them may say 1.
 - `species` lists species the player can pick (see [`docs/features/species.md`](docs/features/species.md) and
   [`e2e/fixtures/species-pack.json`](e2e/fixtures/species-pack.json)): each has `modifiers` added to the rolled
   characteristics, an optional `minCharacteristic`, and `traits` shown as text. Human is built in.
+- `education` lists pre-career education entries (see [`docs/features/education.md`](docs/features/education.md)
+  and the invented samples in [`src/data/education/`](src/data/education/)): an `entry` check, `skills` (a
+  `pick` list or a tied career's `service-skills`), optional `onEntry` effects, `events` covering 2 to 12, a
+  `graduation` check with `honoursAt`, `benefits`, and an optional `tiedCareer` for an academy. They are offered
+  at the career pick for terms 1 to `rules.preCareer.lastTerm`, before any career, and after a career only
+  when an earlier entry failed. In an education term, effects that need a career (such as `promote` or
+  `extra-benefit`) are notes.
 - Each career has a qualification check, skill tables, assignments with survival and advancement checks and
   ranks, an events table covering 2 to 12, a mishaps table covering 1 to 6, and a mustering-out table
   covering 1 to 7.
@@ -125,8 +133,8 @@ The top level of a pack:
 - A `check` effect (`options`, `target`, optional `pass` and `fail` effect lists) rolls 2D with one of its
   options: a characteristic name uses that characteristic's DM, and a skill uses its level (-3 untrained).
   `next-career` (`career`, a career id or `"draft"`) ends the career after the term and starts that career, or
-  the Draft, next with no qualification roll. `fail-graduation` is for education terms (planned) and is a note
-  in a career. See [`docs/features/education.md`](docs/features/education.md).
+  the Draft, next with no qualification roll. `fail-graduation` skips graduation in an education term and is a
+  note in a career. See [`docs/features/education.md`](docs/features/education.md).
 - A `choice` effect asks the player to pick one of its `options`, each a `label` and the `effects` applied
   when it is picked: `{ "type": "choice", "options": [{ "label": "Tactics 1", "effects": [...] }, { "label":
   "DM +4 to the next advancement roll", "effects": [{ "type": "dm-next", "roll": "advancement", "dm": 4 }] }] }`.
