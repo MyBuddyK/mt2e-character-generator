@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { CHARACTERISTICS } from './characteristics'
 import { CheckSchema, coversRolls, EventEntrySchema } from './career-schema'
 import { EffectsSchema } from './effects'
+import { compareCodeUnits } from './combine'
 
 /**
  * Pre-career education entries (docs/features/education.md): a university or an academy, taken as a term in
@@ -113,4 +114,30 @@ export function parseEducation(data: unknown): { ok: true; education: EducationD
   const result = EducationSchema.safeParse(data)
   if (result.success) return { ok: true, education: result.data }
   return { ok: false, errors: result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`) }
+}
+
+/**
+ * Parses every file in `files` (file name → parsed JSON) with parseEducation, in file name order by UTF-16
+ * code units. Files that fail are left out of `education`, and their problems are added to `errors` with the
+ * file name in front. An entry whose id an earlier file already used is also left out and reported.
+ */
+export function loadEducation(files: Record<string, unknown>): { education: EducationDefinition[]; errors: string[] } {
+  const education: EducationDefinition[] = []
+  const errors: string[] = []
+  const idOwners = new Map<string, string>()
+  for (const [file, data] of Object.entries(files).sort(([a], [b]) => compareCodeUnits(a, b))) {
+    const result = parseEducation(data)
+    if (!result.ok) {
+      errors.push(...result.errors.map((e) => `${file}: ${e}`))
+      continue
+    }
+    const owner = idOwners.get(result.education.id)
+    if (owner) {
+      errors.push(`${file}: id "${result.education.id}" is already used by ${owner}`)
+      continue
+    }
+    idOwners.set(result.education.id, file)
+    education.push(result.education)
+  }
+  return { education, errors }
 }

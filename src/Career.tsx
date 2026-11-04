@@ -800,7 +800,7 @@ export interface CareerProps {
  * opportunities, and the optional next-career picker.
  */
 export function Career({ seed, base, careers, education, rules, packs }: CareerProps) {
-  const career = useCareer(seed, base, careers, rules.rules, packs, education)
+  const career = useCareer(seed, base, careers, rules.rules, education, packs)
   const { input, result, update } = career
   const pending = result.pending
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)

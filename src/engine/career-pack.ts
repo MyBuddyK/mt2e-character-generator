@@ -126,6 +126,38 @@ function usesEffects(careers: unknown[]): boolean {
 }
 
 /**
+ * Parses each entry of `raws` with `parse` and returns the ones that pass, in order. An entry that fails, or
+ * whose id an earlier entry in `raws` already used, is left out, and its problems are added to `problems` as
+ * "<key>.<index> (<id>): <message>". The duplicate message reads "id "<id>" is used by an earlier <kind> in
+ * this pack".
+ */
+function parseEntries<T extends { id: string }>(
+  raws: unknown[],
+  key: string,
+  kind: string,
+  problems: string[],
+  parse: (raw: unknown) => { ok: true; value: T } | { ok: false; errors: string[] },
+): T[] {
+  const out: T[] = []
+  const seen = new Set<string>()
+  raws.forEach((raw, index) => {
+    const prefix = `${key}.${index}${entryLabel(raw)}`
+    const result = parse(raw)
+    if (!result.ok) {
+      problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
+      return
+    }
+    if (seen.has(result.value.id)) {
+      problems.push(`${prefix}: id "${result.value.id}" is used by an earlier ${kind} in this pack`)
+      return
+    }
+    seen.add(result.value.id)
+    out.push(result.value)
+  })
+  return out
+}
+
+/**
  * Checks parsed JSON as a career pack. It rejects the pack when it is not an object, when `format`
  * is not PACK_FORMAT, when `formatVersion` is not one of SUPPORTED_FORMAT_VERSIONS (with a message
  * naming them), when a version 1 pack uses `rules` or `effects` (with a message that it must say
@@ -182,57 +214,21 @@ export function parseCareerPack(data: unknown): PackParseResult {
     }
   }
   const { careers: rawCareers, species: rawSpecies = [], education: rawEducation = [], id, name, revision, source, rules } = envelope.data
-  const careers: CareerDefinition[] = []
   const problems: string[] = []
-  const seen = new Set<string>()
-  rawCareers.forEach((raw, index) => {
-    const prefix = `careers.${index}${entryLabel(raw)}`
-    const result = parseCareer(raw)
-    if (!result.ok) {
-      problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
-      return
-    }
-    if (seen.has(result.career.id)) {
-      problems.push(`${prefix}: id "${result.career.id}" is used by an earlier career in this pack`)
-      return
-    }
-    seen.add(result.career.id)
-    careers.push(result.career)
+  const careers = parseEntries(rawCareers, 'careers', 'career', problems, (raw) => {
+    const r = parseCareer(raw)
+    return r.ok ? { ok: true, value: r.career } : r
   })
   if (careers.length === 0) {
     return { ok: false, reason: 'no career in the pack is valid', problems }
   }
-  const species: SpeciesDefinition[] = []
-  const speciesIds = new Set<string>()
-  rawSpecies.forEach((raw, index) => {
-    const prefix = `species.${index}${entryLabel(raw)}`
-    const result = parseSpecies(raw)
-    if (!result.ok) {
-      problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
-      return
-    }
-    if (speciesIds.has(result.species.id)) {
-      problems.push(`${prefix}: id "${result.species.id}" is used by an earlier species in this pack`)
-      return
-    }
-    speciesIds.add(result.species.id)
-    species.push(result.species)
+  const species = parseEntries(rawSpecies, 'species', 'species', problems, (raw) => {
+    const r = parseSpecies(raw)
+    return r.ok ? { ok: true, value: r.species } : r
   })
-  const education: EducationDefinition[] = []
-  const educationIds = new Set<string>()
-  rawEducation.forEach((raw, index) => {
-    const prefix = `education.${index}${entryLabel(raw)}`
-    const result = parseEducation(raw)
-    if (!result.ok) {
-      problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
-      return
-    }
-    if (educationIds.has(result.education.id)) {
-      problems.push(`${prefix}: id "${result.education.id}" is used by an earlier education entry in this pack`)
-      return
-    }
-    educationIds.add(result.education.id)
-    education.push(result.education)
+  const education = parseEntries(rawEducation, 'education', 'education entry', problems, (raw) => {
+    const r = parseEducation(raw)
+    return r.ok ? { ok: true, value: r.education } : r
   })
   return { ok: true, pack: { id, name, revision, source }, careers, rules, species, education, problems }
 }

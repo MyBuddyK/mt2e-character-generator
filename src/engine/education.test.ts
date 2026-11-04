@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseCareer, type CareerDefinition } from './career-schema'
-import { parseEducation, type EducationDefinition } from './education-schema'
+import { loadEducation, parseEducation, type EducationDefinition } from './education-schema'
 import type { Effect } from './effects'
 import { finishCareer } from './policy'
 import type { Rules } from './rules-schema'
@@ -280,28 +280,39 @@ describe('graduation bonuses', () => {
     expect(step(two, 'education.graduation').reasons).toContain('Dice of 2 (2 or less) lose the entry to Sample: Orbital Sanitation.')
   })
 
-  // Is drafted into the sample career first, then fails graduation from a school whose event 7 sends the
-  // character to the Draft, and expects a third career that is drafted and forced.
+  // Fails entry to the trade school, is drafted into the sample career, then enters the school (offered again
+  // after the failed entry) whose event 7 sends the character to the Draft, and expects a third career that
+  // is drafted and forced.
   // Criteria: ED-12.
   it('next-career to the Draft in education drafts again', () => {
     const rules: Rules = { ...sampleRules, draft: [{ roll: 1, career: 'sample-sanitation', assignment: 'hazmat' }] }
     const edu = withEvent7(school(tradeSchoolJson), [{ type: 'next-career', career: 'draft' }])
     const choices = {
-      ...startSanitation(''),
-      fallback: 'draft',
-      'term-1.skill-0.table': 'serviceSkills',
-      'term-1.next': 'leave',
-      'benefit-0': 'benefit',
-      'career-2.start.career': TRADE,
-      'career-2.education.skills.pick-0': 'Admin',
-      'career-2.education.skills.pick-1': 'Broker',
+      'start.career': TRADE,
+      ...startSanitation('career-2.'),
+      'career-2.fallback': 'draft',
+      'career-2.term-1.skill-0.table': 'serviceSkills',
+      'career-2.term-1.next': 'leave',
+      'career-2.benefit-0': 'benefit',
+      'career-3.start.career': TRADE,
+      'career-3.education.skills.pick-0': 'Admin',
+      'career-3.education.skills.pick-1': 'Broker',
     }
-    const rolls = { qualification: 2, 'term-1.survival': 12, 'term-1.event': 7, 'term-1.advancement': 2, 'career-2.education.entry': 12, 'career-2.education.event': 7 }
+    const rolls = {
+      'education.entry': 2,
+      'career-2.qualification': 2,
+      'career-2.term-1.survival': 12,
+      'career-2.term-1.event': 7,
+      'career-2.term-1.advancement': 2,
+      'career-3.education.entry': 12,
+      'career-3.education.event': 7,
+    }
     const result = build(choices, rolls, data(rules, [edu]))
+    expect(result.educations[1]?.outcome).toBe('failed')
     expect(result.runs[0]?.entry).toBe('draft')
     expect(result.runs[1]?.forced).toBe(true)
     expect(result.runs[1]?.entry).toBe('draft')
-    expect(result.runs[1]?.draft?.key).toBe('career-3.draft')
+    expect(result.runs[1]?.draft?.key).toBe('career-4.draft')
   })
 })
 
@@ -357,5 +368,129 @@ describe('education with removal, Finish career and age', () => {
   // Criteria: ED-1.
   it('the bundled education files pass EducationSchema', () => {
     expect(educationErrors).toEqual([])
+  })
+})
+
+// Tests for commission rolls, removal, offering and effects at the edges of an education term.
+describe('education edge cases', () => {
+  /** The sample career with a SOC 8 commission check and an officer rank 1, and rules with a commission. */
+  function withCommission(): { career: CareerDefinition; rules: Rules } {
+    const career: CareerDefinition = {
+      ...sampleCareer(),
+      commission: { characteristic: 'SOC', target: 8 },
+      officerRanks: [{ rank: 1, title: 'Ensign' }],
+    }
+    return { career, rules: { ...sampleRules, commission: { anyTermFromSOC: 9, dmPerLaterTerm: -1 } } }
+  }
+  /** Term 1 choices and rolls that play the sample career under career-2. up to its commission choice. */
+  const TERM_1 = { 'career-2.term-1.skill-0.table': 'serviceSkills' }
+  const TERM_1_ROLLS = { 'career-2.term-1.survival': 12, 'career-2.term-1.event': 7 }
+
+  // Fails academy graduation with dice of 3 and enters the tied career, which has a commission check, and
+  // expects term 1 to go past the commission with no commission choice; a graduate gets the choice.
+  // Criteria: ED-29.
+  it('a failed academy graduation gives no commission roll in the tied career’s first term', () => {
+    const { career, rules } = withCommission()
+    const d: CareerData = { careers: [career], rules, education: [school(academyJson)] }
+    const choices = { 'start.career': ACADEMY, ...startSanitation('career-2.'), ...TERM_1 }
+    const failed = build(choices, { ...ENTERED, 'education.graduation': 3, ...TERM_1_ROLLS }, d)
+    expect(failed.educations[0]?.outcome).toBe('failed')
+    expect(failed.pending?.kind).not.toBe('commission')
+    expect(failed.terms[1]?.steps.map((st) => st.key)).not.toContain('career-2.term-1.commission')
+    const picks = {
+      'career-2.term-1.academy-skills.pick-0': 'Pilot',
+      'career-2.term-1.academy-skills.pick-1': 'Mechanic',
+      'career-2.term-1.academy-skills.pick-2': 'Broker',
+    }
+    const graduate = build({ ...choices, ...picks }, { ...ENTERED, 'education.graduation': 8, ...TERM_1_ROLLS }, d)
+    expect(graduate.pending).toMatchObject({ kind: 'commission', key: 'career-2.term-1.commission.try' })
+  })
+
+  // Graduates from a school whose commission bonus lists the career, fails that commission roll, and
+  // expects no second commission choice in term 1.
+  // Criteria: ED-30.
+  it('a failed education commission takes the place of term 1’s commission roll', () => {
+    const { career, rules } = withCommission()
+    const trade = school(tradeSchoolJson)
+    const edu: EducationDefinition = { ...trade, benefits: { ...trade.benefits, commission: { careers: [career.id], dm: 0 } } }
+    const d: CareerData = { careers: [career], rules, education: [edu] }
+    const choices = { 'start.career': TRADE, ...PICKS, ...startSanitation('career-2.'), ...TERM_1 }
+    const rolls = { ...ENTERED, 'education.graduation': 8, 'career-2.qualification': 12, 'career-2.term-1.education-commission': 2, ...TERM_1_ROLLS }
+    const result = build(choices, rolls, d)
+    expect(step(result, 'career-2.term-1.education-commission').result).toBe('fail')
+    expect(result.pending?.kind).not.toBe('commission')
+    expect(result.runs[0]?.officerRank).toBeUndefined()
+  })
+
+  // Enters a school whose event 7 sends the character to the sample career, plays the forced career's
+  // term 1, removes it, and expects the education term removed too, with nothing chosen.
+  // Criteria: ED-31.
+  it('removing a forced career’s first term after education removes the education term too', () => {
+    const edu = withEvent7(school(tradeSchoolJson), [{ type: 'next-career', career: 'sample-sanitation' }])
+    const d = data(sampleRules, [edu])
+    const input: CareerInput = {
+      ...EMPTY_INPUT,
+      choices: { 'start.career': TRADE, ...PICKS, 'career-2.assignment': 'debris-sweep', ...TERM_1 },
+      rolls: { ...ENTERED, ...TERM_1_ROLLS },
+    }
+    const full = buildCareer(SEED, BASE, input, d)
+    expect(full.runs[0]?.forced).toBe(true)
+    expect(full.terms).toHaveLength(2)
+    const removal = removeLastTerm(SEED, BASE, input, d)
+    expect(removal?.removed).toBe(1)
+    expect(removal?.input).toEqual(EMPTY_INPUT)
+  })
+
+  // Plays term 1 of the sample career and leaves, and expects the next career pick (nextCareer) to offer no
+  // education; after a failed entry and the same career term, it offers both schools.
+  // Criteria: ED-32.
+  it('after a career, education is offered only when an earlier entry failed', () => {
+    const career = {
+      'career-2.term-1.skill-0.table': 'serviceSkills',
+      'career-2.term-1.next': 'leave',
+      'career-2.benefit-0': 'benefit',
+    }
+    const rolls = { 'career-2.qualification': 12, 'career-2.term-1.survival': 12, 'career-2.term-1.event': 7, 'career-2.term-1.advancement': 2 }
+    const plain = Object.fromEntries(Object.entries({ ...startSanitation('career-2.'), ...career }).map(([k, v]) => [k.replace(/^career-2\./, ''), v]))
+    const plainRolls = Object.fromEntries(Object.entries(rolls).map(([k, v]) => [k.replace(/^career-2\./, ''), v]))
+    const noEntry = build(plain, plainRolls)
+    expect(noEntry.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'], education: [] })
+    const afterFailed = build({ 'start.career': TRADE, ...startSanitation('career-2.'), ...career }, { 'education.entry': 2, ...rolls })
+    expect(afterFailed.nextCareer?.prefix).toBe('career-3.')
+    expect(afterFailed.nextCareer?.education.map((e) => e.id)).toEqual(['sample-trade-school', 'sample-sanitation-academy'])
+  })
+
+  // Sets the trade school's event 7 to "promote" and "extra-benefit", and expects one note for each on the
+  // event step, no rank, and the same result as a quiet event otherwise.
+  // Criteria: ED-33.
+  it('career-only effects in an education event are notes', () => {
+    const edu = withEvent7(school(tradeSchoolJson), [{ type: 'promote' }, { type: 'extra-benefit' }])
+    const result = build({ 'start.career': TRADE, ...PICKS }, { ...ENTERED, 'education.graduation': 8 }, data(sampleRules, [edu]))
+    expect(step(result, 'education.event').notes).toEqual([
+      'Apply "promote" by hand: it needs a career, and this is an education term.',
+      'Apply "extra-benefit" by hand: it needs a career, and this is an education term.',
+    ])
+    const quiet = build({ 'start.career': TRADE, ...PICKS }, { ...ENTERED, 'education.graduation': 8 })
+    expect(result.skills).toEqual(quiet.skills)
+    expect(result.pending).toEqual(quiet.pending)
+  })
+
+  // Saves an education id no loaded pack has as the career pick, and expects one problem that names it.
+  // Criteria: ED-34.
+  it('a saved education that can’t be picked gives one problem', () => {
+    const result = build({ 'start.career': 'education:missing-school' })
+    expect(result.problems).toEqual([`The saved education "missing-school" can't be picked for this term.`])
+    expect(result.pending).toMatchObject({ kind: 'start', prefix: '' })
+  })
+
+  // Loads two files with the same education id and one that fails, and expects the first by file name order
+  // kept, and a message for the duplicate and for the failing file.
+  // Criteria: ED-35.
+  it('loadEducation leaves out a repeated id and a failing file', () => {
+    const result = loadEducation({ './b.json': tradeSchoolJson, './a.json': tradeSchoolJson, './c.json': { id: 'broken' } })
+    expect(result.education.map((e) => e.id)).toEqual(['sample-trade-school'])
+    expect(result.errors[0]).toBe('./b.json: id "sample-trade-school" is already used by ./a.json')
+    expect(result.errors.slice(1).every((e) => e.startsWith('./c.json: '))).toBe(true)
+    expect(result.errors.length).toBeGreaterThan(1)
   })
 })

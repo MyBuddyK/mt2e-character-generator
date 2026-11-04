@@ -308,6 +308,21 @@ export interface CareerData {
   education?: EducationDefinition[]
 }
 
+/**
+ * Effects that change the current career (its skill tables, benefit rolls, rank or the end of the term),
+ * which an education term has none of: in an education term they are notes.
+ */
+const CAREER_ONLY_EFFECTS: readonly Effect['type'][] = [
+  'roll-table',
+  'extra-benefit',
+  'leave-career',
+  'mishap',
+  'promote',
+  'stay-in-career',
+  'keep-benefit',
+  'wager',
+]
+
 /** Thrown inside buildCareer when the character dies, to end the build. */
 class Died {}
 
@@ -442,6 +457,8 @@ export function buildCareer(
   let graduated = false
   /** While an education term's effects are applied: whether an event failed graduation. */
   let educationState: { failedGraduation: boolean } | undefined
+  /** True while an education term is played, so effects that need a career become notes. */
+  let inEducation = false
   /**
    * What graduation gives the next career, which the next career start reads and clears: a qualification
    * DM and a commission roll for the listed careers, and the academy's tie to a career.
@@ -451,7 +468,8 @@ export function buildCareer(
         school: string
         qualificationDM: { careers: string[]; dm: number } | undefined
         commission: { careers: string[]; dm: number; automatic: boolean } | undefined
-        tied: { career: string; serviceSkills: number } | undefined
+        /** `commission` is false when graduation failed: the tied career then has no commission roll in its first term. */
+        tied: { career: string; serviceSkills: number; commission: boolean } | undefined
       }
     | undefined
   const skillLimits = rules.skillLimits
@@ -786,6 +804,10 @@ export function buildCareer(
   const applyEffects = (effects: Effect[] | undefined, key: string, step: Step, termSteps: Step[], term: TermResult | undefined) => {
     ;(effects ?? []).forEach((effect, i) => {
       const effectKey = `${key}.effect-${i}`
+      if (inEducation && CAREER_ONLY_EFFECTS.includes(effect.type)) {
+        step.notes.push(`Apply "${effect.type}" by hand: it needs a career, and this is an education term.`)
+        return
+      }
       switch (effect.type) {
         case 'skill':
           gainSkill(pickOption(`${effectKey}.skill`, effect.options), step, effect.level)
@@ -1091,12 +1113,14 @@ export function buildCareer(
 
   /**
    * Returns the education entries the career pick at the next term can offer: none without
-   * rules.preCareer, after a graduation, after a failed entry in the same term (`afterFailedEntry`), or when
-   * the next term is after rules.preCareer.lastTerm.
+   * rules.preCareer, after a graduation, after a failed entry in the same term (`afterFailedEntry`), when
+   * the next term is after rules.preCareer.lastTerm, or after a career unless an earlier entry failed (the
+   * career was the one taken in place of the education, so the character may try again).
    */
   const educationOptions = (afterFailedEntry: boolean): EducationOption[] => {
     const pre = rules.preCareer
     if (!pre || graduated || afterFailedEntry || terms.length + 1 > pre.lastTerm) return []
+    if (runs.length > 0 && !educations.some((e) => e.outcome === 'failed-entry')) return []
     return (data.education ?? []).map((e) => ({ id: e.id, name: e.name }))
   }
 
@@ -1117,9 +1141,20 @@ export function buildCareer(
    * `educations`, and sets educationBonus for the next career.
    */
   const runEducation = (order: number, prefix: string, edu: EducationDefinition) => {
+    inEducation = true
+    try {
+      playEducation(order, prefix, edu)
+    } finally {
+      inEducation = false
+    }
+  }
+
+  /** The body of runEducation. A new run state keeps the education's effects off any earlier career. */
+  const playEducation = (order: number, prefix: string, edu: EducationDefinition) => {
     career = undefined
     assignment = undefined
     educationBonus = undefined
+    rs = newRunState()
     const number = terms.length + 1
     const entryKey = `${prefix}education.entry`
     const termDM = edu.entry.termDMs?.find((t) => t.term === number)?.dm ?? 0
@@ -1220,7 +1255,7 @@ export function buildCareer(
           school: edu.name,
           qualificationDM: q ? { careers: q.careers, dm: honours ? q.honoursDM : q.dm } : undefined,
           commission: c ? { careers: c.careers, dm: c.dm, automatic: honours && (c.honoursAutomatic ?? false) } : undefined,
-          tied: tied ? { career: tied.career, serviceSkills: tied.serviceSkillsOnEntry } : undefined,
+          tied: tied ? { career: tied.career, serviceSkills: tied.serviceSkillsOnEntry, commission: true } : undefined,
         }
         if (q) record.bonuses.push(`DM ${signedText(honours ? q.honoursDM : q.dm)} to qualify for ${careerNames(q.careers)} as the next career.`)
         if (c) {
@@ -1239,7 +1274,7 @@ export function buildCareer(
         record.outcome = 'failed'
         const natural = graduation.dice === undefined ? 0 : current(graduation.dice)
         if (tied && natural > tied.failedEntryUnlessAtOrBelow) {
-          educationBonus = { school: edu.name, qualificationDM: undefined, commission: undefined, tied: { career: tied.career, serviceSkills: 0 } }
+          educationBonus = { school: edu.name, qualificationDM: undefined, commission: undefined, tied: { career: tied.career, serviceSkills: 0, commission: false } }
           record.bonuses.push(`Entry to ${tiedName} with no qualification roll as the next career, with no commission roll in its first term.`)
         } else if (tied) {
           graduation.reasons.push(`Dice of ${natural} (${tied.failedEntryUnlessAtOrBelow} or less) lose the entry to ${tiedName}.`)
@@ -1255,9 +1290,10 @@ export function buildCareer(
    * Applies graduation bonuses in term 1 of the career after education, after basic training: for the
    * academy's tied career, the player picks `serviceSkills` different Service Skills to raise to level 1;
    * for a career listed in the bonus commission, a commission roll (or none, when automatic) that, on a
-   * pass, makes the character officer rank 1, so the term's usual commission roll is not offered.
+   * pass, makes the character officer rank 1. Returns true when the term's usual commission roll is not
+   * offered: after this commission roll, pass or fail, and in the tied career after a failed graduation.
    */
-  const educationStart = (bonus: NonNullable<typeof educationBonus>, entered: CareerDefinition, steps: Step[], term: TermResult, termKey: string) => {
+  const educationStart = (bonus: NonNullable<typeof educationBonus>, entered: CareerDefinition, steps: Step[], term: TermResult, termKey: string): boolean => {
     const tied = bonus.tied
     if (tied && tied.career === entered.id && tied.serviceSkills > 0) {
       const step: Step = { key: `${termKey}.academy-skills`, label: `${bonus.school}: Service Skills to 1`, result: '', applied: [], notes: [], reasons: [] }
@@ -1273,8 +1309,9 @@ export function buildCareer(
       }
       step.result = step.applied.join(', ')
     }
+    const noTiedCommission = tied !== undefined && tied.career === entered.id && !tied.commission
     const commission = bonus.commission
-    if (!commission || !commission.careers.includes(entered.id)) return
+    if (!commission || !commission.careers.includes(entered.id)) return noTiedCommission
     const key = `${termKey}.education-commission`
     if (!entered.commission) {
       steps.push({
@@ -1285,7 +1322,7 @@ export function buildCareer(
         notes: [`${entered.name} has no commission check, so the commission from ${bonus.school} is not rolled.`],
         reasons: [],
       })
-      return
+      return noTiedCommission
     }
     const step = commission.automatic
       ? automaticOutcome(key, 'Commission (education)', `Automatic commission with honours from ${bonus.school}.`)
@@ -1295,10 +1332,12 @@ export function buildCareer(
       if (commission.dm !== 0) step.reasons.push(`DM ${signedText(commission.dm)} from ${bonus.school}.`)
     }
     steps.push(step)
-    if (!passed(step)) return
-    rs.enlistedRankAtCommission = rs.rank
-    rs.officerRank = 0
-    reachRank(1, steps, term, `${termKey}.officer-rank-1`)
+    if (passed(step)) {
+      rs.enlistedRankAtCommission = rs.rank
+      rs.officerRank = 0
+      reachRank(1, steps, term, `${termKey}.officer-rank-1`)
+    }
+    return true
   }
 
   /** Returns the names of the careers with ids `ids` (the id when a career isn't loaded), joined with "or". */
@@ -1387,9 +1426,9 @@ export function buildCareer(
           }
           problems.push(`The saved education "${educationId}" can't be picked for this term.`)
         }
-        const named = data.careers.find((c) => c.id === careerId)
+        const named = careerId?.startsWith('education:') ? undefined : data.careers.find((c) => c.id === careerId)
         career = named !== undefined && !exclude.includes(named.id) ? named : undefined
-        if (careerId !== undefined && !named) problems.push(`The saved career "${careerId}" isn't loaded.`)
+        if (careerId !== undefined && !named && !careerId.startsWith('education:')) problems.push(`The saved career "${careerId}" isn't loaded.`)
         if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
         const assignmentId = choice(`${prefix}start.assignment`)
         assignment = career?.assignments.find((a) => a.id === assignmentId)
@@ -1495,6 +1534,8 @@ export function buildCareer(
       }
       if (!assignment) break
 
+      /** True when education bonuses take the place of term 1's usual commission roll. */
+      let skipCommission = false
       for (let n = 1; ; n += 1) {
         const termKey = `${prefix}term-${n}`
         const number = terms.length + 1
@@ -1547,7 +1588,7 @@ export function buildCareer(
             }
           }
           reachRank(0, steps, term, `${termKey}.rank-0`)
-          if (bonus) educationStart(bonus, career, steps, term, termKey)
+          if (bonus) skipCommission = educationStart(bonus, career, steps, term, termKey)
         }
 
         const drugs = rules.anagathics
@@ -1613,6 +1654,7 @@ export function buildCareer(
           career.commission &&
           rs.officerRank === undefined &&
           !promoteThisTerm &&
+          !(n === 1 && skipCommission) &&
           (n === 1 || value('SOC') >= commission.anyTermFromSOC)
         ) {
           const tryKey = `${termKey}.commission.try`
@@ -1837,7 +1879,10 @@ export function pruneInput(input: CareerInput, used: Set<string>): { input: Care
   }
 }
 
-/** What removeLastTerm returns: the new input, and the number of the term it removed (from 1). */
+/**
+ * What removeLastTerm returns: the new input, and the number (from 1) of the earliest term it removed, which
+ * is the last term unless an education term was removed with it.
+ */
 export interface TermRemoval {
   input: CareerInput
   removed: number
@@ -1853,7 +1898,9 @@ const NOTES_KEY = /^term-(\d+)$/
  * is built here. The term before the removed one, when there is one, loses its after-term choice
  * ("<term>.next"), so the rebuilt career stops at the end of that term with the after-term choice
  * pending. When the term before is an education term, which has no after-term choice, the removed term's
- * start choices are removed instead, so the career pick after the education term is pending. Every choice,
+ * start choices are removed instead, so the career pick after the education term is pending; when the
+ * removed term's career has no start choices (a next-career event in the education term forced it), the
+ * education term is removed too, and `removed` is the education term's number. Every choice,
  * roll override and outcome override the rebuilt career no longer reads is
  * then removed with pruneInput: the removed term's own keys, and any mustering out and later careers
  * that followed it. When the removed term is the character's first, every choice and override is
@@ -1868,22 +1915,35 @@ export function removeLastTerm(
   built: CareerResult = buildCareer(seed, base, input, data),
 ): TermRemoval | undefined {
   const { terms } = built
-  const last = terms[terms.length - 1]
-  if (!last) return undefined
-  const previous = terms[terms.length - 2]
+  if (terms.length === 0) return undefined
+  /** Returns the start choice keys of the career or education that `term` belongs to. */
+  const startKeys = (term: TermResult) => {
+    const prefix = term.key.replace(/(term-\d+|education)$/, '')
+    return [`${prefix}start.career`, `${prefix}start.assignment`]
+  }
+  // After an education term there is no after-term choice, so the start choices of the term after it are
+  // removed instead. When there are none (a next-career event in the education term forced the career),
+  // the education term is removed as well.
+  let index = terms.length - 1
+  let drop: string[] = []
+  for (;;) {
+    const before = terms[index - 1]
+    const cut = terms[index]
+    if (!before || !cut) break
+    drop = before.education === undefined ? [`${before.key}.next`] : startKeys(cut)
+    if (before.education === undefined || drop.some((k) => k in input.choices)) break
+    index -= 1
+  }
+  const first = terms[index]
+  if (!first) return undefined
   const notes = Object.fromEntries(
     Object.entries(input.notes).filter(([k]) => {
       const match = NOTES_KEY.exec(k)
-      return match === null || Number(match[1]) < last.number
+      return match === null || Number(match[1]) < first.number
     }),
   )
-  if (!previous) return { input: { ...EMPTY_INPUT, notes }, removed: last.number }
-  // After an education term there is no after-term choice: removing the start choices of the last term's
-  // career or education goes back to the career pick that followed the education term.
-  const lastPrefix = last.key.replace(/(term-\d+|education)$/, '')
-  const drop =
-    previous.education === undefined ? [`${previous.key}.next`] : [`${lastPrefix}start.career`, `${lastPrefix}start.assignment`]
+  if (index === 0) return { input: { ...EMPTY_INPUT, notes }, removed: first.number }
   const choices = Object.fromEntries(Object.entries(input.choices).filter(([k]) => !drop.includes(k)))
   const trimmed: CareerInput = { ...input, choices, notes }
-  return { input: pruneInput(trimmed, buildCareer(seed, base, trimmed, data).usedKeys).input, removed: last.number }
+  return { input: pruneInput(trimmed, buildCareer(seed, base, trimmed, data).usedKeys).input, removed: first.number }
 }
