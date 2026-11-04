@@ -141,14 +141,27 @@ describe('mishap choices', () => {
     expect(pick(undefined).pending).toMatchObject({ kind: 'event-choice', key: 'term-1.mishap.effect-0.choice', source: 'Mishap' })
   })
 
-  // Picks Stay and expects the after-term choice open (not forced to muster); the term still loses
-  // its benefit roll, because only keep-benefit gives it back.
+  // Picks Stay and expects the after-term choice open (not forced to muster), and the term's benefit
+  // roll kept with no lost-roll reason, the same as a stay-in-career listed outside a choice.
   // Criteria: EC-4.
-  it('an option with stay-in-career keeps the character in the career', () => {
+  it('an option with stay-in-career keeps the character in the career and the benefit roll', () => {
     const result = pick('Stay')
     expect(result.pending).toEqual({ kind: 'next', key: 'term-1.next', forced: undefined, reason: undefined })
     expect(result.terms[0]?.endReason).toBeUndefined()
-    expect(result.lostBenefitTerms).toBe(1)
+    expect(result.lostBenefitTerms).toBe(0)
+    expect(step(result, 'term-1.mishap').reasons).toEqual([])
+  })
+
+  // Gives every mishap leave-career followed by a choice whose first option is stay-in-career, picks
+  // that option, and expects mustering out still forced by the leave-career effect.
+  // Criteria: EC-4.
+  it('a stay-in-career option does not undo a leave-career effect on the same mishap', () => {
+    const leaving: CareerDefinition = {
+      ...career,
+      mishaps: career.mishaps.map((m) => ({ ...m, effects: [{ type: 'leave-career' }, ...(m.effects ?? [])] })),
+    }
+    const result = build(leaving, { 'term-1.mishap.effect-1.choice': 'Stay' }, { 'term-1.survival': 2 }, losesTerm)
+    expect(result.pending).toMatchObject({ kind: 'next', forced: 'muster', reason: 'An event ends the career after this term.' })
   })
 
   // Picks Leave with the benefit roll and expects mustering out forced, no lost benefit roll, and no
@@ -181,6 +194,45 @@ describe('forward DMs', () => {
     expect(step(result, 'term-1.advancement').dm).toBe(0)
     expect(step(result, 'term-2.survival').dm).toBe(-2)
     expect(step(result, 'term-2.survival').reasons).toContain('DM -2 from an event.')
+  })
+
+  // Gives the event dm-next survival +3 and takes anagathics in term 2, and expects the DM on the
+  // first term 2 survival roll only, not on the second (anagathics) survival roll.
+  // Criteria: EC-5.
+  it('dm-next on survival goes on the first survival roll of a term on anagathics', () => {
+    const rules: Rules = { ...sampleRules, anagathics: { characteristic: 'SOC', target: 2, costDice: 1, costPerDie: 1 } }
+    const result = build(
+      withEvent7([{ type: 'dm-next', roll: 'survival', dm: 3 }]),
+      { ...TERM_2, 'term-2.anagathics': 'take' },
+      { 'term-2.anagathics': 12, 'term-2.survival': 12, 'term-2.survival-2': 12 },
+      rules,
+    )
+    expect(step(result, 'term-2.survival').dm).toBe(3)
+    expect(step(result, 'term-2.survival-2').dm).toBe(0)
+  })
+
+  // Gives the event dm-next advancement +4 and allows a commission (SOC 8+), tries for it and fails, and
+  // expects the DM and its reason on the commission roll and no event DM on the advancement roll after.
+  // Criteria: EC-5.
+  it('an advancement DM used by a failed commission roll does not go on advancement too', () => {
+    const rules: Rules = { ...sampleRules, commission: { anyTermFromSOC: 9, dmPerLaterTerm: -1 } }
+    const career: CareerDefinition = { ...withEvent7([{ type: 'dm-next', roll: 'advancement', dm: 4 }]), commission: { characteristic: 'SOC', target: 8 } }
+    const result = build(career, { 'term-1.commission.try': 'try' }, { 'term-1.commission': 2 }, rules)
+    expect(step(result, 'term-1.commission').dm).toBe(4)
+    expect(step(result, 'term-1.commission').reasons).toContain('DM +4 from an event.')
+    expect(step(result, 'term-1.commission').result).toBe('fail')
+    expect(step(result, 'term-1.advancement').dm).toBe(0)
+    expect(step(result, 'term-1.advancement').reasons).not.toContain('DM +4 from an event.')
+  })
+
+  // Gives the event dm-next survival +2, leaves after term 1, and expects the DM reported as unused
+  // in the result; with no DM both unused values are 0.
+  // Criteria: EC-8.
+  it('a dm-next DM not used when the career ends is reported as unused', () => {
+    const result = build(withEvent7([{ type: 'dm-next', roll: 'survival', dm: 2 }]), { 'term-1.next': 'leave', 'benefit-0': 'benefit' })
+    expect(result.finished).toBe(true)
+    expect(result.unusedNextDMs).toEqual({ advancement: 0, survival: 2 })
+    expect(build(withEvent7([])).unusedNextDMs).toEqual({ advancement: 0, survival: 0 })
   })
 
   // Gives the event dm-later +4 on advancement rolls, and expects it held on the event step, not

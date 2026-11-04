@@ -22,14 +22,17 @@ forward DM that the player picks to be applied automatically or by hand, dependi
 
 2. **Choices on a mishap can keep the career or the benefit roll.** A mishap that ends the career sets
    the end of the career and, with `rules.benefits.mishapLosesTerm`, the lost benefit roll before its
-   effects are applied. A `stay-in-career` effect picked in a choice undoes the end of the career, and a
-   `keep-benefit` effect picked in a choice gives back the benefit roll. Listed outside a choice, both
-   work as before.
+   effects are applied. A `stay-in-career` effect picked in a choice undoes the mishap's end of the career
+   and gives back the benefit roll, as it does when listed outside a choice. It does not undo an end set by
+   another effect, such as a `leave-career` on the same entry. A `keep-benefit` effect picked in a choice
+   gives back the benefit roll. Listed outside a choice, both work as before.
 
 3. **A forward DM whose roll is clear is applied by the engine.** `dm-next` names the roll:
    `advancement`, `qualification`, or (new) `survival`. The engine adds the DM to the next roll of that
-   kind, and that roll gives the reason ("DM +4 from an event."). An advancement DM also goes on a
-   commission roll made in its place, as before. `benefit-dm` keeps going on the next roll on the
+   kind, and that roll gives the reason ("DM +4 from an event."). An advancement DM goes on a commission
+   roll when the player tries for one, and that roll uses it up whether it passes or fails, so the
+   advancement roll after a failed commission doesn't get it again. A survival DM goes on the term's first
+   survival roll, not on the second roll for anagathics. `benefit-dm` keeps going on the next roll on the
    benefit table.
 
 4. **A forward DM whose roll the player decides is applied by hand.** `dm-later` is for entries such as
@@ -48,7 +51,8 @@ forward DM that the player picks to be applied automatically or by hand, dependi
 
 6. **Finish career picks options at random and leaves `dm-later` unapplied.** It picks a choice option
    with the seed, the same way it picks a skill option, so a seed gives the same pick each time. It does
-   not apply a `dm-later` DM. The finished summary lists every `dm-later` DM that was not applied.
+   not apply a `dm-later` DM. The finished summary lists every `dm-later` DM that was not applied, and any
+   `dm-next` advancement or survival DM that no roll used.
 
 ## UI
 
@@ -57,7 +61,8 @@ forward DM that the player picks to be applied automatically or by hand, dependi
 - A step with a `dm-later` DM shows "DM +4 for one later advancement roll, applied by hand:" and a select
   named "<term> <step> DM +4 applies to", with Not applied and each roll it can go on. Before any such
   roll has been rolled, it says to pick the roll once it has been rolled.
-- The finished summary has a "DMs not applied" line when any `dm-later` DM was not applied.
+- The finished summary has a "DMs not applied" line when any `dm-later` DM was not applied or a `dm-next`
+  advancement or survival DM is left over.
 
 ## Acceptance criteria
 
@@ -68,14 +73,16 @@ forward DM that the player picks to be applied automatically or by hand, dependi
       summary and the option labels. A saved answer that is not one of the labels asks again.
 - [x] **EC-3** Picking an option applies only that option's effects, and the step says which option was chosen.
 - [x] **EC-4** On a mishap, an option with `stay-in-career` keeps the career going, and an option with
-      `keep-benefit` gives back the term's benefit roll.
+      `keep-benefit` gives back the term's benefit roll. `stay-in-career` in a choice also keeps the benefit roll
+      and does not undo a `leave-career` on the same entry.
 - [x] **EC-5** A `dm-next` DM, picked in a choice or not, goes on the next roll of its kind (advancement or
-      survival here), and that roll gives the reason.
+      survival here), and that roll gives the reason. A failed commission roll uses up an advancement DM, and a
+      survival DM goes on a term's first survival roll only.
 - [x] **EC-6** A `dm-later` DM is not applied until the player picks a later roll of its kinds; then it goes on
       that roll, which gives the reason.
 - [x] **EC-7** A `dm-later` pick that names a roll not offered (wrong kind, or not built) is not applied and is
       removed from the saved choices.
 - [x] **EC-8** Finish career picks a choice option from the seed and leaves `dm-later` DMs unapplied, and the
-      finished summary lists them.
+      finished summary lists them with any `dm-next` DM left over.
 - [x] **EC-9** In the browser, a choice shows a button per option; picking the DM option puts the DM on the
       advancement roll, and a held DM can be applied to a later roll with its select.

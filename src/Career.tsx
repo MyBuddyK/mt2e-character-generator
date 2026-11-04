@@ -690,6 +690,13 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
   const { input, result, update } = career
   const pending = result.pending
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)
+  // DMs from events that no roll used: dm-later DMs the player didn't apply, and dm-next DMs left over.
+  const unusedDMs = [
+    ...result.laterDMs.filter((d) => d.appliedTo === undefined).map((d) => `DM ${signed(d.dm)} for ${laterRollsText(d.rolls)} (${d.source})`),
+    ...(['advancement', 'survival'] as const).flatMap((roll) =>
+      result.unusedNextDMs[roll] === 0 ? [] : [`DM ${signed(result.unusedNextDMs[roll])} on the next ${roll} roll`],
+    ),
+  ]
   const sectionRef = useRef<HTMLElement>(null)
   const removedTerm = career.removedTerm
   // After a removal the clicked button is gone, so focus moves to the new most recent term's Remove
@@ -841,15 +848,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
                   Characteristic changes: {changes.map(([c, v]) => `${c} ${signed(v)}`).join(', ')}
                 </p>
               )}
-              {result.laterDMs.some((d) => d.appliedTo === undefined) && (
-                <p data-testid="summary-later-dms">
-                  DMs not applied:{' '}
-                  {result.laterDMs
-                    .filter((d) => d.appliedTo === undefined)
-                    .map((d) => `DM ${signed(d.dm)} for ${laterRollsText(d.rolls)} (${d.source})`)
-                    .join(', ')}
-                </p>
-              )}
+              {unusedDMs.length > 0 && <p data-testid="summary-later-dms">DMs not applied: {unusedDMs.join(', ')}</p>}
               <p data-testid="summary-benefits">
                 Benefits:{' '}
                 {result.benefits

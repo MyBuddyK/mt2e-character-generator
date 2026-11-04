@@ -235,6 +235,11 @@ export interface CareerResult {
   lostBenefitTerms: number
   /** A DM from a dm-next effect for the next career's qualification roll (used by a later career). */
   qualificationDM: number
+  /**
+   * `dm-next` advancement and survival DMs not used yet when the build ended (0 when none). A later
+   * career's first roll of that kind uses them.
+   */
+  unusedNextDMs: { advancement: number; survival: number }
   /** Every DM from a `dm-later` effect, in the order gained, applied or not. */
   laterDMs: LaterDM[]
   /** Cash from mustering out, less `costs`. Below 0 is a debt. */
@@ -438,6 +443,19 @@ export function buildCareer(
   }
 
   /**
+   * Returns the DMs for the roll `key` (shown as `label`) of `kind` that come from events: the `dm-next`
+   * DM for `next` when given, which is then used up, and the `dm-later` DMs the player applied to it
+   * (see laterDMFor). Returns their sum and one reason for each.
+   */
+  const rollDMs = (key: string, kind: RollKind, label: string, next?: keyof typeof nextDM): { dm: number; reasons: string[] } => {
+    const eventDM = next === undefined ? 0 : nextDM[next]
+    if (next !== undefined) nextDM[next] = 0
+    const held = laterDMFor(key, kind, label)
+    const reasons = eventDM === 0 ? held.reasons : [`DM ${signedText(eventDM)} from an event.`, ...held.reasons]
+    return { dm: eventDM + held.dm, reasons }
+  }
+
+  /**
    * Rolls 2D + `dm` against `target` and returns the step, with dice and outcome overrides applied.
    * When `failOnNatural` is set, dice at or below it fail whatever the total, and the step says so.
    */
@@ -522,7 +540,7 @@ export function buildCareer(
       return automaticOutcome(key, 'Qualification', `Automatic qualification with ${high} ${q.automaticAt ?? 0} or higher.`)
     }
     const ageDM = q.ageDM !== undefined && ageStart >= q.ageDM.fromAge ? q.ageDM.dm : 0
-    const held = laterDMFor(key, 'qualification', `${label} Qualification`)
+    const held = rollDMs(key, 'qualification', `${label} Qualification`)
     const step = check(key, 'Qualification', q, extraDM + ageDM + held.dm)
     if (ageDM !== 0) step.reasons.push(`DM ${signedText(ageDM)} for age ${q.ageDM?.fromAge ?? ageStart} or more.`)
     step.reasons.push(...held.reasons)
@@ -641,6 +659,14 @@ export function buildCareer(
    * benefit roll, so a `stay-in-career` or `keep-benefit` effect picked in a choice can undo either.
    */
   let mishapState: { endedCareer: boolean; lostTerm: boolean } | undefined
+  /** Gives back the benefit roll the current mishap took, if it took one, and removes the reason from `step`. */
+  const restoreMishapTerm = (step: Step) => {
+    if (!mishapState?.lostTerm) return
+    rs.lostBenefitTerms -= 1
+    mishapState.lostTerm = false
+    const at = step.reasons.indexOf(LOST_TERM_REASON)
+    if (at >= 0) step.reasons.splice(at, 1)
+  }
 
   /** Applies `effects` to the character, adding to `step`. Choices are keyed under `key`. */
   const applyEffects = (effects: Effect[] | undefined, key: string, step: Step, termSteps: Step[], term: TermResult | undefined) => {
@@ -721,11 +747,11 @@ export function buildCareer(
           step.applied.push('Automatic promotion this term')
           break
         case 'stay-in-career':
-          // Inside a choice the mishap has already ended the career, so picking this option undoes that.
-          if (mishapState?.endedCareer && term) {
-            term.endReason = undefined
-            mishapState.endedCareer = false
-          }
+          // Inside a choice the mishap has already ended the career and taken the benefit roll, so
+          // picking this option undoes both, as a stay-in-career outside a choice would.
+          if (mishapState?.endedCareer && term && term.endReason === MISHAP_END_REASON) term.endReason = undefined
+          if (mishapState) mishapState.endedCareer = false
+          restoreMishapTerm(step)
           step.applied.push('Stays in the career')
           break
         case 'wager': {
@@ -764,12 +790,7 @@ export function buildCareer(
         }
         case 'keep-benefit':
           // Inside a choice the mishap has already counted the lost benefit roll, so picking this option gives it back.
-          if (mishapState?.lostTerm) {
-            rs.lostBenefitTerms -= 1
-            mishapState.lostTerm = false
-            const at = step.reasons.indexOf(LOST_TERM_REASON)
-            if (at >= 0) step.reasons.splice(at, 1)
-          }
+          restoreMishapTerm(step)
           step.applied.push("Keeps this term's benefit roll")
           break
         case 'reduce': {
@@ -816,7 +837,7 @@ export function buildCareer(
     // The lost term is counted before the row's effects, so a wager on this row can't bet that term's roll.
     const state = { endedCareer: false, lostTerm: false }
     if (endsCareer && term && !has('stay-in-career')) {
-      term.endReason = 'Survival failed, so this career ends after this term.'
+      term.endReason = MISHAP_END_REASON
       state.endedCareer = true
       if (rules.benefits.mishapLosesTerm && !has('keep-benefit')) {
         rs.lostBenefitTerms += 1
@@ -826,8 +847,11 @@ export function buildCareer(
     }
     const outer = mishapState
     mishapState = state
-    if (row) applyEffects(row.effects, key, step, termSteps, term)
-    mishapState = outer
+    try {
+      if (row) applyEffects(row.effects, key, step, termSteps, term)
+    } finally {
+      mishapState = outer
+    }
   }
 
   /**
@@ -862,7 +886,7 @@ export function buildCareer(
    * with rules.aging.crisis it asks whether to pay for medical care or let the character die.
    */
   const ageing = (key: string, label: string, dm: number, reasons: string[], term: TermResult, steps: Step[], atTermStart = false) => {
-    const held = laterDMFor(key, 'aging', `Term ${term.number} ${label}`)
+    const held = rollDMs(key, 'aging', `Term ${term.number} ${label}`)
     const { step, row } = tableRoll(key, label, rules.aging.dice, dm + held.dm, rules.aging.table)
     step.result = row?.summary ?? ''
     step.reasons.push(...reasons, ...held.reasons)
@@ -1084,18 +1108,16 @@ export function buildCareer(
 
         promoteThisTerm = false
         const survivalKey = `${termKey}.survival`
-        const survivalHeld = laterDMFor(survivalKey, 'survival', `Term ${number} Survival`)
-        const survivalEventDM = nextDM.survival
-        nextDM.survival = 0
-        const survival = check(survivalKey, 'Survival', assignment.survival, survivalEventDM + survivalHeld.dm, rules.survival?.failOnNatural)
-        if (survivalEventDM !== 0) survival.reasons.push(`DM ${signedText(survivalEventDM)} from an event.`)
-        survival.reasons.push(...survivalHeld.reasons)
+        // A dm-next survival DM goes on the term's first survival roll only, not on the anagathics roll.
+        const survivalDMs = rollDMs(survivalKey, 'survival', `Term ${number} Survival`, 'survival')
+        const survival = check(survivalKey, 'Survival', assignment.survival, survivalDMs.dm, rules.survival?.failOnNatural)
+        survival.reasons.push(...survivalDMs.reasons)
         steps.push(survival)
         let survived = passed(survival)
         if (term.anagathics) {
-          const secondHeld = laterDMFor(`${termKey}.survival-2`, 'survival', `Term ${number} Survival (anagathics)`)
-          const second = check(`${termKey}.survival-2`, 'Survival (anagathics)', assignment.survival, secondHeld.dm, rules.survival?.failOnNatural)
-          second.reasons.push('Anagathics: a second survival roll this term.', ...secondHeld.reasons)
+          const secondDMs = rollDMs(`${termKey}.survival-2`, 'survival', `Term ${number} Survival (anagathics)`)
+          const second = check(`${termKey}.survival-2`, 'Survival (anagathics)', assignment.survival, secondDMs.dm, rules.survival?.failOnNatural)
+          second.reasons.push('Anagathics: a second survival roll this term.', ...secondDMs.reasons)
           steps.push(second)
           survived = survived && passed(second)
         }
@@ -1125,15 +1147,14 @@ export function buildCareer(
           if (answer !== 'try' && answer !== 'skip') throw new Stop({ kind: 'commission', key: tryKey })
           if (answer === 'try') {
             const laterDM = commission.dmPerLaterTerm * (n - 1)
-            const held = laterDMFor(`${termKey}.commission`, 'commission', `Term ${number} Commission`)
-            const step = check(`${termKey}.commission`, 'Commission', career.commission, nextDM.advancement + laterDM + held.dm)
+            // The advancement DM from an event is used up by the commission roll, pass or fail.
+            const eventDMs = rollDMs(`${termKey}.commission`, 'commission', `Term ${number} Commission`, 'advancement')
+            const step = check(`${termKey}.commission`, 'Commission', career.commission, laterDM + eventDMs.dm)
             if (laterDM !== 0) step.reasons.push(`DM ${signedText(laterDM)} for ${n - 1} term${n === 2 ? '' : 's'} after the first.`)
-            if (nextDM.advancement !== 0) step.reasons.push(`DM ${signedText(nextDM.advancement)} from an event.`)
-            step.reasons.push(...held.reasons)
+            step.reasons.push(...eventDMs.reasons)
             steps.push(step)
             if (passed(step)) {
               commissioned = true
-              nextDM.advancement = 0
               rs.enlistedRankAtCommission = rs.rank
               rs.officerRank = 0
               step.reasons.push('A commission replaces this term’s advancement roll.')
@@ -1149,12 +1170,9 @@ export function buildCareer(
           if (promoteThisTerm) {
             advancement = automaticOutcome(advancementKey, 'Advancement', 'Automatic promotion from an event this term.')
           } else {
-            const held = laterDMFor(advancementKey, 'advancement', `Term ${number} Advancement`)
-            const eventDM = nextDM.advancement
-            advancement = check(advancementKey, 'Advancement', assignment.advancement, eventDM + held.dm)
-            nextDM.advancement = 0
-            if (eventDM !== 0) advancement.reasons.push(`DM ${signedText(eventDM)} from an event.`)
-            advancement.reasons.push(...held.reasons)
+            const eventDMs = rollDMs(advancementKey, 'advancement', `Term ${number} Advancement`, 'advancement')
+            advancement = check(advancementKey, 'Advancement', assignment.advancement, eventDMs.dm)
+            advancement.reasons.push(...eventDMs.reasons)
             const adv = rules.advancement
             const natural = advancement.dice === undefined ? 0 : current(advancement.dice)
             const total = advancement.total ?? 0
@@ -1218,7 +1236,7 @@ export function buildCareer(
         const table = picked === 'cash' ? 'cash' : 'benefit'
         if (table === 'cash') cashRolls += 1
         const label = table === 'cash' ? 'Cash roll' : 'Benefit roll'
-        const held = laterDMFor(key, 'benefit', `${k === 1 ? 'Mustering out' : `Career ${k} mustering out`} ${label} ${i + 1}`)
+        const held = rollDMs(key, 'benefit', `${k === 1 ? 'Mustering out' : `Career ${k} mustering out`} ${label} ${i + 1}`)
         const dm = (table === 'benefit' ? benefitDM + rankDM : rankDM + cashSkillDM) + held.dm
         const eventDM = table === 'benefit' ? benefitDM : 0
         if (table === 'benefit') benefitDM = 0
@@ -1277,6 +1295,7 @@ export function buildCareer(
     benefitCount: sum((r) => r.benefitCount),
     lostBenefitTerms: sum((r) => r.lostBenefitTerms),
     qualificationDM: nextDM.qualification,
+    unusedNextDMs: { advancement: nextDM.advancement, survival: nextDM.survival },
     laterDMs: later.map((l) => l.dm),
     cash: benefits.reduce((total, b) => total + b.cash, 0) - costs,
     costs,
@@ -1297,6 +1316,9 @@ function signedText(n: number): string {
 
 /** The reason a mishap step gives when its term gives no benefit roll (rules.benefits.mishapLosesTerm). */
 const LOST_TERM_REASON = 'This term gives no benefit roll because it ended in a mishap.'
+
+/** The end reason a mishap that ends the career sets on its term. */
+const MISHAP_END_REASON = 'Survival failed, so this career ends after this term.'
 
 /** Returns the rolls a `dm-later` DM may be applied to, as text: "one later roll", or "one later advancement or survival roll". */
 export function laterRollsText(rolls: RollKind[] | undefined): string {
