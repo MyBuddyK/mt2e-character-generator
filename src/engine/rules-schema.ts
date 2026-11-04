@@ -28,6 +28,32 @@ function consecutiveRolls(entries: { roll: number }[], ctx: z.RefinementCtx) {
   }
 }
 
+const lifeEventRow = {
+  roll: z.int(),
+  summary: z.string().trim().min(1, 'must be a non-empty string'),
+  /** Optional. Marks the entry as a possible link between two characters. */
+  connection: z.boolean().optional(),
+  effects: EffectsSchema,
+}
+
+/**
+ * One row of a Life Events sub-table, rolled on 1D: the roll (1 to 6), a short summary, and optional
+ * `connection` and effects.
+ */
+export const LifeEventSubEntrySchema = z.strictObject({ ...lifeEventRow, roll: z.int().min(1).max(6) })
+
+/**
+ * One Life Events table row: the total it answers to, a short summary, optional `connection` and
+ * `effects`, and an optional 1D `subTable` rolled after it (for an entry such as an unusual event). A
+ * sub-table's rolls must be consecutive, each once.
+ */
+export const LifeEventEntrySchema = z.strictObject({
+  ...lifeEventRow,
+  subTable: z.array(LifeEventSubEntrySchema).min(1, 'must have at least one row').superRefine(consecutiveRolls).optional(),
+})
+/** One Life Events row, as described by LifeEventEntrySchema. */
+export type LifeEventEntry = z.infer<typeof LifeEventEntrySchema>
+
 /** The full rules object. Unknown keys are rejected. */
 export const RulesSchema = z.strictObject({
   /** Where the values come from, e.g. "Core Rulebook p.XX". */
@@ -95,6 +121,16 @@ export const RulesSchema = z.strictObject({
     table: z.array(AgingEntrySchema).min(1, 'must have at least one row').superRefine(consecutiveRolls),
     crisis: z.strictObject({ costDice: z.int().min(1), costPerDie: z.int().min(0) }).optional(),
   }),
+  /**
+   * Optional Life Events table, rolled by a `life-event` effect: `dice` D (2 in the Core Rulebook) on
+   * `table`. Totals below the lowest row use the lowest row, and totals above the highest use the highest.
+   */
+  lifeEvents: z
+    .strictObject({
+      dice: z.int().min(1),
+      table: z.array(LifeEventEntrySchema).min(1, 'must have at least one row').superRefine(consecutiveRolls),
+    })
+    .optional(),
   /**
    * Optional anagathics. The player can take them in any term: starting needs a 2D check of
    * `characteristic` against `target`. While taken, each term costs `costDice` D × `costPerDie` credits

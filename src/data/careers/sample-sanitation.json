@@ -263,7 +263,12 @@
     },
     {
       "roll": 7,
-      "summary": "Life event."
+      "summary": "Life event.",
+      "effects": [
+        {
+          "type": "life-event"
+        }
+      ]
     },
     {
       "roll": 8,
@@ -356,7 +361,7 @@
     {
       "roll": 5,
       "cash": 10000,
-      "benefit": "Ship share"
+      "benefit": "Ship share", "shipShares": 1
     },
     {
       "roll": 6,
@@ -366,7 +371,7 @@
     {
       "roll": 7,
       "cash": 20000,
-      "benefit": "Two ship shares"
+      "benefit": "Two ship shares", "shipShares": 2
     }
   ]
 }

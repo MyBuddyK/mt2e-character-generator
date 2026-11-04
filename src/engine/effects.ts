@@ -49,6 +49,9 @@ export type RollKind = (typeof ROLL_KINDS)[number]
  *   set) on a 2D roll with one of `skills` (skill level as the DM, -3 when untrained) against `target`.
  *   Success gains half the wager in extra benefit rolls, rounded up; failure loses the wager. With
  *   `gainUsedSkill`, the skill used gains a level either way. Wagering 0 skips the roll.
+ * - `life-event`: roll on the Life Events table in the rules (`rules.lifeEvents`) and apply the entry in
+ *   the same term, as its own step after the step that gave it. With no table in the rules it is a note.
+ * - `ship-shares`: gain `count` ship shares, counted on the character.
  * - `choice`: the player picks one of `options` (at least two, each label once), and the engine
  *   applies that option's effects. An option's effects can be any effect but another `choice`.
  *
@@ -75,6 +78,8 @@ const PLAIN_EFFECTS = [
   z.strictObject({ type: z.literal('promote') }),
   z.strictObject({ type: z.literal('stay-in-career') }),
   z.strictObject({ type: z.literal('keep-benefit') }),
+  z.strictObject({ type: z.literal('life-event') }),
+  z.strictObject({ type: z.literal('ship-shares'), count: z.int().min(1) }),
   z.strictObject({
     type: z.literal('reduce'),
     characteristics: z

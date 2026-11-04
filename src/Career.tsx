@@ -829,6 +829,11 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
                 Age <strong data-testid="summary-age">{result.age}</strong>,{' '}
                 {result.runs[result.runs.length - 1]?.officerRank !== undefined ? 'officer rank' : 'rank'} {result.rank}
                 {result.title ? ` ${result.title}` : ''}, cash <strong data-testid="summary-cash">Cr{result.cash}</strong>
+                {result.shipShares > 0 && (
+                  <>
+                    , ship shares <strong data-testid="summary-ship-shares">{result.shipShares}</strong>
+                  </>
+                )}
               </p>
               {result.runs.length > 1 && (
                 <p data-testid="summary-careers">
