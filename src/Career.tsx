@@ -222,9 +222,10 @@ interface InfoTipProps {
 }
 
 /**
- * Renders an "i" button that shows `text` in a tooltip while a mouse pointer is over it, and toggles
- * it on click or tap (a click while it is shown hides it). Escape anywhere, a press outside the tip,
- * or moving focus away hides it.
+ * Renders an "i" button that shows `text` in a tooltip while a mouse pointer is over it. A click or tap
+ * pins the tip open, and a click or tap while it is pinned hides it. Whether a click pins or hides
+ * depends only on the pin, not on the hover, so a mouse click on a tip shown by hover pins it. Escape
+ * anywhere, a press outside the tip, or moving focus away hides it.
  */
 function InfoTip({ label, text }: InfoTipProps) {
   const [open, setOpen] = useState(false)
@@ -270,7 +271,7 @@ function InfoTip({ label, text }: InfoTipProps) {
         aria-label={label}
         aria-describedby={shown ? id : undefined}
         onClick={() => {
-          if (shown) {
+          if (open) {
             setOpen(false)
             setHover(false)
           } else {

@@ -22,15 +22,18 @@ export const SavedCharacterSchema = z.object({ packs: z.string(), input: InputSc
 /** One saved character, as described by SavedCharacterSchema. */
 export type SavedCharacter = { packs: string; input: CareerInput }
 
-/** Reads every saved character entry as raw JSON, or an empty object when there is none or it can't be read. */
-function readAll(storage: Storage): Record<string, unknown> {
+/**
+ * Reads every saved character entry as raw JSON [seed, value] pairs, or no entries when there is none or
+ * it can't be read. Pairs are used instead of an object so that seeds such as "__proto__" are plain keys.
+ */
+function readEntries(storage: Storage): [string, unknown][] {
   try {
     const text = storage.getItem(CHARACTERS_KEY)
-    if (text === null) return {}
+    if (text === null) return []
     const value: unknown = JSON.parse(text)
-    return typeof value === 'object' && value !== null && !Array.isArray(value) ? { ...value } : {}
+    return typeof value === 'object' && value !== null && !Array.isArray(value) ? Object.entries(value) : []
   } catch {
-    return {}
+    return []
   }
 }
 
@@ -40,7 +43,7 @@ function readAll(storage: Storage): Record<string, unknown> {
  */
 export function readSavedCharacter(storage: Storage | undefined, seed: string): SavedCharacter | undefined {
   if (!storage) return undefined
-  const result = SavedCharacterSchema.safeParse(readAll(storage)[seed])
+  const result = SavedCharacterSchema.safeParse(readEntries(storage).find(([key]) => key === seed)?.[1])
   return result.success ? result.data : undefined
 }
 
@@ -54,11 +57,10 @@ export function writeSavedCharacter(
   character: SavedCharacter | undefined,
 ): WriteResult {
   if (!storage) return 'unavailable'
-  const all = readAll(storage)
-  if (character === undefined) delete all[seed]
-  else all[seed] = character
+  const entries: [string, unknown][] = readEntries(storage).filter(([key]) => key !== seed)
+  if (character !== undefined) entries.push([seed, character])
   try {
-    storage.setItem(CHARACTERS_KEY, JSON.stringify(all))
+    storage.setItem(CHARACTERS_KEY, JSON.stringify(Object.fromEntries(entries)))
     return 'saved'
   } catch {
     return 'failed'

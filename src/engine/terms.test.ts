@@ -428,6 +428,22 @@ describe('saved characters', () => {
     expect(readSavedCharacter(storage, 'a')).toBeUndefined()
     expect(readSavedCharacter(storage, 'b')).toEqual({ packs: '', input: EMPTY_INPUT })
   })
+
+  // Saves characters for the seeds "__proto__" and "constructor", expects each read back and a seed
+  // "toString" with nothing saved to read as undefined; then removes "__proto__" and expects
+  // "constructor" kept.
+  it('saves and reads seeds named like object properties as plain keys', () => {
+    const storage = memory()
+    const saved = { packs: 'p@1', input: started() }
+    expect(writeSavedCharacter(storage, '__proto__', saved)).toBe('saved')
+    writeSavedCharacter(storage, 'constructor', { packs: '', input: EMPTY_INPUT })
+    expect(readSavedCharacter(storage, '__proto__')).toEqual(saved)
+    expect(readSavedCharacter(storage, 'constructor')).toEqual({ packs: '', input: EMPTY_INPUT })
+    expect(readSavedCharacter(storage, 'toString')).toBeUndefined()
+    writeSavedCharacter(storage, '__proto__', undefined)
+    expect(readSavedCharacter(storage, '__proto__')).toBeUndefined()
+    expect(readSavedCharacter(storage, 'constructor')).toEqual({ packs: '', input: EMPTY_INPUT })
+  })
 })
 
 // Checks which skill table entries asCharacteristic reads as characteristic changes.
