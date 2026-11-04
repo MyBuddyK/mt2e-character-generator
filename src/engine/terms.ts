@@ -453,12 +453,18 @@ export function buildCareer(
   let benefitDM = 0
   let cashRolls = 0
   let costs = 0
-  /** PSI as rolled by a `psi-test` effect, or undefined before a test. */
-  let psiBase: number | undefined
-  /** The sum of PSI changes since the test; psiBase + psiChange is never below 0. */
-  let psiChange = 0
+  /** PSI after the `psi-test` roll and later changes (never below 0), or undefined before a test. */
+  let psi: number | undefined
   /** Talent rolls made so far, for the `attemptDM` of the next one. */
   let talentRolls = 0
+  /** The talents rolled for so far, by name; term 1 of a career with `talents` rolls only the others. */
+  const talentsRolled = new Set<string>()
+  /** Talent rolls made from skill gains on each step, by step key, so each roll has its own key. */
+  const talentRollsOnStep = new Map<string, number>()
+  /** The steps of the career term being played, or undefined outside one (talent rolls from skill gains go here). */
+  let currentSteps: Step[] | undefined
+  /** True during basic training, where a talent the character lacks is not gained. */
+  let inBasicTraining = false
   let dead = false
   /** The age at death: the start of the term when the character dies before serving it. */
   let deathAge: number | undefined
@@ -495,7 +501,7 @@ export function buildCareer(
 
   /** The current value of `c`. PSI is 0 until a `psi-test` effect tests it. */
   const value = (c: CheckCharacteristic) =>
-    c === 'PSI' ? (psiBase === undefined ? 0 : psiBase + psiChange) : (normalizeCharacteristic(base[c] + changes[c]) ?? 0)
+    c === 'PSI' ? (psi ?? 0) : (normalizeCharacteristic(base[c] + changes[c]) ?? 0)
 
   /**
    * Adds `change` to `c` and lists it on `step`. PSI never goes below 0, and before a PSI test a PSI change is
@@ -503,11 +509,11 @@ export function buildCareer(
    */
   const changeCharacteristic = (c: CheckCharacteristic, change: number, step: Step) => {
     if (c === 'PSI') {
-      if (psiBase === undefined) {
+      if (psi === undefined) {
         step.notes.push(`PSI ${signedText(change)} changes nothing: the character's PSI hasn't been tested.`)
         return
       }
-      psiChange = Math.max(-psiBase, psiChange + change)
+      psi = Math.max(0, psi + change)
     } else {
       changes[c] += change
     }
@@ -719,28 +725,37 @@ export function buildCareer(
    * for each talent roll before it, against `target`. Counts the roll and returns the step.
    */
   const talentRoll = (key: string, talent: { name: string; dm: number }): Step => {
-    const rules = career?.talents
-    const attemptDM = (rules?.attemptDM ?? 0) * talentRolls
-    const step = roll2D(key, `Talent: ${talent.name}`, characteristicDM(value('PSI')) + talent.dm + attemptDM, rules?.target ?? 0)
+    const talentRules = career?.talents
+    const attemptDM = (talentRules?.attemptDM ?? 0) * talentRolls
+    const step = roll2D(key, `Talent: ${talent.name}`, characteristicDM(value('PSI')) + talent.dm + attemptDM, talentRules?.target ?? 0)
     step.characteristic = 'PSI'
     if (talent.dm !== 0) step.reasons.push(`DM ${signedText(talent.dm)} for ${talent.name}.`)
     if (attemptDM !== 0) step.reasons.push(`DM ${signedText(attemptDM)} for ${talentRolls} earlier talent roll${talentRolls === 1 ? '' : 's'}.`)
     talentRolls += 1
+    talentsRolled.add(talent.name)
     return step
   }
 
   /**
    * Gains a level in `skill`, or raises it to at least `level`. A gain that would break a limit in
-   * rules.skillLimits is lost, and the step says why. In a career with `talents`, a listed talent the
-   * character lacks first needs a talent roll (added to the current term), unless `talentRolled` says the
-   * caller has made it; on a fail nothing is gained.
+   * rules.skillLimits is lost, and the step says why. In a career term with `talents`, a listed talent the
+   * character lacks first needs a talent roll at `<step key>.talent-<n>` (added to the term), unless
+   * `talentRolled` says the caller has made it; on a fail nothing is gained. In basic training such a talent
+   * is not gained.
    */
   const gainSkill = (skill: string, step: Step, level?: number, talentRolled = false) => {
     // In a career with talents, gaining a talent the character lacks needs a talent roll first.
-    const talent = talentRolled ? undefined : career?.talents?.list.find((t) => t.name === skill)
-    if (talent && skills[skill] === undefined) {
-      const roll = talentRoll(`${step.key}.talent.${skill}`, talent)
-      terms[terms.length - 1]?.steps.push(roll)
+    const termSteps = currentSteps
+    const talent = talentRolled || !termSteps ? undefined : career?.talents?.list.find((t) => t.name === skill)
+    if (talent && termSteps && skills[skill] === undefined) {
+      if (inBasicTraining) {
+        step.reasons.push(`No ${skill}: in basic training a talent comes only from its talent roll.`)
+        return
+      }
+      const n = talentRollsOnStep.get(step.key) ?? 0
+      talentRollsOnStep.set(step.key, n + 1)
+      const roll = talentRoll(`${step.key}.talent-${n}`, talent)
+      termSteps.push(roll)
       if (!passed(roll)) {
         step.reasons.push(`No ${skill}: its talent roll failed.`)
         return
@@ -964,18 +979,19 @@ export function buildCareer(
           changeCharacteristic(effect.characteristic, effect.change, step)
           break
         case 'psi-test': {
-          if (psiBase !== undefined) {
+          if (psi !== undefined) {
             step.notes.push(`The character's PSI is already tested (PSI ${value('PSI')}), so this changes nothing.`)
             break
           }
           // Terms finished before the current one, education terms included.
           const served = term ? term.number - 1 : terms.length
           const test = diceStep(`${effectKey}.psi`, 'PSI test', 2, -served)
-          psiBase = Math.max(0, test.total ?? 0)
-          test.result = `PSI ${psiBase}`
+          psi = Math.max(0, test.total ?? 0)
+          test.result = `PSI ${psi}`
           if (served > 0) test.reasons.push(`DM -${served} for ${served} term${served === 1 ? '' : 's'} served.`)
+          if ((test.total ?? 0) < 0) test.reasons.push('PSI is never below 0.')
           termSteps.push(test)
-          step.applied.push(`PSI tested: ${psiBase}`)
+          step.applied.push(`PSI tested: ${psi}`)
           break
         }
         case 'leave-career':
@@ -1557,10 +1573,10 @@ export function buildCareer(
           problems.push(`The saved education "${educationId}" can't be picked for this term.`)
         }
         const named = careerId?.startsWith('education:') ? undefined : data.careers.find((c) => c.id === careerId)
-        career = named !== undefined && canPick(named, exclude, psiBase !== undefined) ? named : undefined
+        career = named !== undefined && canPick(named, exclude, psi !== undefined) ? named : undefined
         if (careerId !== undefined && !named && !careerId.startsWith('education:')) problems.push(`The saved career "${careerId}" isn't loaded.`)
         if (named?.entry === 'forced') problems.push(`${named.name} can be entered only when an event sends the character there.`)
-        else if (named?.entry === 'psi-tested' && psiBase === undefined) {
+        else if (named?.entry === 'psi-tested' && psi === undefined) {
           problems.push(`${named.name} can be picked only once the character's PSI has been tested.`)
         }
         else if (named && !career) problems.push(`${named.name} is the career just left, so it can't be entered again.`)
@@ -1715,6 +1731,7 @@ export function buildCareer(
         terms.push(term)
         rs.terms.push(term)
         const steps = term.steps
+        currentSteps = steps
         if (changedTo) {
           steps.push({ key: `${termKey}.assignment`, label: 'Assignment', result: changedTo.name, applied: [], notes: [], reasons: [] })
         }
@@ -1724,7 +1741,9 @@ export function buildCareer(
           const talents = career.talents
           const tried: string[] = []
           for (let i = 0; ; i += 1) {
-            const left = talents.list.filter((t) => skills[t.name] === undefined && !tried.includes(t.name)).map((t) => t.name)
+            const left = talents.list
+              .filter((t) => skills[t.name] === undefined && !tried.includes(t.name) && !talentsRolled.has(t.name))
+              .map((t) => t.name)
             if (left.length === 0) break
             const key = `${termKey}.talents.pick-${i}`
             const name = pickFrom(key, left, () => ({ kind: 'talent', key, options: left }))
@@ -1764,20 +1783,25 @@ export function buildCareer(
           }
           // The step is shown before its entries are applied, so a pick asked for here appears under it.
           steps.push(training)
-          if (careerNumber === 1) {
-            tableEntries(trainingTable).forEach((entry, i) => {
-              applyTableEntry(entry, training, rules.basicTraining.level, `${termKey}.training.pick-${i}`)
-              training.result = training.applied.join(', ')
-            })
-          } else {
-            // A later career's basic training gives one skill from the table, picked by the player.
-            const options = [
-              ...new Set(tableEntries(trainingTable).flatMap((e) => entryOptions(e).filter((o) => asCharacteristic(o) === undefined))),
-            ]
-            if (options.length > 0) {
-              gainSkill(pickOption(`${termKey}.training.pick`, options), training, rules.basicTraining.level)
-              training.result = training.applied.join(', ')
+          inBasicTraining = true
+          try {
+            if (careerNumber === 1) {
+              tableEntries(trainingTable).forEach((entry, i) => {
+                applyTableEntry(entry, training, rules.basicTraining.level, `${termKey}.training.pick-${i}`)
+                training.result = training.applied.join(', ')
+              })
+            } else {
+              // A later career's basic training gives one skill from the table, picked by the player.
+              const options = [
+                ...new Set(tableEntries(trainingTable).flatMap((e) => entryOptions(e).filter((o) => asCharacteristic(o) === undefined))),
+              ]
+              if (options.length > 0) {
+                gainSkill(pickOption(`${termKey}.training.pick`, options), training, rules.basicTraining.level)
+                training.result = training.applied.join(', ')
+              }
             }
+          } finally {
+            inBasicTraining = false
           }
           reachRank(0, steps, term, `${termKey}.rank-0`)
           const parole = rollParole(`${termKey}.parole`)
@@ -1957,6 +1981,7 @@ export function buildCareer(
         if (next !== 'continue') throw new Stop({ kind: 'next', key: nextKey, forced: undefined, reason: undefined })
       }
 
+      currentSteps = undefined
       // For benefits, an officer's rank is the officer rank plus the enlisted rank held when commissioned.
       const benefitRank = rs.officerRank === undefined ? rs.rank : rs.officerRank + (rs.enlistedRankAtCommission ?? 0)
       const highest = <T extends { minRank: number }>(list: T[]) =>
@@ -2045,7 +2070,7 @@ export function buildCareer(
     laterDMs: later.map((l) => l.dm),
     cash: benefits.reduce((total, b) => total + b.cash, 0) - costs,
     shipShares,
-    psi: psiBase === undefined ? undefined : value('PSI'),
+    psi,
     costs,
     dead,
     connections,

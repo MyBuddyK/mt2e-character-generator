@@ -93,7 +93,8 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
 9. **PSI is a seventh value only for a tested character.** It is not in the UPP, the rolled characteristics
    or species modifiers. `CareerResult.psi` is its current value, or undefined until it is tested.
 10. **`psi-test` rolls PSI once.** It rolls 2D at `<effect key>.psi` and subtracts the terms finished before
-    the current term, education terms included, with 0 as the lowest value. A second `psi-test` is a note.
+    the current term, education terms included, with 0 as the lowest value (the step then says so). A second
+    `psi-test` is a note.
 11. **`"entry": "psi-tested"`** lists a career at the career pick only once PSI is tested. A saved pick of it
     before that is a problem, as for a forced career.
 12. **PSI in checks.** `PSI` can be the characteristic of a qualification, survival, advancement or
@@ -102,15 +103,18 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
     the lowest value. Before PSI is tested it is a note and changes nothing.
 14. **`talents` is `{ target, attemptDM, automaticFirst?, list }`**, where `list` holds `{ name, dm }`. In term 1
     of the career, before basic training, the player picks which talent to try next at
-    `<term-1>.talents.pick-<i>` from the listed talents the character lacks, until none are left. Each is
+    `<term-1>.talents.pick-<i>` from the listed talents the character lacks and has never rolled for (so a
+    character who joins the career again rolls none twice), until none are left; the last one needs no
+    pick. Each is
     rolled at `<term-1>.talents.roll-<i>`: 2D + the PSI DM + the talent's `dm` + `attemptDM` for each talent
     roll made before it, against `target`. A pass gives the talent at level 0. `automaticFirst`, when it is
     the first talent picked, is gained with no roll and doesn't count as a roll made. Finish career tries the
     talents in the listed order.
-15. **A talent from a skill gain is a talent roll.** In a career with `talents`, a skill gain (from a skill
-    table, an event or a rank) naming a listed talent the character lacks rolls for it at `<step key>.talent`
-    first, as in decision 14; a pass applies the gain, a fail gives nothing. It counts as a talent roll for
-    the DM of later ones.
+15. **A talent from a skill gain is a talent roll.** In a career term with `talents`, a skill gain (from a
+    skill table, an event or a rank) naming a listed talent the character lacks rolls for it at
+    `<step key>.talent-<n>` first, where `n` counts the talent rolls of that step from 0, as in decision 14; a
+    pass applies the gain, a fail gives nothing. It counts as a talent roll for the DM of later ones. Basic
+    training gives no talent the character lacks, since term 1 has just rolled for each one.
 16. **Not covered**: a Psionics Institute outside a career (its cost and its training), and changing
     assignment by qualifying again. The pack keeps these in summaries, for the player to apply by hand.
 
@@ -170,3 +174,8 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
       and gives nothing on a fail. (Unit test.)
 - [x] **PP-20** Finish career tries the talents in the listed order. (Unit test.)
 - [x] **PP-21** The finished summary shows PSI once it is tested.
+- [x] **PP-22** Two talent rolls from skill gains on one step have their own keys and dice. (Unit test.)
+- [x] **PP-23** A character who joins a career with talents again rolls no talent in term 1 that was rolled for
+      before. (Unit test.)
+- [x] **PP-24** Basic training in a career with talents gives no talent the character lacks, and rolls for none.
+      (Unit test.)

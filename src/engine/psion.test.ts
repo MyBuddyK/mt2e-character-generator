@@ -170,11 +170,11 @@ describe('talents', () => {
   it('a skill gain naming a missing talent rolls for it first', () => {
     const choices = { ...TESTED, ...TALENTS, 'career-2.term-1.training.pick': 'Deception', 'career-2.term-1.skill-0.table': 'serviceSkills' }
     const rolls = { ...TESTED_ROLLS, 'career-2.term-1.talents.roll-1': 2, 'career-2.term-1.talents.roll-2': 12, 'career-2.term-1.skill-0': 3 }
-    const failed = build(choices, { ...rolls, 'career-2.term-1.skill-0.talent.Lifting': 2 })
-    expect(step(failed, 'career-2.term-1.skill-0.talent.Lifting').label).toBe('Talent: Lifting')
+    const failed = build(choices, { ...rolls, 'career-2.term-1.skill-0.talent-0': 2 })
+    expect(step(failed, 'career-2.term-1.skill-0.talent-0').label).toBe('Talent: Lifting')
     expect(step(failed, 'career-2.term-1.skill-0').reasons).toEqual(['No Lifting: its talent roll failed.'])
     expect(failed.skills['Lifting']).toBeUndefined()
-    const passedRoll = build(choices, { ...rolls, 'career-2.term-1.skill-0.talent.Lifting': 12 })
+    const passedRoll = build(choices, { ...rolls, 'career-2.term-1.skill-0.talent-0': 12 })
     expect(passedRoll.skills['Lifting']).toBe(1)
   })
 
@@ -187,5 +187,80 @@ describe('talents', () => {
     expect(finished.choices['career-2.term-1.talents.pick-1']).toBe('Farsight')
     expect(finished.choices['career-2.term-1.talents.pick-2']).toBeUndefined()
     expect(step(buildCareer(SEED, BASE, finished, data()), 'career-2.term-1.talents.roll-2').label).toBe('Talent: Lifting')
+  })
+})
+
+// Tests for talent rolls on later steps, careers and basic training.
+describe('talent rolls after term 1 starts', () => {
+  /** Choices and rolls that fail the Lifting and Farsight talent rolls in the Mind career's term 1. */
+  const FAILED = {
+    choices: { ...TESTED, ...TALENTS, 'career-2.term-1.training.pick': 'Deception', 'career-2.term-1.skill-0.table': 'personalDevelopment' },
+    rolls: { ...TESTED_ROLLS, 'career-2.term-1.talents.roll-1': 2, 'career-2.term-1.talents.roll-2': 2, 'career-2.term-1.skill-0': 1, 'career-2.term-1.survival': 12 },
+  }
+
+  // Replaces the Mind career's roll 9 event with gains of Lifting and Farsight, fails both talent rolls in
+  // term 1, rolls event 9, and expects two talent rolls on the event step with keys talent-0 and talent-1.
+  // Criteria: PP-22.
+  it('two talent rolls on one step have their own keys', () => {
+    const { testing, mind } = packCareers()
+    const twoGains: CareerDefinition = {
+      ...mind,
+      events: mind.events.map((e) =>
+        e.roll === 9
+          ? { ...e, effects: [{ type: 'skill', options: ['Lifting'] }, { type: 'skill', options: ['Farsight'] }] }
+          : e,
+      ),
+    }
+    const rolls = { ...FAILED.rolls, 'career-2.term-1.event': 9, 'career-2.term-1.event.talent-0': 12, 'career-2.term-1.event.talent-1': 2 }
+    const result = build(FAILED.choices, rolls, { careers: [testing, twoGains], rules: sampleRules })
+    expect(step(result, 'career-2.term-1.event.talent-0').label).toBe('Talent: Lifting')
+    expect(step(result, 'career-2.term-1.event.talent-1').label).toBe('Talent: Farsight')
+    expect(result.skills['Lifting']).toBe(1)
+    expect(result.skills['Farsight']).toBeUndefined()
+  })
+
+  // Fails Lifting and Farsight in the Mind career, leaves, plays the Testing career, starts the Mind career
+  // again, and expects no talent pick and no talent roll in its term 1.
+  // Criteria: PP-23.
+  it('joining the career again rolls no talent rolled for before', () => {
+    const choices = {
+      ...FAILED.choices,
+      'career-2.term-1.next': 'leave',
+      'career-2.benefit-0': 'benefit',
+      'career-3.start.career': 'test-testing',
+      'career-3.start.assignment': 'debris-sweep',
+      'career-3.term-1.training.pick': 'Pilot',
+      'career-3.term-1.skill-0.table': 'serviceSkills',
+      'career-3.term-1.next': 'leave',
+      'career-3.benefit-0': 'benefit',
+      'career-4.start.career': 'test-mind',
+      'career-4.start.assignment': 'untrained',
+    }
+    const rolls = {
+      ...FAILED.rolls,
+      'career-2.term-1.event': 8,
+      'career-2.term-1.advancement': 2,
+      'career-3.qualification': 12,
+      'career-3.term-1.survival': 12,
+      'career-3.term-1.event': 5,
+      'career-3.term-1.advancement': 2,
+      'career-4.qualification': 12,
+    }
+    const result = build(choices, rolls)
+    expect(result.runs[3]?.career.id).toBe('test-mind')
+    expect(result.pending?.kind).not.toBe('talent')
+    const keys = result.terms.flatMap((t) => t.steps).map((s) => s.key)
+    expect(keys.filter((k) => k.startsWith('career-4.term-1.talents'))).toEqual([])
+  })
+
+  // Fails the Lifting talent roll, picks Lifting in basic training, and expects a reason, no Lifting and no
+  // talent roll on the training step.
+  // Criteria: PP-24.
+  it('basic training gives no talent the character lacks', () => {
+    const choices = { ...FAILED.choices, 'career-2.term-1.training.pick': 'Lifting' }
+    const result = build(choices, FAILED.rolls)
+    expect(step(result, 'career-2.term-1.training').reasons).toContain('No Lifting: in basic training a talent comes only from its talent roll.')
+    expect(result.skills['Lifting']).toBeUndefined()
+    expect(result.terms.flatMap((t) => t.steps).some((s) => s.key.startsWith('career-2.term-1.training.talent'))).toBe(false)
   })
 })
