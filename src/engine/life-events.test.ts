@@ -214,4 +214,52 @@ describe('life events', () => {
     expect(RulesSchema.safeParse(sampleRules).success).toBe(true)
     expect(RulesSchema.safeParse(rulesWith(TABLE)).success).toBe(true)
   })
+
+  // Builds with the sample rules and each Life Event total from 2 to 12, and expects the default entry and
+  // no out-of-range mark every time.
+  // Criteria: LE-12.
+  it('the sample Life Events table answers every 2D total with the default entry', () => {
+    for (let total = 2; total <= 12; total += 1) {
+      const life = step(build(sampleRules, {}, { [LIFE_KEY]: total }), LIFE_KEY)
+      expect(life.result).toBe('Passes Go! Collects two ship shares.')
+      expect(life.outOfRange).toBe(false)
+    }
+  })
+
+  // Gives every sample mishap a life-event effect, fails term 1 survival, and uses a Life Events entry with
+  // stay-in-career and keep-benefit effects; expects the term still to end the career from the mishap.
+  // Criteria: LE-13.
+  it('a Life Event rolled from a mishap cannot undo the mishap', () => {
+    const base = sampleCareer()
+    const career: CareerDefinition = { ...base, mishaps: base.mishaps.map((m) => ({ ...m, effects: [{ type: 'life-event' }] })) }
+    const rules = rulesWith([{ roll: 7, summary: 'Lucky.', effects: [{ type: 'stay-in-career' }, { type: 'keep-benefit' }] }])
+    const result = buildCareer(SEED, BASE, input({}, { 'term-1.survival': 2, 'term-1.mishap': 1 }), { careers: [career], rules })
+    expect(step(result, 'term-1.mishap.effect-0.life-event').applied).toContain('Stays in the career')
+    expect(result.terms[0]?.endReason).toBe('Survival failed, so this career ends after this term.')
+  })
+
+  // Leaves after term 1 (whose Life Event gives 2 ship shares) and takes a benefit roll of 5 ("Ship share",
+  // shipShares 1), then 7 ("Two ship shares", shipShares 2); expects 3 and then 4 ship shares, and a
+  // cash roll of 5 to add none.
+  // Criteria: LE-14.
+  it('a mustering-out benefit with shipShares adds to the ship shares', () => {
+    const leave = { 'term-1.next': 'leave', 'benefit-0': 'benefit' }
+    const five = build(sampleRules, leave, { 'benefit-0': 5 })
+    expect(five.shipShares).toBe(3)
+    expect(five.benefits[0]?.step.applied).toEqual(['1 ship share'])
+    expect(build(sampleRules, leave, { 'benefit-0': 7 }).shipShares).toBe(4)
+    expect(build(sampleRules, { ...leave, 'benefit-0': 'cash' }, { 'benefit-0': 5 }).shipShares).toBe(2)
+  })
+
+  // Parses rules whose sub-table has a row for roll 7, and one for roll 0, and expects both to fail RulesSchema.
+  // Criteria: LE-15.
+  it('Life Events sub-table rows must be 1 to 6', () => {
+    const subTable = (roll: number) => ({
+      ...sampleRules,
+      lifeEvents: { dice: 2, table: [{ roll: 7, summary: 'a', subTable: [{ roll, summary: 'x' }] }] },
+    })
+    expect(RulesSchema.safeParse(subTable(7)).success).toBe(false)
+    expect(RulesSchema.safeParse(subTable(0)).success).toBe(false)
+    expect(RulesSchema.safeParse(subTable(6)).success).toBe(true)
+  })
 })

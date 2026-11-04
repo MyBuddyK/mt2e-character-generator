@@ -119,7 +119,8 @@ The top level of a pack:
   on a skill roll (`skills`, `target`, optional `maxWager` and `gainUsedSkill`).
 - A `life-event` effect rolls on the Life Events table in `rules.lifeEvents` (`dice` and a `table` of rows
   with `roll`, `summary`, optional `effects`, `connection` and a 1D `subTable`) and applies the entry in the
-  same term. `ship-shares` (`count`) adds ship shares to the character. See
+  same term. `ship-shares` (`count`) adds ship shares to the character, as does `shipShares` on a
+  mustering-out row when it is taken as a benefit. See
   [`docs/features/life-events.md`](docs/features/life-events.md).
 - A `choice` effect asks the player to pick one of its `options`, each a `label` and the `effects` applied
   when it is picked: `{ "type": "choice", "options": [{ "label": "Tactics 1", "effects": [...] }, { "label":

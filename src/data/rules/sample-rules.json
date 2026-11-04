@@ -20,7 +20,17 @@
   "lifeEvents": {
     "dice": 2,
     "table": [
-      { "roll": 7, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] }
+      { "roll": 2, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 3, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 4, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 5, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 6, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 7, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 8, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 9, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 10, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 11, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] },
+      { "roll": 12, "summary": "Passes Go! Collects two ship shares.", "effects": [{ "type": "ship-shares", "count": 2 }] }
     ]
   },
   "benefits": {

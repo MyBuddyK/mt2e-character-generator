@@ -116,11 +116,13 @@ export const AssignmentSchema = z.object({
 /** One assignment, as described by AssignmentSchema. */
 export type Assignment = z.infer<typeof AssignmentSchema>
 
-/** One mustering-out row: the 1D roll (1 to 7), a non-negative whole cash amount and the benefit. */
+/** One mustering-out row: the 1D roll (1 to 7), a non-negative whole cash amount, the benefit and optional `shipShares`. */
 export const MusterOutEntrySchema = z.object({
   roll: z.int(),
   cash: z.int().min(0),
   benefit: nonEmpty,
+  /** Optional. The ship shares this benefit gives, added to the character's ship shares when it is rolled. */
+  shipShares: z.int().min(1).optional(),
 })
 /** One mustering-out row, as described by MusterOutEntrySchema. */
 export type MusterOutEntry = z.infer<typeof MusterOutEntrySchema>

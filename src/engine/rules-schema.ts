@@ -36,8 +36,11 @@ const lifeEventRow = {
   effects: EffectsSchema,
 }
 
-/** One row of a Life Events sub-table, rolled on 1D: the roll, a short summary, and optional effects. */
-export const LifeEventSubEntrySchema = z.strictObject(lifeEventRow)
+/**
+ * One row of a Life Events sub-table, rolled on 1D: the roll (1 to 6), a short summary, and optional
+ * `connection` and effects.
+ */
+export const LifeEventSubEntrySchema = z.strictObject({ ...lifeEventRow, roll: z.int().min(1).max(6) })
 
 /**
  * One Life Events table row: the total it answers to, a short summary, optional `connection` and

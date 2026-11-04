@@ -655,12 +655,33 @@ export function buildCareer(
     rollOnTable(key, table, termSteps)
   }
 
+  /**
+   * Shows a rolled table row on `step`: sets the result to the row's summary, marks a connection,
+   * notes the summary when the row has no effects (and `noteSummary` is not false), adds the step to
+   * `termSteps` and applies the row's effects under `key`. Does nothing more when `row` is undefined.
+   */
+  const showRow = (
+    step: Step,
+    row: { summary: string; connection?: boolean | undefined; effects?: Effect[] | undefined } | undefined,
+    key: string,
+    termSteps: Step[],
+    term: TermResult | undefined,
+    noteSummary = true,
+  ) => {
+    step.result = row?.summary ?? ''
+    if (row?.connection) step.connection = true
+    if (row && !row.effects && noteSummary) step.notes.push(row.summary)
+    termSteps.push(step)
+    if (row) applyEffects(row.effects, key, step, termSteps, term)
+  }
+
   let shipShares = 0
   let lifeEventDepth = 0
   /**
    * Rolls on rules.lifeEvents under `key` and adds the step after the step that gave it, then rolls the
    * entry's 1D sub-table when it has one, and applies the effects of each. A `life-event` effect inside a
-   * Life Event is a note, so one entry rolls the table at most once.
+   * Life Event is a note, so one entry rolls the table at most once. The Life Event's effects run outside
+   * any mishap, so a `stay-in-career` or `keep-benefit` effect on a Life Events entry can't undo a mishap.
    */
   const lifeEvent = (key: string, from: Step, termSteps: Step[], term: TermResult | undefined) => {
     const table = rules.lifeEvents
@@ -672,22 +693,20 @@ export function buildCareer(
       from.notes.push('Roll another Life Event by hand. The app rolls one Life Event per entry.')
       return
     }
+    const outerMishap = mishapState
+    mishapState = undefined
     lifeEventDepth += 1
-    const { step, row } = tableRoll(key, 'Life Event', table.dice, 0, table.table)
-    step.result = row?.summary ?? ''
-    if (row?.connection) step.connection = true
-    if (row && !row.effects && !row.subTable) step.notes.push(row.summary)
-    termSteps.push(step)
-    if (row) applyEffects(row.effects, key, step, termSteps, term)
-    if (row?.subTable) {
-      const sub = tableRoll(`${key}.sub`, `Life Event: ${row.summary}`, 1, 0, row.subTable)
-      sub.step.result = sub.row?.summary ?? ''
-      if (sub.row?.connection) sub.step.connection = true
-      if (sub.row && !sub.row.effects) sub.step.notes.push(sub.row.summary)
-      termSteps.push(sub.step)
-      if (sub.row) applyEffects(sub.row.effects, `${key}.sub`, sub.step, termSteps, term)
+    try {
+      const { step, row } = tableRoll(key, 'Life Event', table.dice, 0, table.table)
+      showRow(step, row, key, termSteps, term, !row?.subTable)
+      if (row?.subTable) {
+        const sub = tableRoll(`${key}.sub`, `Life Event: ${row.summary}`, 1, 0, row.subTable)
+        showRow(sub.step, sub.row, `${key}.sub`, termSteps, term)
+      }
+    } finally {
+      lifeEventDepth -= 1
+      mishapState = outerMishap
     }
-    lifeEventDepth -= 1
   }
 
   let mishapDepth = 0
@@ -873,10 +892,6 @@ export function buildCareer(
     if (!career) return
     const label = endsCareer ? 'Mishap' : term?.endReason ? 'Extra mishap' : 'Mishap (keeps the job)'
     const { step, row } = tableRoll(key, label, 1, 0, career.mishaps)
-    step.result = row?.summary ?? ''
-    if (row?.connection) step.connection = true
-    termSteps.push(step)
-    if (row && !row.effects) step.notes.push(row.summary)
     const has = (type: Effect['type']) => row?.effects?.some((e) => e.type === type) ?? false
     // The lost term is counted before the row's effects, so a wager on this row can't bet that term's roll.
     const state = { endedCareer: false, lostTerm: false }
@@ -892,7 +907,7 @@ export function buildCareer(
     const outer = mishapState
     mishapState = state
     try {
-      if (row) applyEffects(row.effects, key, step, termSteps, term)
+      showRow(step, row, key, termSteps, term)
     } finally {
       mishapState = outer
     }
@@ -932,12 +947,9 @@ export function buildCareer(
   const ageing = (key: string, label: string, dm: number, reasons: string[], term: TermResult, steps: Step[], atTermStart = false) => {
     const held = rollDMs(key, 'aging', `Term ${term.number} ${label}`)
     const { step, row } = tableRoll(key, label, rules.aging.dice, dm + held.dm, rules.aging.table)
-    step.result = row?.summary ?? ''
     step.reasons.push(...reasons, ...held.reasons)
-    steps.push(step)
-    if (row && !row.effects) step.notes.push(row.summary)
     const beforeAging = { ...changes }
-    if (row) applyEffects(row.effects, key, step, steps, term)
+    showRow(step, row, key, steps, term)
     const crisis = CHARACTERISTICS.filter((c) => base[c] + changes[c] <= 0 && base[c] + beforeAging[c] > 0)
     if (crisis.length === 0) return
     term.ageingCrisis = true
@@ -1167,11 +1179,7 @@ export function buildCareer(
         }
         if (survived) {
           const { step, row } = tableRoll(`${termKey}.event`, 'Event', 2, 0, career.events)
-          step.result = row?.summary ?? ''
-          if (row?.connection) step.connection = true
-          if (row && !row.effects) step.notes.push(row.summary)
-          steps.push(step)
-          if (row) applyEffects(row.effects, `${termKey}.event`, step, steps, term)
+          showRow(step, row, `${termKey}.event`, steps, term)
         } else {
           mishap(`${termKey}.mishap`, steps, term, true)
         }
@@ -1296,6 +1304,11 @@ export function buildCareer(
           benefit: table === 'benefit' ? row?.benefit : undefined,
         }
         step.result = table === 'cash' ? `Cr${result.cash}` : (result.benefit ?? '')
+        const shares = table === 'benefit' ? row?.shipShares : undefined
+        if (shares) {
+          shipShares += shares
+          step.applied.push(`${shares} ship share${shares === 1 ? '' : 's'}`)
+        }
         rs.benefits.push(result)
       }
       previous = career

@@ -41,15 +41,21 @@ with rules is loaded.
 4. **No table, no roll.** When the rules have no `lifeEvents`, a `life-event` effect adds a note to roll by
    hand.
 5. **Ship shares are counted.** A `ship-shares` effect (`count` at least 1) adds to the character's ship
-   shares. Ship shares that a mustering-out benefit names only in its text are not counted.
-6. **The sample rules have a default.** `src/data/rules/sample-rules.json` has one invented row, "Passes Go!
-   Collects two ship shares.", with a `ship-shares` effect of 2. The invented sample career's roll 7 event has
-   a `life-event` effect.
+   shares. A mustering-out row can set `shipShares` (at least 1), which is added when that row is taken as a
+   benefit (not as cash). Ship shares that a benefit names only in its text are not counted.
+6. **The sample rules have a default.** `src/data/rules/sample-rules.json` has the same invented entry, "Passes
+   Go! Collects two ship shares.", with a `ship-shares` effect of 2, on every row from 2 to 12, so no 2D total
+   is out of range. The invented sample career's roll 7 event has a `life-event` effect, and its "Ship share"
+   and "Two ship shares" benefits set `shipShares`.
+7. **A Life Event is not part of a mishap.** When a mishap's entry rolls a Life Event, the Life Event's
+   `stay-in-career` and `keep-benefit` effects don't undo the mishap.
+8. **Sub-table rows are 1 to 6**, since the sub-table is rolled on 1D.
 
 ## Engine and data changes
 
 - `src/engine/effects.ts`: the `life-event` and `ship-shares` effects.
 - `src/engine/rules-schema.ts`: `rules.lifeEvents`, `LifeEventEntrySchema` and `LifeEventSubEntrySchema`.
+- `src/engine/career-schema.ts`: optional `shipShares` on mustering-out rows.
 - `src/engine/terms.ts`: the Life Event roll and `shipShares` on the career result.
 - The private Core Rulebook pack gets its Life Events table and `life-event` effects on its "Life Event"
   entries as a separate pack revision.
@@ -75,3 +81,10 @@ with rules is loaded.
 - [x] **LE-10** Removing a term removes its Life Event and the ship shares it gave. (Unit test.)
 - [x] **LE-11** A Life Events table whose rolls are not consecutive, or whose sub-table rolls are not, fails
       `RulesSchema`. (Unit test.)
+- [x] **LE-12** With the sample rules, every Life Event total from 2 to 12 gives "Passes Go! Collects two ship
+      shares." and no step is out of range. (Unit test.)
+- [x] **LE-13** A Life Event rolled from a mishap's entry can't undo the mishap with `stay-in-career` or
+      `keep-benefit`. (Unit test.)
+- [x] **LE-14** A mustering-out benefit row with `shipShares` adds that many ship shares when taken as a
+      benefit, and none when the same roll is a cash roll. (Unit test.)
+- [x] **LE-15** A Life Events sub-table row whose roll is below 1 or above 6 fails `RulesSchema`. (Unit test.)
