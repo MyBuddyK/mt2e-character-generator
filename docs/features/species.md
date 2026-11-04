@@ -45,14 +45,20 @@ format and invented test data.
    are read in order of their `id`, as for careers), is left out and listed with the duplicate careers.
 3. **The modifier applies to the roll.** The modified value is the dice total plus the modifier, raised to
    `minCharacteristic` when it is below it, then clamped to 0 to 33 like any characteristic. A value above 15
-   is kept.
-4. **An override replaces the modified value.** Reset returns to the modified value. An override keeps its
-   value when the species changes, and typing the modified value removes the override.
+   is kept. `minCharacteristic` limits only characteristics the species modifies; one with no modifier is
+   its dice total, so a value differs from its roll only when the Species column shows a modifier for it.
+4. **An override replaces the modified value.** Reset returns to the modified value. Typing the modified
+   value removes the override. When the species in use changes (a new pick, or a pack that defines the saved
+   species loading or being removed), an override equal to the new modified value is removed; other
+   overrides keep their values.
 5. **Picking a species rolls no dice.** The characteristics and every career roll keep the same dice totals
    for the same seed whichever species is picked; only totals that add a characteristic DM can change.
 6. **The species is saved per seed.** It is kept in localStorage under `mt2e.species.v1`, as a map from
-   seed to species id. Picking Human removes the seed's entry. Reroll and Clear seed save the picked species
-   for the new seed.
+   seed to species id. Picking Human removes the seed's entry. Each seed is read as its own key, so seeds
+   such as `__proto__` work like any other, and an entry that isn't a species id is ignored without hiding
+   the other seeds' entries. Reroll and Clear seed save the species in use for the new seed; a saved
+   species that no loaded pack defines is not carried, so the new seed is Human. When a save fails, a
+   notice says the species stays only until the page closes.
 7. **A missing species is shown, not dropped.** A saved species id that no loaded pack defines shows the
    notice above and builds the character as Human. The saved id is kept, so loading the pack brings the
    species back.
@@ -90,6 +96,17 @@ format and invented test data.
 - [x] **SP-10** Reroll keeps the picked species for the new seed.
 - [x] **SP-11** A version 2 pack that lists `species` is rejected with a message that it must say version 3.
 - [x] **SP-12** The Career section's qualification DM uses the modified characteristic value.
+- [x] **SP-13** Seeds named `__proto__` and `constructor` save and read their species like any other seed, and
+      opening `./?seed=__proto__` shows the page with Human picked.
+- [x] **SP-14** A saved entry that isn't a species id doesn't remove other seeds' saved species, and saving a
+      species for one seed keeps every other entry. (Unit test.)
+- [x] **SP-15** A species with `minCharacteristic` leaves a characteristic it doesn't modify at its dice total,
+      even when that total is below the minimum. (Unit test.)
+- [x] **SP-16** Changing species removes an override equal to the new modified value, so changing back shows
+      that species' modified value with no override.
+- [x] **SP-17** Reroll with a saved species that no loaded pack defines gives the new seed Human, with no
+      missing species notice.
+- [x] **SP-18** When saving the species fails, a notice says it could not be saved in this browser.
 
 ## Open questions
 

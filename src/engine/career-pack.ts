@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { CareerSchema, parseCareer, type CareerDefinition } from './career-schema'
 import { RulesSchema, type Rules } from './rules-schema'
 import { parseSpecies, SpeciesSchema, type SpeciesDefinition } from './species'
+import { combineById, compareCodeUnits } from './combine'
 
 /**
  * Career packs: one JSON file that holds any number of careers, which a referee shares with their
@@ -246,11 +247,6 @@ export interface CombinedCareers {
   problems: string[]
 }
 
-/** Compares two strings by UTF-16 code units, so the order is the same in every locale. */
-function compareCodeUnits(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0
-}
-
 /**
  * Returns the careers to offer. With no packs, that is `bundled`. With one or more packs, the
  * bundled careers are left out and the packs' careers are used instead, sorted by name and then id
@@ -261,22 +257,11 @@ function compareCodeUnits(a: string, b: string): number {
  */
 export function combineCareers(bundled: CareerDefinition[], packs: LoadedPack[]): CombinedCareers {
   if (packs.length === 0) return { careers: bundled, problems: [] }
-  const careers: CareerDefinition[] = []
-  const problems: string[] = []
-  const owners = new Map<string, string>()
-  for (const pack of [...packs].sort((a, b) => compareCodeUnits(a.id, b.id))) {
-    for (const career of pack.careers) {
-      const owner = owners.get(career.id)
-      if (owner !== undefined) {
-        problems.push(`${pack.name}: career id "${career.id}" is already used by ${owner}`)
-        continue
-      }
-      owners.set(career.id, pack.name)
-      careers.push(career)
-    }
-  }
-  careers.sort((a, b) => compareCodeUnits(a.name, b.name) || compareCodeUnits(a.id, b.id))
-  return { careers, problems }
+  const { items, problems } = combineById(
+    packs.map((p) => ({ id: p.id, name: p.name, items: p.careers })),
+    'career',
+  )
+  return { careers: items, problems }
 }
 
 /** One entry of the ?packs= link value: a pack id and the fingerprint it had. */

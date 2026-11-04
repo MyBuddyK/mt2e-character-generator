@@ -17,7 +17,7 @@ import { Career } from './Career'
 import { useCareerPacks } from './use-career-packs'
 import { FAIR_USE_DISCLAIMER } from './legal'
 import { SeedBar } from './SeedBar'
-import { HUMAN, applySpecies, speciesBase, speciesModifier } from './engine/species'
+import { HUMAN, applySpecies, dropMatchingOverrides, speciesBase, speciesModifier } from './engine/species'
 import { browserStorage } from './storage/career-packs'
 import { readSavedSpecies, writeSavedSpecies } from './storage/species'
 
@@ -133,7 +133,7 @@ function CharacteristicRow({ name, entry, dice, modifier, onOverride }: Characte
             <button
               type="button"
               className="secondary"
-              aria-label={modifier === undefined ? `Reset ${name} to rolled value` : `Reset ${name} to modified value`}
+              aria-label={modifier === undefined || modifier === 0 ? `Reset ${name} to rolled value` : `Reset ${name} to modified value`}
               onClick={() => onOverride(undefined)}
             >
               Reset
@@ -171,17 +171,27 @@ export default function App() {
   const species = found ?? HUMAN
   const missingSpecies = found === undefined ? speciesId : undefined
   const showModifiers = CHARACTERISTICS.some((key) => speciesModifier(species, key) !== 0)
+  const [speciesSaveFailed, setSpeciesSaveFailed] = useState(false)
+  // When the species in use changes (a pick, or a pack that defines the saved species loading), overrides
+  // equal to the new modified values are removed, so no override is kept that the table doesn't show.
+  const [overridesSpecies, setOverridesSpecies] = useState(species.id)
+  if (overridesSpecies !== species.id) {
+    setOverridesSpecies(species.id)
+    setCharacter((c) => ({ ...c, characteristics: dropMatchingOverrides(c.characteristics, species) }))
+  }
   const pickSpecies = (id: string) => {
-    writeSavedSpecies(storage, character.seed, id)
+    setSpeciesSaveFailed(writeSavedSpecies(storage, character.seed, id) === 'failed')
     setPicked({ seed: character.seed, id })
   }
-  // Reroll and Clear seed both start a new character from a new random seed, keeping the picked species.
+  // Reroll and Clear seed both start a new character from a new random seed, keeping the species in use.
+  // A saved species that no loaded pack defines is not carried, since the character is shown as Human.
+  const speciesInUse = species.id
   const rollNewCharacter = useCallback(() => {
     const seed = randomSeed()
-    writeSavedSpecies(storage, seed, speciesId)
-    setPicked({ seed, id: speciesId })
+    setSpeciesSaveFailed(writeSavedSpecies(storage, seed, speciesInUse) === 'failed')
+    setPicked({ seed, id: speciesInUse })
     setCharacter(newCharacter(seed))
-  }, [storage, speciesId])
+  }, [storage, speciesInUse])
   const showingSample = packs.entries.length === 0
   const shown = useMemo(() => applySpecies(character.characteristics, species), [character.characteristics, species])
   const base = useMemo(() => speciesBase(character.characteristics, species), [character.characteristics, species])
@@ -248,6 +258,11 @@ export default function App() {
               {missingSpecies !== undefined && <option value={missingSpecies}>{missingSpecies} (not loaded)</option>}
             </select>
           </label>
+          {speciesSaveFailed && (
+            <p className="notice small" data-testid="species-save-failed">
+              The species could not be saved in this browser. It stays until the page closes.
+            </p>
+          )}
           {missingSpecies !== undefined && (
             <p className="notice" data-testid="missing-species">
               The species "{missingSpecies}" saved for this seed is not in any loaded career pack. The character is

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { CHARACTERISTICS, normalizeCharacteristic, type Characteristic, type Characteristics } from './characteristics'
+import { combineById } from './combine'
 import { current } from './overridable'
 
 /**
@@ -16,8 +17,8 @@ export type Trait = z.infer<typeof TraitSchema>
 
 /**
  * One species. `modifiers` holds a whole number per characteristic (characteristics left out get 0).
- * `minCharacteristic`, when set, is the lowest value a modifier can take a characteristic to. Unknown keys
- * are rejected.
+ * `minCharacteristic`, when set, is the lowest value a non-zero modifier can take a characteristic to;
+ * characteristics with no modifier are not raised to it. Unknown keys are rejected.
  */
 export const SpeciesSchema = z.strictObject({
   id: nonEmpty,
@@ -62,11 +63,14 @@ export function speciesModifier(species: SpeciesDefinition, key: Characteristic)
 
 /**
  * Returns the modified value of characteristic `key` for a dice total `rolled`: rolled plus the species
- * modifier, raised to `minCharacteristic` when it is below it, then rounded and clamped with
- * normalizeCharacteristic. A value above 15 is kept.
+ * modifier, then rounded and clamped with normalizeCharacteristic. When the species has a non-zero
+ * modifier for `key`, a result below `minCharacteristic` is raised to it; a characteristic with no
+ * modifier is the dice total. A value above 15 is kept.
  */
 export function speciesValue(rolled: number, species: SpeciesDefinition, key: Characteristic): number {
-  const raw = rolled + speciesModifier(species, key)
+  const modifier = speciesModifier(species, key)
+  if (modifier === 0) return normalizeCharacteristic(rolled) ?? 0
+  const raw = rolled + modifier
   const floored = species.minCharacteristic !== undefined ? Math.max(species.minCharacteristic, raw) : raw
   return normalizeCharacteristic(floored) ?? 0
 }
@@ -81,6 +85,19 @@ export function applySpecies(chars: Characteristics, species: SpeciesDefinition)
     const value = speciesValue(chars[key].rolled, species, key)
     const override = chars[key].override
     return override === undefined || override === value ? { rolled: value } : { rolled: value, override }
+  }
+  return { STR: one('STR'), DEX: one('DEX'), END: one('END'), INT: one('INT'), EDU: one('EDU'), SOC: one('SOC') }
+}
+
+/**
+ * Returns `chars` with each override removed that equals the value `species` gives that characteristic
+ * (speciesValue), so an override hidden by a species change is not kept. Other overrides and the dice
+ * totals are unchanged. The input is not changed.
+ */
+export function dropMatchingOverrides(chars: Characteristics, species: SpeciesDefinition): Characteristics {
+  const one = (key: Characteristic) => {
+    const { rolled, override } = chars[key]
+    return override === undefined || override === speciesValue(rolled, species, key) ? { rolled } : { rolled, override }
   }
   return { STR: one('STR'), DEX: one('DEX'), END: one('END'), INT: one('INT'), EDU: one('EDU'), SOC: one('SOC') }
 }
@@ -112,21 +129,10 @@ export interface PackSpecies {
  * <owner>", where the owner of "human" is "the built-in Human".
  */
 export function combineSpecies(packs: PackSpecies[]): { species: SpeciesDefinition[]; problems: string[] } {
-  const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
-  const owners = new Map<string, string>([[HUMAN.id, 'the built-in Human']])
-  const found: SpeciesDefinition[] = []
-  const problems: string[] = []
-  for (const pack of [...packs].sort((a, b) => compare(a.id, b.id))) {
-    for (const species of pack.species) {
-      const owner = owners.get(species.id)
-      if (owner !== undefined) {
-        problems.push(`${pack.name}: species id "${species.id}" is already used by ${owner}`)
-        continue
-      }
-      owners.set(species.id, pack.name)
-      found.push(species)
-    }
-  }
-  found.sort((a, b) => compare(a.name, b.name) || compare(a.id, b.id))
-  return { species: [HUMAN, ...found], problems }
+  const { items, problems } = combineById(
+    packs.map((p) => ({ id: p.id, name: p.name, items: p.species })),
+    'species',
+    new Map([[HUMAN.id, 'the built-in Human']]),
+  )
+  return { species: [HUMAN, ...items], problems }
 }

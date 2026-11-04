@@ -3,7 +3,16 @@ import { parseCareerPack } from './career-pack'
 import { newCharacter, overrideCharacteristic } from './character'
 import { characteristicDM, type Characteristics } from './characteristics'
 import { current, isOverridden } from './overridable'
-import { HUMAN, applySpecies, combineSpecies, parseSpecies, speciesBase, speciesValue, type SpeciesDefinition } from './species'
+import {
+  HUMAN,
+  applySpecies,
+  combineSpecies,
+  dropMatchingOverrides,
+  parseSpecies,
+  speciesBase,
+  speciesValue,
+  type SpeciesDefinition,
+} from './species'
 import { buildCareer, EMPTY_INPUT, type CareerData } from './terms'
 import { sampleRules } from '../data/rules'
 import { readSavedSpecies, SPECIES_KEY, writeSavedSpecies } from '../storage/species'
@@ -73,6 +82,16 @@ describe('species modifiers', () => {
     expect(speciesValue(12, { ...URSINE, modifiers: { STR: 30 } }, 'STR')).toBe(33)
   })
 
+  // Applies a species with minCharacteristic 1 and no END modifier to END dice totals of 0 and 3 with a
+  // minimum of 5, and expects END to stay at its dice total each time.
+  // Criteria: SP-15.
+  it('does not raise a characteristic the species does not modify to minCharacteristic', () => {
+    const highMinimum: SpeciesDefinition = { ...URSINE, minCharacteristic: 5 }
+    expect(speciesValue(0, highMinimum, 'END')).toBe(0)
+    expect(speciesValue(3, highMinimum, 'END')).toBe(3)
+    expect(speciesValue(3, highMinimum, 'DEX')).toBe(5)
+  })
+
   // Applies a species with no modifier for END and expects END to equal its dice total.
   it('leaves a characteristic with no listed modifier at its dice total', () => {
     expect(speciesValue(8, URSINE, 'END')).toBe(8)
@@ -86,6 +105,22 @@ describe('species modifiers', () => {
     const applied = applySpecies(chars, URSINE)
     expect(applied.STR).toEqual({ rolled: 10, override: 4 })
     expect(applied.DEX).toEqual({ rolled: 6 })
+  })
+})
+
+// Tests for dropMatchingOverrides: the overrides removed when the species in use changes.
+describe('dropMatchingOverrides', () => {
+  // Gives STR an override equal to Ursine's modified STR and DEX an override that differs, drops matching
+  // overrides for Ursine, and expects only DEX's override kept; then switching back to Human shows STR
+  // at its dice total.
+  // Criteria: SP-16.
+  it('removes an override equal to the new modified value and keeps the others', () => {
+    const chars: Characteristics = { ...allRolled(7), STR: { rolled: 7, override: 10 }, DEX: { rolled: 7, override: 3 } }
+    const dropped = dropMatchingOverrides(chars, URSINE)
+    expect(dropped.STR).toEqual({ rolled: 7 })
+    expect(dropped.DEX).toEqual({ rolled: 7, override: 3 })
+    expect(current(applySpecies(dropped, HUMAN).STR)).toBe(7)
+    expect(chars.STR).toEqual({ rolled: 7, override: 10 })
   })
 })
 
@@ -190,6 +225,32 @@ describe('saved species', () => {
     expect(readSavedSpecies(storage, 'two')).toBe('human')
     writeSavedSpecies(storage, 'one', 'human')
     expect(storage.getItem(SPECIES_KEY)).toBe('{}')
+  })
+
+  // Saves species for the seeds "__proto__" and "constructor" and expects each read back; a seed with
+  // nothing saved still reads Human.
+  // Criteria: SP-13.
+  it('reads and writes seeds named like object properties as plain keys', () => {
+    const storage = new MemoryStorage()
+    expect(readSavedSpecies(storage, '__proto__')).toBe('human')
+    expect(readSavedSpecies(storage, 'constructor')).toBe('human')
+    writeSavedSpecies(storage, '__proto__', 'sample-ursine')
+    writeSavedSpecies(storage, 'constructor', 'sample-mite')
+    expect(readSavedSpecies(storage, '__proto__')).toBe('sample-ursine')
+    expect(readSavedSpecies(storage, 'constructor')).toBe('sample-mite')
+    expect(readSavedSpecies(storage, 'toString')).toBe('human')
+  })
+
+  // Saves a map with one valid entry and one numeric entry, reads both seeds, then saves a species for a
+  // third seed and expects all three entries in storage, the numeric one unchanged.
+  // Criteria: SP-14.
+  it('keeps the other entries when one saved entry is not a species id', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(SPECIES_KEY, JSON.stringify({ good: 'sample-ursine', bad: 7 }))
+    expect(readSavedSpecies(storage, 'good')).toBe('sample-ursine')
+    expect(readSavedSpecies(storage, 'bad')).toBe('human')
+    writeSavedSpecies(storage, 'new', 'sample-mite')
+    expect(JSON.parse(storage.getItem(SPECIES_KEY) ?? '{}')).toEqual({ good: 'sample-ursine', bad: 7, new: 'sample-mite' })
   })
 
   // Reads with no storage, with text that is not JSON, and with a failing write, and expects Human,

@@ -126,4 +126,69 @@ test.describe('species', () => {
     await expect(page).not.toHaveURL(/seed=species(&|$)/)
     await expect(page.getByRole('combobox', { name: 'Species', exact: true })).toHaveValue('sample-ursine')
   })
+
+  // Opens ./?seed=__proto__ and expects the page with Human picked and no missing species notice; then
+  // imports the pack, picks Sample Ursine, reloads, and expects it still picked.
+  // Criteria: SP-13.
+  test('a seed named __proto__ saves and reads its species', async ({ page }) => {
+    await page.goto('./?seed=__proto__')
+    const select = page.getByRole('combobox', { name: 'Species', exact: true })
+    await expect(select).toHaveValue('human')
+    await expect(page.getByTestId('missing-species')).toHaveCount(0)
+    await importSpeciesPack(page)
+    await select.selectOption('Sample Ursine')
+    await page.reload()
+    await expect(select).toHaveValue('sample-ursine')
+  })
+
+  // As Human, overrides STR with its roll + 3, picks Sample Ursine (whose modified STR is roll + 3) and
+  // expects STR not overridden; then picks Human and expects STR back at its roll with no override.
+  // Criteria: SP-16.
+  test('changing species removes an override equal to the new modified value', async ({ page }) => {
+    await page.goto('./?seed=species')
+    await importSpeciesPack(page)
+    const roll = await rollOf(page, 'STR')
+    await page.getByLabel('STR value').fill(String(roll + 3))
+    await page.getByLabel('STR value').press('Enter')
+    await expect(page.getByTestId('overridden-STR')).toBeVisible()
+    const select = page.getByRole('combobox', { name: 'Species', exact: true })
+    await select.selectOption('Sample Ursine')
+    await expect(page.getByTestId('overridden-STR')).toHaveCount(0)
+    await expect(page.getByLabel('STR value')).toHaveValue(String(roll + 3))
+    await select.selectOption('Human')
+    await expect(page.getByLabel('STR value')).toHaveValue(String(roll))
+    await expect(page.getByTestId('overridden-STR')).toHaveCount(0)
+  })
+
+  // Saves Sample Ursine for the seed with no pack loaded, opens it, clicks Reroll, and expects Human picked
+  // for the new seed with no missing species notice.
+  // Criteria: SP-17.
+  test('Reroll does not carry a species that no pack defines', async ({ page }) => {
+    await page.goto('./?seed=species')
+    await page.evaluate(() => localStorage.setItem('mt2e.species.v1', JSON.stringify({ species: 'sample-ursine' })))
+    await page.reload()
+    await expect(page.getByTestId('missing-species')).toBeVisible()
+    await page.getByRole('button', { name: 'Reroll' }).click()
+    await expect(page).not.toHaveURL(/seed=species(&|$)/)
+    await expect(page.getByTestId('missing-species')).toHaveCount(0)
+    await expect(page.getByRole('combobox', { name: 'Species', exact: true })).toHaveValue('human')
+  })
+
+  // Makes localStorage refuse writes to the species key, imports the pack, picks Sample Ursine, and expects
+  // the notice that the species could not be saved, with the species still picked.
+  // Criteria: SP-18.
+  test('a failed species save shows a notice', async ({ page }) => {
+    await page.addInitScript(() => {
+      const setItem = Storage.prototype.setItem
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (key === 'mt2e.species.v1') throw new DOMException('full', 'QuotaExceededError')
+        setItem.call(this, key, value)
+      }
+    })
+    await page.goto('./?seed=species')
+    await importSpeciesPack(page)
+    await page.getByRole('combobox', { name: 'Species', exact: true }).selectOption('Sample Ursine')
+    await expect(page.getByTestId('species-save-failed')).toContainText('could not be saved in this browser')
+    await expect(page.getByTestId('species-traits')).toBeVisible()
+  })
 })
