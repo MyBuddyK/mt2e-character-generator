@@ -6,10 +6,12 @@ import type { Rules } from './engine/rules-schema'
 import { current } from './engine/overridable'
 import { POLICY_SUMMARY } from './engine/policy'
 import {
+  laterRollsText,
   skillTableName,
   stepOverridden,
   type CareerInput,
   type CareerRun,
+  type LaterDM,
   type PendingChoice,
   type Step,
   type TermResult,
@@ -151,7 +153,47 @@ function StepRow({ step, context, input, onChange }: StepRowProps) {
           Apply by hand: {n}
         </div>
       ))}
+      {step.later?.map((held) => (
+        <LaterDMRow key={held.key} held={held} name={name} input={input} onChange={onChange} />
+      ))}
     </li>
+  )
+}
+
+interface LaterDMRowProps {
+  held: LaterDM
+  /** The accessible name of the step that gave the DM, e.g. "Term 2 Event". */
+  name: string
+  input: CareerInput
+  onChange: (next: CareerInput) => void
+}
+
+/**
+ * Renders a DM from a `dm-later` effect: a select labelled "<step> DM <n> applies to" that lists "Not
+ * applied" and each later roll the DM can be applied to. Picking a roll stores its step key under the
+ * DM's choice key; "Not applied" removes it. Before any such roll has been rolled it says so.
+ */
+function LaterDMRow({ held, name, input, onChange }: LaterDMRowProps) {
+  const label = `${name} DM ${signed(held.dm)} applies to`
+  return (
+    <div className="step-later" data-testid="later-dm">
+      <label>
+        DM {signed(held.dm)} for {laterRollsText(held.rolls)}, applied by hand:{' '}
+        <select
+          aria-label={label}
+          value={held.appliedTo ?? ''}
+          onChange={(e) => onChange({ ...input, choices: setKey(input.choices, held.key, e.target.value === '' ? undefined : e.target.value) })}
+        >
+          <option value="">Not applied</option>
+          {held.targets.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {held.targets.length === 0 && <span className="muted small"> Pick the roll here once it has been rolled.</span>}
+    </div>
   )
 }
 
@@ -443,6 +485,20 @@ function Pending({ pending, input, onChange, onGenerate }: PendingProps) {
           {generate}
         </div>
       )
+    case 'event-choice':
+      return (
+        <div className="pending" role="group" aria-label="Choose an option">
+          <p data-testid="event-choice">
+            {pending.source}: {pending.summary} Choose one:
+          </p>
+          {pending.options.map((o) => (
+            <button type="button" key={o} onClick={() => choose(pending.key, o)}>
+              {o}
+            </button>
+          ))}
+          {generate}
+        </div>
+      )
     case 'next':
       if (pending.forced === 'muster') {
         return (
@@ -634,6 +690,13 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
   const { input, result, update } = career
   const pending = result.pending
   const changes = Object.entries(result.characteristicChanges).filter(([, v]) => v !== 0)
+  // DMs from events that no roll used: dm-later DMs the player didn't apply, and dm-next DMs left over.
+  const unusedDMs = [
+    ...result.laterDMs.filter((d) => d.appliedTo === undefined).map((d) => `DM ${signed(d.dm)} for ${laterRollsText(d.rolls)} (${d.source})`),
+    ...(['advancement', 'survival'] as const).flatMap((roll) =>
+      result.unusedNextDMs[roll] === 0 ? [] : [`DM ${signed(result.unusedNextDMs[roll])} on the next ${roll} roll`],
+    ),
+  ]
   const sectionRef = useRef<HTMLElement>(null)
   const removedTerm = career.removedTerm
   // After a removal the clicked button is gone, so focus moves to the new most recent term's Remove
@@ -785,6 +848,7 @@ export function Career({ seed, base, careers, rules, packs }: CareerProps) {
                   Characteristic changes: {changes.map(([c, v]) => `${c} ${signed(v)}`).join(', ')}
                 </p>
               )}
+              {unusedDMs.length > 0 && <p data-testid="summary-later-dms">DMs not applied: {unusedDMs.join(', ')}</p>}
               <p data-testid="summary-benefits">
                 Benefits:{' '}
                 {result.benefits
