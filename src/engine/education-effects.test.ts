@@ -207,4 +207,54 @@ describe('next-career effect', () => {
     expect(after.terms).toHaveLength(1)
     expect(after.pending).toMatchObject({ kind: 'next', key: 'term-1.next', forced: 'muster' })
   })
+
+  // Uses a Draft table whose only row names a career no pack has, sends the character to the Draft, and
+  // expects the problem listed and the next career pick offered; picking Sample Recycling then starts it with
+  // a qualification roll.
+  // Criteria: ED-25.
+  it('a forced Draft into a missing career falls back to the career pick', () => {
+    const rules: Rules = { ...sampleRules, draft: [{ roll: 1, career: 'missing-career' }] }
+    const careers = [withEvent7([{ type: 'next-career', career: 'draft' }]), recycling()]
+    const result = build(careers, MUSTER, {}, rules)
+    expect(result.problems).toContain('An event sent the character to the Draft, but the Draft named a career no pack has, so pick the next career.')
+    expect(result.finished).toBe(true)
+    expect(result.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'] })
+    const picked = build(careers, { ...MUSTER, 'career-2.start.career': 'sample-recycling', 'career-2.start.assignment': 'debris-sweep' }, {}, rules)
+    expect(picked.runs[1]?.forced).toBe(false)
+    expect(picked.runs[1]?.qualification.dice).toBeDefined()
+  })
+
+  // Names the current career and expects a note, no end reason and no forced after-term choice.
+  // Criteria: ED-27.
+  it('naming the current career is a note', () => {
+    const result = build([withEvent7([{ type: 'next-career', career: 'sample-sanitation' }])])
+    expect(step(result, 'term-1.event').notes).toContain('The character is already in Sample: Orbital Sanitation, so this changes nothing.')
+    expect(result.terms[0]?.endReason).toBeUndefined()
+  })
+})
+
+// Tests for check keys and option names found in review.
+describe('check effect keys and option names', () => {
+  // Uses a check whose pass and fail each offer Admin or Science, saves Science for the pass, overrides the
+  // check to a fail, and expects the fail's own pick to be asked for.
+  // Criteria: ED-26.
+  it('pass and fail effects keep separate picks', () => {
+    const options = [{ type: 'skill' as const, options: ['Admin', 'Science'] }]
+    const career = withEvent7([{ type: 'check', options: ['INT'], target: 8, pass: options, fail: options }])
+    const passKey = `${EFFECT}.check.pass.effect-0.skill`
+    const pass = build([career], { [passKey]: 'Science' }, { [`${EFFECT}.check`]: 8 })
+    expect(pass.skills['Science']).toBe(1)
+    const fail = build([career], { [passKey]: 'Science' }, { [`${EFFECT}.check`]: 2 })
+    expect(fail.pending).toEqual({ kind: 'skill-option', key: `${EFFECT}.check.fail.effect-0.skill`, options: ['Admin', 'Science'] })
+  })
+
+  // Parses checks with the options Int, int and INT, and expects the first two to fail EffectSchema.
+  // Criteria: ED-28.
+  it('a characteristic option must be in capitals', () => {
+    const parse = (option: string) => EffectSchema.safeParse({ type: 'check', options: [option], target: 8 }).success
+    expect(parse('Int')).toBe(false)
+    expect(parse('int')).toBe(false)
+    expect(parse('INT')).toBe(true)
+    expect(parse('Admin')).toBe(true)
+  })
 })

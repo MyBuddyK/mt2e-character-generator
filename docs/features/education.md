@@ -41,13 +41,19 @@ career pack. The repo has invented samples.
 1. **`check` is one roll with one of several options.** `options` lists skill names or characteristic names.
    A characteristic uses its DM; a skill uses its level, or -3 untrained, as the `wager` effect does. With more
    than one option the player picks one (Finish career picks one from the seed). `pass` and `fail` are effect
-   lists applied after the roll; they can't hold a `check` or a `choice`, so a check can't nest.
+   lists applied after the roll; they can't hold a `check` or a `choice`, so a check can't nest. Each outcome
+   has its own key prefix (`….check.pass` and `….check.fail`), so a pick saved for one outcome is never read
+   by the other. A characteristic option must be in capitals; `Int` fails the schema rather than being read as
+   a skill.
 2. **`fail-graduation` belongs to education.** Outside an education term it is a note and changes nothing.
 3. **`next-career` ends the career and sets the next one.** The term's career ends after it (the after-term
    choice is forced to muster out), the character musters out as usual, and the next career starts with no
    career pick and no qualification roll. `career` is a career id, or `"draft"` for the Draft, which is rolled
    even when the character was drafted before. A career that no loaded pack has, or `"draft"` with no Draft
-   table in the rules, is a note. When one term has two `next-career` effects, the last one applied is used.
+   table in the rules, is a note. So is a `next-career` naming the current career, since a career can't be
+   entered again straight after it, and one applied outside a career term. When the forced Draft names a
+   career that no pack has, the app lists the problem and the player picks the next career as usual. When
+   one term has two `next-career` effects, the last one applied is used.
 4. **Finish career stops at a forced career.** It plays out the career that rolled `next-career`, musters out,
    and stops when the forced career has started.
 5. **Education is pack data** (planned). Pack format version 3 gets an optional `education` array, checked by
@@ -117,3 +123,11 @@ career pack. The repo has invented samples.
       made in it. (Unit test.)
 - [x] **ED-24** Remove last term on the first term of a forced career returns to the after-term choice of the
       term before it. (Unit test.)
+- [x] **ED-25** When a forced Draft names a career no loaded pack has, the problems list says so and the next
+      career is picked as usual. (Unit test.)
+- [x] **ED-26** A pick saved under a check's pass effects is not used by its fail effects when the check is
+      overridden to a fail. (Unit test.)
+- [x] **ED-27** A `next-career` effect naming the current career adds a note and the career does not end.
+      (Unit test.)
+- [x] **ED-28** A `check` option that is a characteristic name not in capitals, such as `Int`, fails
+      `EffectSchema`. (Unit test.)

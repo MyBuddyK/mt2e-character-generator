@@ -56,11 +56,14 @@ export type RollKind = (typeof ROLL_KINDS)[number]
  *   education term it is a note.
  * - `next-career`: the current career ends after this term and the next career is `career` (a career id)
  *   with no qualification roll, or the Draft when `career` is "draft", even if the character was drafted
- *   before. A career id that no loaded pack has, or "draft" with no Draft table in the rules, is a note.
- * - `check`: a 2D roll with one of `options` against `target`. An option that is a characteristic name
- *   (STR, DEX, END, INT, EDU or SOC) uses that characteristic's DM; any other option is a skill, with its
- *   level as the DM (-3 untrained). With several options the player picks one. The `pass` or `fail`
- *   effects are then applied; they can be any effect but `check` and `choice`.
+ *   before. It is a note when the career id is not loaded or is the current career, when "draft" has no
+ *   Draft table in the rules, or when it is applied outside a career term. When the Draft names a career
+ *   that is not loaded, the player picks the next career as usual.
+ * - `check`: a 2D roll with one of `options` against `target`. An option that is a characteristic name in
+ *   capitals (STR, DEX, END, INT, EDU or SOC) uses that characteristic's DM; a characteristic name in any
+ *   other case fails the schema. Any other option is a skill, with its level as the DM (-3 untrained). With
+ *   several options the player picks one. The `pass` or `fail` effects are then applied, each under its
+ *   own key; they can be any effect but `check` and `choice`.
  * - `choice`: the player picks one of `options` (at least two, each label once), and the engine
  *   applies that option's effects. An option's effects can be any effect but another `choice`.
  *
@@ -120,7 +123,11 @@ const PLAIN_EFFECTS = [
     options: z
       .array(nonEmpty)
       .min(1, 'must list at least one skill or characteristic')
-      .refine((list) => new Set(list).size === list.length, 'must not list an option twice'),
+      .refine((list) => new Set(list).size === list.length, 'must not list an option twice')
+      .refine(
+        (list) => list.every((o) => CHARACTERISTICS.some((c) => c === o) || !CHARACTERISTICS.some((c) => c === o.toUpperCase())),
+        'must write a characteristic in capitals (STR, DEX, END, INT, EDU or SOC)',
+      ),
     target: z.int().min(0).max(20),
     pass: z.array(BasicEffectSchema).optional(),
     fail: z.array(BasicEffectSchema).optional(),

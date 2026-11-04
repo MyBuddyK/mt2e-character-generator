@@ -855,13 +855,17 @@ export function buildCareer(
           step.notes.push('Fails graduation: this applies only in an education term, so nothing changes here.')
           break
         case 'next-career': {
+          if (!term) {
+            step.notes.push('Take the next career this names by hand: it applies only inside a career term.')
+            break
+          }
           if (effect.career === 'draft') {
             if (!rules.draft) {
               step.notes.push('Take the Draft next term by hand: the rules have no Draft table.')
               break
             }
             forcedNext = { kind: 'draft' }
-            if (term) term.endReason = 'An event sends the character to the Draft, so this career ends after this term.'
+            term.endReason = 'An event sends the character to the Draft, so this career ends after this term.'
             step.applied.push('The Draft next term')
             break
           }
@@ -870,8 +874,12 @@ export function buildCareer(
             step.notes.push(`Take the career "${effect.career}" next term by hand: no loaded career pack has it.`)
             break
           }
+          if (target.id === career?.id) {
+            step.notes.push(`The character is already in ${target.name}, so this changes nothing.`)
+            break
+          }
           forcedNext = { kind: 'career', career: target }
-          if (term) term.endReason = `An event sends the character to ${target.name}, so this career ends after this term.`
+          term.endReason = `An event sends the character to ${target.name}, so this career ends after this term.`
           step.applied.push(`${target.name} next term`)
           break
         }
@@ -883,7 +891,9 @@ export function buildCareer(
           const roll = roll2D(`${effectKey}.check`, `Check: ${option}`, dm, effect.target)
           roll.reasons.push(`${option} ${effect.target}+, DM ${signedText(dm)} from ${characteristic ? 'the characteristic' : 'the skill level'}.`)
           termSteps.push(roll)
-          applyEffects(passed(roll) ? effect.pass : effect.fail, `${effectKey}.check`, roll, termSteps, term)
+          // Each outcome has its own key prefix, so a pick saved under one is never read by the other.
+          const outcome = passed(roll) ? 'pass' : 'fail'
+          applyEffects(outcome === 'pass' ? effect.pass : effect.fail, `${effectKey}.check.${outcome}`, roll, termSteps, term)
           break
         }
         case 'keep-benefit':
@@ -1064,14 +1074,24 @@ export function buildCareer(
       }
 
       let forcedDraft: ReturnType<typeof rollDraft> | undefined
-      if (forced?.kind === 'draft' && rules.draft) {
-        forcedDraft = rollDraft(rules.draft)
-        career = forcedDraft.entered
+      let forcedTo = forced
+      if (forcedTo?.kind === 'draft' && rules.draft) {
+        try {
+          forcedDraft = rollDraft(rules.draft)
+          career = forcedDraft.entered
+          assignment = undefined
+        } catch (error) {
+          // The Draft named a career no pack has: rollDraft listed the problem, and the player picks the
+          // next career as usual instead.
+          if (!(error instanceof Stop)) throw error
+          problems.push('An event sent the character to the Draft, but the Draft named a career no pack has, so pick the next career.')
+          forcedTo = undefined
+        }
+      }
+      if (forcedTo?.kind === 'career') {
+        career = forcedTo.career
         assignment = undefined
-      } else if (forced?.kind === 'career') {
-        career = forced.career
-        assignment = undefined
-      } else {
+      } else if (!forcedTo) {
         const careerId = choice(`${prefix}start.career`)
         const named = data.careers.find((c) => c.id === careerId)
         career = named !== undefined && !exclude.includes(named.id) ? named : undefined
@@ -1090,9 +1110,11 @@ export function buildCareer(
         }
       }
 
+      // Every branch above sets the career or stops; this narrows its type.
+      if (!career) break
       let qualification: Step
-      if (forced) {
-        const where = forced.kind === 'draft' ? 'the Draft' : career.name
+      if (forcedTo) {
+        const where = forcedTo.kind === 'draft' ? 'the Draft' : career.name
         qualification = {
           key: `${prefix}qualification`,
           label: 'Qualification',
@@ -1123,14 +1145,14 @@ export function buildCareer(
         career,
         assignment,
         entry: forcedDraft ? 'draft' : 'qualified',
-        forced: forced !== undefined,
+        forced: forcedTo !== undefined,
         qualification,
         draft: forcedDraft?.step,
       }
       rs = run
       runs.push(run)
 
-      if (forced) {
+      if (forcedTo) {
         const entered = career
         try {
           pickAssignment(entered, forcedDraft?.assignmentId)
