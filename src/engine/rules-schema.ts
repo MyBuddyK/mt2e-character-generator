@@ -92,6 +92,11 @@ export const RulesSchema = z.strictObject({
    * when SOC is at least `anyTermFromSOC`, with `dmPerLaterTerm` for each term after the first.
    */
   commission: z.strictObject({ anyTermFromSOC: z.int().min(0), dmPerLaterTerm: z.int() }).optional(),
+  /**
+   * Optional pre-career education rules (docs/features/education.md). `lastTerm`: education entries are
+   * offered at a career pick for terms 1 to `lastTerm`. Without it no education is offered.
+   */
+  preCareer: z.strictObject({ lastTerm: z.int().min(1) }).optional(),
   /** Optional. `failOnNatural`: survival fails when the dice (before DMs) are at or below this value. */
   survival: z.strictObject({ failOnNatural: z.int().min(0).optional() }).optional(),
   /**

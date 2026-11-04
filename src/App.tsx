@@ -11,6 +11,7 @@ import {
 } from './engine/characteristics'
 import { current, isOverridden, type Overridable } from './engine/overridable'
 import { careerErrors, careers as bundledCareers } from './data/careers'
+import { education as bundledEducation, educationErrors } from './data/education'
 import { formatPackRefs, parsePackRefs } from './engine/career-pack'
 import { CareerData } from './CareerData'
 import { Career } from './Career'
@@ -160,7 +161,7 @@ export default function App() {
   const [expectedPacks] = useState(initialPacksParam)
   const [storage] = useState(() => browserStorage())
   const [picked, setPicked] = useState(() => ({ seed: character.seed, id: readSavedSpecies(storage, character.seed) }))
-  const packs = useCareerPacks(bundledCareers)
+  const packs = useCareerPacks(bundledCareers, bundledEducation)
   let speciesId = picked.id
   // A new seed reads the species saved for it.
   if (picked.seed !== character.seed) {
@@ -214,11 +215,11 @@ export default function App() {
           <SeedBar seed={character.seed} onClear={rollNewCharacter} />
         </header>
 
-        {careerErrors.length > 0 && (
+        {careerErrors.length + educationErrors.length > 0 && (
           <section role="alert" className="errors" aria-labelledby="errors-heading">
             <h2 id="errors-heading">Career file problems</h2>
             <ul>
-              {careerErrors.map((e) => (
+              {[...careerErrors, ...educationErrors].map((e) => (
                 <li key={e}>{e}</li>
               ))}
             </ul>
@@ -321,6 +322,7 @@ export default function App() {
           seed={character.seed}
           base={base}
           careers={packs.careers}
+          education={packs.education}
           rules={packs.rules}
           packs={packs.packsParam}
         />

@@ -54,7 +54,7 @@ const SERVICE = { 'term-1.skill-0.table': 'serviceSkills' }
 describe('buildCareer start', () => {
   // Builds with no choices and expects the start choice to be pending.
   it('asks for a career first', () => {
-    expect(build(EMPTY_INPUT).pending).toEqual({ kind: 'start', prefix: '', exclude: [], failedQualification: false })
+    expect(build(EMPTY_INPUT).pending).toEqual({ kind: 'start', prefix: '', exclude: [], failedQualification: false, education: [] })
   })
 
   // Saves a career id that isn't loaded and expects a problem naming it and the start choice pending.
@@ -68,7 +68,7 @@ describe('buildCareer start', () => {
   it('stops after a failed qualification', () => {
     const result = build(started({}, { qualification: 2 }))
     expect(result.qualification?.passed).toEqual({ rolled: false })
-    expect(result.pending).toEqual({ kind: 'start', prefix: '', exclude: [], failedQualification: true })
+    expect(result.pending).toEqual({ kind: 'start', prefix: '', exclude: [], failedQualification: true, education: [] })
     expect(result.terms).toEqual([])
   })
 

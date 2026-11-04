@@ -60,7 +60,7 @@ describe('careers one after another', () => {
     const result = build(FIRST_CAREER)
     expect(result.finished).toBe(true)
     expect(result.pending).toBeUndefined()
-    expect(result.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'] })
+    expect(result.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'], education: [] })
     expect(result.runs).toHaveLength(1)
   })
 

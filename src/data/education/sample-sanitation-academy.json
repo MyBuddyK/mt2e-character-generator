@@ -1,0 +1,166 @@
+{
+  "id": "sample-sanitation-academy",
+  "name": "Sample: Sanitation Academy",
+  "source": "Invented sample values to show the data format. Not taken from any published rules.",
+  "summary": "Invented sample academy tied to the sample sanitation career.",
+  "entry": {
+    "characteristic": [
+      "END",
+      "INT"
+    ],
+    "target": 7,
+    "termDMs": [
+      {
+        "term": 2,
+        "dm": -2
+      },
+      {
+        "term": 3,
+        "dm": -4
+      }
+    ]
+  },
+  "skills": {
+    "kind": "service-skills",
+    "career": "sample-sanitation"
+  },
+  "events": [
+    {
+      "roll": 2,
+      "summary": "A failing grade in a core subject. You fail to graduate.",
+      "effects": [
+        {
+          "type": "fail-graduation"
+        }
+      ]
+    },
+    {
+      "roll": 3,
+      "summary": "A lab accident. Roll END 8+ or fail to graduate.",
+      "effects": [
+        {
+          "type": "check",
+          "options": [
+            "END"
+          ],
+          "target": 8,
+          "fail": [
+            {
+              "type": "fail-graduation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 4,
+      "summary": "You drill in vacuum every week. Gain Vacc Suit.",
+      "effects": [
+        {
+          "type": "skill",
+          "options": [
+            "Vacc Suit"
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 5,
+      "summary": "A study group becomes a circle of friends. Gain a contact."
+    },
+    {
+      "roll": 6,
+      "summary": "Life event.",
+      "effects": [
+        {
+          "type": "life-event"
+        }
+      ]
+    },
+    {
+      "roll": 7,
+      "summary": "A quiet term of lectures."
+    },
+    {
+      "roll": 8,
+      "summary": "A visiting lecturer takes an interest. Gain a contact."
+    },
+    {
+      "roll": 9,
+      "summary": "You tutor first-year students. Gain Admin.",
+      "effects": [
+        {
+          "type": "skill",
+          "options": [
+            "Admin"
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 10,
+      "summary": "A rival student blames you for a cheating scandal. Gain a rival."
+    },
+    {
+      "roll": 11,
+      "summary": "You win a design contest. Gain Electronics or Engineer.",
+      "effects": [
+        {
+          "type": "skill",
+          "options": [
+            "Electronics",
+            "Engineer"
+          ]
+        }
+      ]
+    },
+    {
+      "roll": 12,
+      "summary": "Top of the class. DM+2 to one later roll of your choice.",
+      "effects": [
+        {
+          "type": "dm-later",
+          "dm": 2
+        }
+      ]
+    }
+  ],
+  "graduation": {
+    "characteristic": "INT",
+    "target": 7,
+    "honoursAt": 11,
+    "dms": [
+      {
+        "characteristic": "END",
+        "atLeast": 8,
+        "dm": 1
+      },
+      {
+        "characteristic": "SOC",
+        "atLeast": 8,
+        "dm": 1
+      }
+    ]
+  },
+  "benefits": {
+    "effects": [
+      {
+        "type": "characteristic",
+        "characteristic": "EDU",
+        "change": 1
+      }
+    ],
+    "honoursEffects": [
+      {
+        "type": "characteristic",
+        "characteristic": "SOC",
+        "change": 1
+      }
+    ]
+  },
+  "tiedCareer": {
+    "career": "sample-sanitation",
+    "serviceSkillsOnEntry": 3,
+    "failedEntryUnlessAtOrBelow": 2
+  }
+}

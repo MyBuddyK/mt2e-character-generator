@@ -3,6 +3,7 @@ import { CareerSchema, parseCareer, type CareerDefinition } from './career-schem
 import { RulesSchema, type Rules } from './rules-schema'
 import { parseSpecies, SpeciesSchema, type SpeciesDefinition } from './species'
 import { combineById, compareCodeUnits } from './combine'
+import { EducationSchema, parseEducation, type EducationDefinition } from './education-schema'
 
 /**
  * Career packs: one JSON file that holds any number of careers, which a referee shares with their
@@ -15,7 +16,7 @@ export const PACK_FORMAT = 'mt2e-career-pack'
 /**
  * The latest `formatVersion` this app reads. The app reads versions 1, 2 and 3; a pack with any other
  * version is rejected. Version 2 adds the optional `rules` object and `effects` on careers. Version 3
- * adds the optional `species` array.
+ * adds the optional `species` and `education` arrays.
  */
 export const PACK_FORMAT_VERSION = 3
 
@@ -51,6 +52,8 @@ export const CareerPackSchema = z.strictObject({
   careers: z.array(CareerSchema).min(1, 'must have at least one career'),
   /** Species the pack defines (version 3 only). See species.ts. */
   species: z.array(SpeciesSchema).optional(),
+  /** Pre-career education entries the pack defines (version 3 only). See education-schema.ts. */
+  education: z.array(EducationSchema).optional(),
 })
 
 /** The pack fields with each career left unchecked, so careers can be checked one at a time. */
@@ -58,6 +61,7 @@ const PackEnvelopeSchema = z.strictObject({
   ...packFields,
   careers: z.array(z.unknown()).min(1, 'must have at least one career'),
   species: z.array(z.unknown()).optional(),
+  education: z.array(z.unknown()).optional(),
 })
 
 /** The identifying fields of a pack that passed parseCareerPack. */
@@ -80,6 +84,7 @@ export type PackParseResult =
       careers: CareerDefinition[]
       rules: Rules | undefined
       species: SpeciesDefinition[]
+      education: EducationDefinition[]
       problems: string[]
     }
   | { ok: false; reason: string; problems: string[] }
@@ -124,12 +129,13 @@ function usesEffects(careers: unknown[]): boolean {
  * Checks parsed JSON as a career pack. It rejects the pack when it is not an object, when `format`
  * is not PACK_FORMAT, when `formatVersion` is not one of SUPPORTED_FORMAT_VERSIONS (with a message
  * naming them), when a version 1 pack uses `rules` or `effects` (with a message that it must say
- * version 2), when a version 1 or 2 pack lists `species` (with a message that it must say version 3),
+ * version 2), when a version 1 or 2 pack lists `species` or `education` (with a message that it must say version 3),
  * when another pack field fails, or when no career passes. Otherwise it checks each career with
  * parseCareer and skips the ones that fail, and also skips a career whose id was used by an earlier
  * career in the same pack. Each skipped career adds messages of the form
  * "careers.<index> (<id>): <path>: <message>". Species are checked the same way with parseSpecies, and
- * each skipped species adds messages starting "species.<index> (<id>)". It does not throw for any input.
+ * each skipped species adds messages starting "species.<index> (<id>)"; education entries likewise, with
+ * parseEducation and "education.<index> (<id>)". It does not throw for any input.
  */
 export function parseCareerPack(data: unknown): PackParseResult {
   if (!isRecord(data)) {
@@ -161,8 +167,11 @@ export function parseCareerPack(data: unknown): PackParseResult {
       }
     }
   }
-  if (version < 3 && 'species' in data) {
-    return { ok: false, reason: 'this pack uses "species", so its "formatVersion" must be 3', problems: [] }
+  if (version < 3) {
+    const features = ['species', 'education'].filter((k) => k in data).map((k) => `"${k}"`)
+    if (features.length > 0) {
+      return { ok: false, reason: `this pack uses ${features.join(' and ')}, so its "formatVersion" must be 3`, problems: [] }
+    }
   }
   const envelope = PackEnvelopeSchema.safeParse(data)
   if (!envelope.success) {
@@ -172,7 +181,7 @@ export function parseCareerPack(data: unknown): PackParseResult {
       problems: envelope.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`),
     }
   }
-  const { careers: rawCareers, species: rawSpecies = [], id, name, revision, source, rules } = envelope.data
+  const { careers: rawCareers, species: rawSpecies = [], education: rawEducation = [], id, name, revision, source, rules } = envelope.data
   const careers: CareerDefinition[] = []
   const problems: string[] = []
   const seen = new Set<string>()
@@ -209,7 +218,23 @@ export function parseCareerPack(data: unknown): PackParseResult {
     speciesIds.add(result.species.id)
     species.push(result.species)
   })
-  return { ok: true, pack: { id, name, revision, source }, careers, rules, species, problems }
+  const education: EducationDefinition[] = []
+  const educationIds = new Set<string>()
+  rawEducation.forEach((raw, index) => {
+    const prefix = `education.${index}${entryLabel(raw)}`
+    const result = parseEducation(raw)
+    if (!result.ok) {
+      problems.push(...result.errors.map((e) => `${prefix}: ${e}`))
+      return
+    }
+    if (educationIds.has(result.education.id)) {
+      problems.push(`${prefix}: id "${result.education.id}" is used by an earlier education entry in this pack`)
+      return
+    }
+    educationIds.add(result.education.id)
+    education.push(result.education)
+  })
+  return { ok: true, pack: { id, name, revision, source }, careers, rules, species, education, problems }
 }
 
 /**
@@ -321,4 +346,25 @@ export function selectRules(packs: { id: string; name: string; rules: Rules | un
   if (!first) return { rules: sample, packName: undefined, differ: false }
   const text = canonicalJson(first.rules)
   return { rules: first.rules, packName: first.name, differ: withRules.some((p) => canonicalJson(p.rules) !== text) }
+}
+
+/** One loaded pack's education entries, as passed to combineEducation. */
+export interface PackEducation {
+  id: string
+  name: string
+  education: EducationDefinition[]
+}
+
+/**
+ * Returns the education entries to offer, with one message per duplicate id. With no packs that is
+ * `bundled`; with one or more packs the bundled entries are left out and the packs' entries are merged by
+ * id, read in order of pack id and sorted by name, as combineCareers does for careers.
+ */
+export function combineEducation(bundled: EducationDefinition[], packs: PackEducation[]): { education: EducationDefinition[]; problems: string[] } {
+  if (packs.length === 0) return { education: bundled, problems: [] }
+  const { items, problems } = combineById(
+    packs.map((p) => ({ id: p.id, name: p.name, items: p.education })),
+    'education',
+  )
+  return { education: items, problems }
 }

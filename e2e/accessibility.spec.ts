@@ -88,4 +88,18 @@ test.describe('accessibility', () => {
     await expect(page.getByTestId('species-traits')).toBeVisible()
     expect(await violations(page)).toEqual([])
   })
+
+  // Starts the sample trade school, passes entry, picks two skills and graduates, and expects no
+  // violations with the education term, its outcome and bonuses, and the next career pick shown.
+  test('an education term has no axe violations', async ({ page }) => {
+    await page.goto('./?seed=terms')
+    await page.getByRole('combobox', { name: 'Career', exact: true }).selectOption({ label: 'Sample: Orbital Trade School' })
+    await page.getByRole('button', { name: 'Start education' }).click()
+    await page.getByLabel('Term 1 Entry dice').fill('12')
+    await page.getByRole('button', { name: 'Admin' }).click()
+    await page.getByRole('button', { name: 'Broker' }).click()
+    await page.getByLabel('Term 1 Graduation dice').fill('8')
+    await expect(page.getByTestId('education-bonuses')).toBeVisible()
+    expect(await violations(page)).toEqual([])
+  })
 })
