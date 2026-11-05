@@ -479,6 +479,18 @@ function Pending({ pending, input, onChange, onGenerate }: PendingProps) {
           {generate}
         </div>
       )
+    case 'talent':
+      return (
+        <div className="pending" role="group" aria-label="Choose a talent">
+          <p>Choose the next talent to roll for:</p>
+          {pending.options.map((o) => (
+            <button type="button" key={o} onClick={() => choose(pending.key, o)}>
+              {o}
+            </button>
+          ))}
+          {generate}
+        </div>
+      )
     case 'wager':
       return (
         <div className="pending" role="group" aria-label="Wager benefit rolls">
@@ -561,6 +573,8 @@ interface StartFormProps {
   prefix: string
   /** Career ids that can't be picked. */
   exclude: string[]
+  /** Whether the character's PSI has been tested, which lists `psi-tested` careers. */
+  psiTested: boolean
   input: CareerInput
   onChange: (next: CareerInput) => void
 }
@@ -571,10 +585,10 @@ interface StartFormProps {
  * career (prefix "") starting replaces every choice and override; for a later career it replaces only
  * the choices and overrides whose keys start with `prefix`.
  */
-function StartForm({ careers, education, prefix, exclude, input, onChange }: StartFormProps) {
+function StartForm({ careers, education, prefix, exclude, psiTested, input, onChange }: StartFormProps) {
   const [pickedCareer, setPickedCareer] = useState('')
   const [pickedAssignment, setPickedAssignment] = useState('')
-  const offered = careers.filter((c) => canPick(c, exclude))
+  const offered = careers.filter((c) => canPick(c, exclude, psiTested))
   const school = education.find((e) => `education:${e.id}` === pickedCareer)
   const selected = school ? undefined : (offered.find((c) => c.id === pickedCareer) ?? offered[0])
   const assignment = selected?.assignments.find((a) => a.id === pickedAssignment) ?? selected?.assignments[0]
@@ -882,7 +896,7 @@ export function Career({ seed, base, careers, education, rules, packs }: CareerP
           )}
 
           {result.runs.length === 0 && result.educations.length === 0 && pending?.kind !== 'start' && (
-            <StartForm careers={careers} education={[]} prefix="" exclude={[]} input={input} onChange={update} />
+            <StartForm careers={careers} education={[]} prefix="" exclude={[]} psiTested={false} input={input} onChange={update} />
           )}
           {[...result.runs.map((run) => ({ order: run.order, run })), ...result.educations.map((record) => ({ order: record.order, record }))]
             .sort((a, b) => a.order - b.order)
@@ -921,6 +935,7 @@ export function Career({ seed, base, careers, education, rules, packs }: CareerP
                 education={pending.education}
                 prefix={pending.prefix}
                 exclude={pending.exclude}
+                psiTested={result.psi !== undefined}
                 input={input}
                 onChange={update}
               />
@@ -960,6 +975,11 @@ export function Career({ seed, base, careers, education, rules, packs }: CareerP
                 {result.shipShares > 0 && (
                   <>
                     , ship shares <strong data-testid="summary-ship-shares">{result.shipShares}</strong>
+                  </>
+                )}
+                {result.psi !== undefined && (
+                  <>
+                    , PSI <strong data-testid="summary-psi">{result.psi}</strong>
                   </>
                 )}
               </p>
@@ -1026,6 +1046,7 @@ export function Career({ seed, base, careers, education, rules, packs }: CareerP
                 education={result.nextCareer.education}
                 prefix={result.nextCareer.prefix}
                 exclude={result.nextCareer.exclude}
+                psiTested={result.psi !== undefined}
                 input={input}
                 onChange={update}
               />

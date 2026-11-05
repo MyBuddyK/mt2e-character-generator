@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CHARACTERISTICS } from './characteristics'
+import { CHECK_CHARACTERISTICS } from './characteristics'
 import { EffectsSchema } from './effects'
 
 /**
@@ -14,10 +14,14 @@ const nonEmpty = z.string().trim().min(1, 'must be a non-empty string')
 /**
  * A characteristic check that succeeds on 2D + DM >= target, e.g. END 7+. Targets are integers from 0
  * to 20. `characteristic` is one characteristic, or a list of them, in which case the check uses the
- * highest DM among them (for example "DEX or INT 5+").
+ * highest DM among them (for example "DEX or INT 5+"). It can be PSI, which counts as 0 until an event
+ * tests it.
  */
 export const CheckSchema = z.object({
-  characteristic: z.union([z.enum(CHARACTERISTICS), z.array(z.enum(CHARACTERISTICS)).min(1, 'must list at least one characteristic')]),
+  characteristic: z.union([
+    z.enum(CHECK_CHARACTERISTICS),
+    z.array(z.enum(CHECK_CHARACTERISTICS)).min(1, 'must list at least one characteristic'),
+  ]),
   target: z.int().min(0).max(20),
 })
 /** A characteristic check, as described by CheckSchema. */
@@ -160,9 +164,10 @@ export const CareerSchema = z.strictObject({
   musteringOut: z.array(MusterOutEntrySchema).superRefine(coversRolls(1, 7)),
   /**
    * Optional. "forced" leaves the career out of the career pick: only a `next-career` effect or a Draft row
-   * sends a character there (docs/features/prisoner-psion.md).
+   * sends a character there. "psi-tested" lists it at the career pick only once a `psi-test` effect has
+   * tested the character's PSI (docs/features/prisoner-psion.md).
    */
-  entry: z.literal('forced').optional(),
+  entry: z.enum(['forced', 'psi-tested']).optional(),
   /**
    * Optional. The Parole Threshold, rolled in term 1 as `dice`D + `plus` and capped at `max`. A career with it
    * ends only when an advancement total is above the threshold, or by an effect, and survival failures don't
@@ -173,6 +178,21 @@ export const CareerSchema = z.strictObject({
   anagathics: z.literal(false).optional(),
   /** Optional. true asks for the assignment at the start of each term after the first. */
   assignmentEachTerm: z.literal(true).optional(),
+  /**
+   * Optional. Psionic talents rolled in term 1, in an order the player picks: each is a 2D roll + the PSI DM +
+   * its `dm` + `attemptDM` for each talent roll before it, against `target`, and a pass gives it at level 0.
+   * `automaticFirst` names a talent gained with no roll when it is the first one picked. In this career a
+   * skill gain naming a talent the character lacks is a talent roll first.
+   */
+  talents: z
+    .strictObject({
+      target: z.int().min(0).max(20),
+      attemptDM: z.int(),
+      automaticFirst: nonEmpty.optional(),
+      list: z.array(z.strictObject({ name: nonEmpty, dm: z.int() })).min(1, 'must list at least one talent').superRefine(uniqueBy('name')),
+    })
+    .refine((t) => t.automaticFirst === undefined || t.list.some((l) => l.name === t.automaticFirst), 'automaticFirst must be a listed talent')
+    .optional(),
 })
 /** A validated career, as described by CareerSchema. */
 export type CareerDefinition = z.infer<typeof CareerSchema>
