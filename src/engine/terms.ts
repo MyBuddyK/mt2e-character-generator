@@ -1411,10 +1411,11 @@ export function buildCareer(
         benefits.result = benefits.applied.join(', ')
         const q = edu.benefits.qualificationDM
         const c = edu.benefits.commission
+        const commissionDM = c ? (honours ? (c.honoursDM ?? c.dm) : c.dm) : 0
         educationBonus = {
           school: edu.name,
           qualificationDM: q ? { careers: q.careers, dm: honours ? q.honoursDM : q.dm } : undefined,
-          commission: c ? { careers: c.careers, dm: c.dm, automatic: honours && (c.honoursAutomatic ?? false) } : undefined,
+          commission: c ? { careers: c.careers, dm: commissionDM, automatic: honours && (c.honoursAutomatic ?? false) } : undefined,
           tied: tied ? { career: tied.career, serviceSkills: tied.serviceSkillsOnEntry, commission: true } : undefined,
         }
         if (q) record.bonuses.push(`DM ${signedText(honours ? q.honoursDM : q.dm)} to qualify for ${careerNames(q.careers)} as the next career.`)
@@ -1422,7 +1423,7 @@ export function buildCareer(
           record.bonuses.push(
             honours && c.honoursAutomatic
               ? `A commission with no roll before the first term of ${careerNames(c.careers)} as the next career.`
-              : `A commission roll${c.dm === 0 ? '' : ` with DM ${signedText(c.dm)}`} before the first term of ${careerNames(c.careers)} as the next career.`,
+              : `A commission roll${commissionDM === 0 ? '' : ` with DM ${signedText(commissionDM)}`} before the first term of ${careerNames(c.careers)} as the next career.`,
           )
         }
         if (tied) {

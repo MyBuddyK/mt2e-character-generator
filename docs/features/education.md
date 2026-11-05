@@ -75,7 +75,8 @@ career pack. The repo has invented samples.
    An academy's "graduation rolled 2 or less" reads the dice before DMs.
 7. **A pre-career commission** that succeeds starts the career at officer rank 1, and that career's first-term
    commission roll is skipped. It is rolled in term 1 of the next career, after basic training, when that
-   career is listed and has a commission check; with honours and `honoursAutomatic` it passes with no roll.
+   career is listed and has a commission check, with the commission's `dm`, or its `honoursDM` (when set) with
+   honours; with honours and `honoursAutomatic` it passes with no roll.
    This roll, pass or fail, takes the place of that term's usual commission roll.
 8. **The education is a step in the career order.** An education attempt takes the next key prefix, as a
    career does (`education.entry`, `education.skills.pick-<n>`, `education.event`, `education.graduation`, and
@@ -182,3 +183,5 @@ career pack. The repo has invented samples.
 - [x] **ED-34** A saved education choice that can't be picked adds one problem. (Unit test.)
 - [x] **ED-35** Loading the bundled education files leaves out a file that fails `EducationSchema` and one whose
       id an earlier file (by file name) used, with a message for each. (Unit test.)
+- [x] **ED-36** With honours, a pre-career commission roll uses the commission's `honoursDM` when it is set.
+      (Unit test.)

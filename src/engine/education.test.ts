@@ -243,6 +243,29 @@ describe('graduation bonuses', () => {
     expect(honours.runs[0]?.officerRank).toBe(1)
   })
 
+  // Gives the school a commission with DM +0 and an honours DM of +2, graduates with and without honours, enters
+  // the Sample Navy, and expects the commission roll's DM to be 2 with honours and 0 without.
+  // Criteria: ED-36.
+  it('a pre-career commission uses the honours DM with honours', () => {
+    const base = sampleCareer()
+    const navy: CareerDefinition = {
+      ...base,
+      id: 'sample-navy',
+      name: 'Sample Navy',
+      commission: { characteristic: 'SOC', target: 8 },
+      officerRanks: [{ rank: 1, title: 'Ensign' }],
+    }
+    const trade = school(tradeSchoolJson)
+    const edu: EducationDefinition = { ...trade, benefits: { ...trade.benefits, commission: { careers: ['sample-navy'], dm: 0, honoursDM: 2 } } }
+    const rules: Rules = { ...sampleRules, commission: { anyTermFromSOC: 9, dmPerLaterTerm: -1 } }
+    const d: CareerData = { careers: [base, navy], rules, education: [edu] }
+    const choices = { ...GRADUATE, 'career-2.start.career': 'sample-navy', 'career-2.start.assignment': 'debris-sweep' }
+    const honours = build(choices, { ...ENTERED, 'education.graduation': 12, 'career-2.qualification': 12 }, d)
+    expect(step(honours, 'career-2.term-1.education-commission').dm).toBe(2)
+    const plain = build(choices, { ...GRADUATED, 'career-2.qualification': 12 }, d)
+    expect(step(plain, 'career-2.term-1.education-commission').dm).toBe(0)
+  })
+
   // Graduates from the academy, enters the sample career, and expects no qualification roll, then three
   // Service Skill picks raised to 1.
   // Criteria: ED-10.
