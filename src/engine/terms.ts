@@ -494,7 +494,8 @@ export function buildCareer(
     | {
         school: string
         qualificationDM: { careers: string[]; dm: number } | undefined
-        commission: { careers: string[]; dm: number; automatic: boolean } | undefined
+        /** `fromHonours` is true when `dm` is the commission's `honoursDM`. */
+        commission: { careers: string[]; dm: number; fromHonours: boolean; automatic: boolean } | undefined
         /** `commission` is false when graduation failed: the tied career then has no commission roll in its first term. */
         tied: { career: string; serviceSkills: number; commission: boolean } | undefined
       }
@@ -1411,19 +1412,23 @@ export function buildCareer(
         benefits.result = benefits.applied.join(', ')
         const q = edu.benefits.qualificationDM
         const c = edu.benefits.commission
-        const commissionDM = c ? (honours ? (c.honoursDM ?? c.dm) : c.dm) : 0
+        const qualificationDM = q ? { careers: q.careers, dm: honours ? q.honoursDM : q.dm } : undefined
+        const fromHonours = honours && c?.honoursDM !== undefined
+        const commission = c
+          ? { careers: c.careers, dm: fromHonours ? (c.honoursDM ?? c.dm) : c.dm, fromHonours, automatic: honours && (c.honoursAutomatic ?? false) }
+          : undefined
         educationBonus = {
           school: edu.name,
-          qualificationDM: q ? { careers: q.careers, dm: honours ? q.honoursDM : q.dm } : undefined,
-          commission: c ? { careers: c.careers, dm: commissionDM, automatic: honours && (c.honoursAutomatic ?? false) } : undefined,
+          qualificationDM,
+          commission,
           tied: tied ? { career: tied.career, serviceSkills: tied.serviceSkillsOnEntry, commission: true } : undefined,
         }
-        if (q) record.bonuses.push(`DM ${signedText(honours ? q.honoursDM : q.dm)} to qualify for ${careerNames(q.careers)} as the next career.`)
-        if (c) {
+        if (qualificationDM) record.bonuses.push(`DM ${signedText(qualificationDM.dm)} to qualify for ${careerNames(qualificationDM.careers)} as the next career.`)
+        if (commission) {
           record.bonuses.push(
-            honours && c.honoursAutomatic
-              ? `A commission with no roll before the first term of ${careerNames(c.careers)} as the next career.`
-              : `A commission roll${commissionDM === 0 ? '' : ` with DM ${signedText(commissionDM)}`} before the first term of ${careerNames(c.careers)} as the next career.`,
+            commission.automatic
+              ? `A commission with no roll before the first term of ${careerNames(commission.careers)} as the next career.`
+              : `A commission roll${commission.dm === 0 ? '' : ` with DM ${signedText(commission.dm)}`} before the first term of ${careerNames(commission.careers)} as the next career.`,
           )
         }
         if (tied) {
@@ -1490,7 +1495,9 @@ export function buildCareer(
       : check(key, 'Commission (education)', entered.commission, commission.dm)
     if (!commission.automatic) {
       step.reasons.push(`A commission roll before the first term, from ${bonus.school}.`)
-      if (commission.dm !== 0) step.reasons.push(`DM ${signedText(commission.dm)} from ${bonus.school}.`)
+      if (commission.dm !== 0) {
+        step.reasons.push(`DM ${signedText(commission.dm)} from ${bonus.school}${commission.fromHonours ? ', for graduating with honours' : ''}.`)
+      }
     }
     steps.push(step)
     if (passed(step)) {
