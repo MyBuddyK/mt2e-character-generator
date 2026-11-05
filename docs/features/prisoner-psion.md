@@ -96,25 +96,28 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
     the current term, education terms included, with 0 as the lowest value (the step then says so). A second
     `psi-test` is a note.
 11. **`"entry": "psi-tested"`** lists a career at the career pick only once PSI is tested. A saved pick of it
-    before that is a problem, as for a forced career.
+    before that is a problem, as for a forced career. Before a PSI test, a `next-career` effect naming one is
+    a note and changes nothing, and a Draft row naming one is a problem that asks for the career pick, as for
+    a Draft career that isn't loaded.
 12. **PSI in checks.** `PSI` can be the characteristic of a qualification, survival, advancement or
     commission check, and an option of a `check` effect. It uses the PSI DM; an untested PSI counts as 0.
 13. **PSI changes.** A `characteristic` effect or a skill table entry such as "PSI +1" changes PSI, with 0 as
     the lowest value. Before PSI is tested it is a note and changes nothing.
 14. **`talents` is `{ target, attemptDM, automaticFirst?, list }`**, where `list` holds `{ name, dm }`. In term 1
     of the career, before basic training, the player picks which talent to try next at
-    `<term-1>.talents.pick-<i>` from the listed talents the character lacks and has never rolled for (so a
-    character who joins the career again rolls none twice), until none are left; the last one needs no
-    pick. Each is
-    rolled at `<term-1>.talents.roll-<i>`: 2D + the PSI DM + the talent's `dm` + `attemptDM` for each talent
+    `<term-1>.talents.pick-<i>` from the listed talents the character lacks and has never tried (so a
+    character who joins the career again tries none twice), until none are left; the last one needs no
+    pick. Each is rolled at `<term-1>.talents.roll-<i>`: 2D + the PSI DM + the talent's `dm` + `attemptDM` for each talent
     roll made before it, against `target`. A pass gives the talent at level 0. `automaticFirst`, when it is
-    the first talent picked, is gained with no roll and doesn't count as a roll made. Finish career tries the
-    talents in the listed order.
+    the first talent picked, is gained with no roll and doesn't count as a roll made. Finish career picks
+    `automaticFirst` first when it is offered, then tries the others in the listed order.
 15. **A talent from a skill gain is a talent roll.** In a career term with `talents`, a skill gain (from a
     skill table, an event or a rank) naming a listed talent the character lacks rolls for it at
     `<step key>.talent-<n>` first, where `n` counts the talent rolls of that step from 0, as in decision 14; a
-    pass applies the gain, a fail gives nothing. It counts as a talent roll for the DM of later ones. Basic
-    training gives no talent the character lacks, since term 1 has just rolled for each one.
+    pass applies the gain, a fail gives nothing. It counts as a talent roll for the DM of later ones. A gain
+    the skill limits block is lost before any talent roll. Basic training gives no talent the character
+    lacks, since term 1 has just rolled for each one: a later career's basic training pick leaves those
+    talents out, and a pick between options leaves them out while another option is left.
 16. **Not covered**: a Psionics Institute outside a career (its cost and its training), and changing
     assignment by qualifying again. The pack keeps these in summaries, for the player to apply by hand.
 
@@ -177,5 +180,9 @@ has invented test data in `e2e/fixtures/prisoner-pack.json`.
 - [x] **PP-22** Two talent rolls from skill gains on one step have their own keys and dice. (Unit test.)
 - [x] **PP-23** A character who joins a career with talents again rolls no talent in term 1 that was rolled for
       before. (Unit test.)
-- [x] **PP-24** Basic training in a career with talents gives no talent the character lacks, and rolls for none.
-      (Unit test.)
+- [x] **PP-24** Basic training in a career with talents gives no talent the character lacks, rolls for none, and
+      leaves those talents out of a later career's basic training pick. (Unit test.)
+- [x] **PP-25** A `next-career` effect naming a `psi-tested` career before a PSI test is a note, and a Draft row
+      naming one is a problem that asks for the career pick. (Unit test.)
+- [x] **PP-26** A skill gain that the skill limits block makes no talent roll. (Unit test.)
+- [x] **PP-27** Finish career picks `automaticFirst` first when it is offered, wherever it is listed. (Unit test.)

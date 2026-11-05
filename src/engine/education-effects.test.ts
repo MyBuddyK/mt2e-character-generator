@@ -216,7 +216,7 @@ describe('next-career effect', () => {
     const rules: Rules = { ...sampleRules, draft: [{ roll: 1, career: 'missing-career' }] }
     const careers = [withEvent7([{ type: 'next-career', career: 'draft' }]), recycling()]
     const result = build(careers, MUSTER, {}, rules)
-    expect(result.problems).toContain('An event sent the character to the Draft, but the Draft named a career no pack has, so pick the next career.')
+    expect(result.problems).toContain("An event sent the character to the Draft, but the Draft named a career the character can't enter, so pick the next career.")
     expect(result.finished).toBe(true)
     expect(result.nextCareer).toEqual({ prefix: 'career-2.', exclude: ['sample-sanitation'], education: [] })
     const picked = build(careers, { ...MUSTER, 'career-2.start.career': 'sample-recycling', 'career-2.start.assignment': 'debris-sweep' }, {}, rules)

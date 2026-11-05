@@ -89,8 +89,11 @@ export type PendingChoice =
    * that offers it ("Event", "Mishap") and `summary` is that step's entry summary.
    */
   | { kind: 'event-choice'; key: string; source: string; summary: string; options: string[] }
-  /** Which talent of `options` (the listed talents not yet held or tried) to roll for next, stored as its name. */
-  | { kind: 'talent'; key: string; options: string[] }
+  /**
+   * Which talent of `options` (the listed talents not yet held or tried) to roll for next, stored as its name.
+   * `automatic` is the career's `automaticFirst` when picking it now gains it with no roll, or undefined.
+   */
+  | { kind: 'talent'; key: string; options: string[]; automatic: string | undefined }
 
 /**
  * A DM from a `dm-later` effect, which the player applies by hand to one later roll. The roll picked
@@ -457,14 +460,13 @@ export function buildCareer(
   let psi: number | undefined
   /** Talent rolls made so far, for the `attemptDM` of the next one. */
   let talentRolls = 0
-  /** The talents rolled for so far, by name; term 1 of a career with `talents` rolls only the others. */
-  const talentsRolled = new Set<string>()
+  /**
+   * The talents tried so far, by name: rolled for, or gained as the automatic first talent. Term 1 of a career
+   * with `talents` offers only the others.
+   */
+  const talentsTried = new Set<string>()
   /** Talent rolls made from skill gains on each step, by step key, so each roll has its own key. */
   const talentRollsOnStep = new Map<string, number>()
-  /** The steps of the career term being played, or undefined outside one (talent rolls from skill gains go here). */
-  let currentSteps: Step[] | undefined
-  /** True during basic training, where a talent the character lacks is not gained. */
-  let inBasicTraining = false
   let dead = false
   /** The age at death: the start of the term when the character dies before serving it. */
   let deathAge: number | undefined
@@ -732,35 +734,24 @@ export function buildCareer(
     if (talent.dm !== 0) step.reasons.push(`DM ${signedText(talent.dm)} for ${talent.name}.`)
     if (attemptDM !== 0) step.reasons.push(`DM ${signedText(attemptDM)} for ${talentRolls} earlier talent roll${talentRolls === 1 ? '' : 's'}.`)
     talentRolls += 1
-    talentsRolled.add(talent.name)
+    talentsTried.add(talent.name)
     return step
   }
 
+  /** Returns the current career's listed talent named `skill` when the character lacks it, or undefined. */
+  const missingTalent = (skill: string) =>
+    inEducation || skills[skill] !== undefined ? undefined : career?.talents?.list.find((t) => t.name === skill)
+
   /**
    * Gains a level in `skill`, or raises it to at least `level`. A gain that would break a limit in
-   * rules.skillLimits is lost, and the step says why. In a career term with `talents`, a listed talent the
-   * character lacks first needs a talent roll at `<step key>.talent-<n>` (added to the term), unless
-   * `talentRolled` says the caller has made it; on a fail nothing is gained. In basic training such a talent
-   * is not gained.
+   * rules.skillLimits is lost, and the step says why. When `skill` is a listed talent of the current career
+   * that the character lacks, `talentSteps` decides: with a term's steps, the gain first needs a talent roll
+   * at `<step key>.talent-<n>`, added to those steps, and gives nothing on a fail; with 'blocked' (basic
+   * training) nothing is gained; with undefined the gain applies with no roll (the caller made the roll, or
+   * no talent rule applies). The skill limits are checked before the talent roll.
    */
-  const gainSkill = (skill: string, step: Step, level?: number, talentRolled = false) => {
-    // In a career with talents, gaining a talent the character lacks needs a talent roll first.
-    const termSteps = currentSteps
-    const talent = talentRolled || !termSteps ? undefined : career?.talents?.list.find((t) => t.name === skill)
-    if (talent && termSteps && skills[skill] === undefined) {
-      if (inBasicTraining) {
-        step.reasons.push(`No ${skill}: in basic training a talent comes only from its talent roll.`)
-        return
-      }
-      const n = talentRollsOnStep.get(step.key) ?? 0
-      talentRollsOnStep.set(step.key, n + 1)
-      const roll = talentRoll(`${step.key}.talent-${n}`, talent)
-      termSteps.push(roll)
-      if (!passed(roll)) {
-        step.reasons.push(`No ${skill}: its talent roll failed.`)
-        return
-      }
-    }
+  const gainSkill = (skill: string, step: Step, level: number | undefined, talentSteps: Step[] | 'blocked' | undefined) => {
+    const talent = talentSteps === undefined ? undefined : missingTalent(skill)
     const before = skills[skill]
     const after = level === undefined ? (before ?? 0) + 1 : Math.max(before ?? 0, level)
     if (skillLimits?.maxLevel !== undefined && after > skillLimits.maxLevel) {
@@ -775,6 +766,22 @@ export function buildCareer(
           `Lost: ${skill} ${after} would make ${total} skill levels in total, above ${skillLimits.totalPerIntEdu} × (INT + EDU) = ${limit}.`,
         )
         return
+      }
+    }
+    if (talent) {
+      if (talentSteps === 'blocked') {
+        step.reasons.push(`No ${skill}: in basic training a talent comes only from its talent roll.`)
+        return
+      }
+      if (talentSteps !== undefined) {
+        const n = talentRollsOnStep.get(step.key) ?? 0
+        talentRollsOnStep.set(step.key, n + 1)
+        const roll = talentRoll(`${step.key}.talent-${n}`, talent)
+        talentSteps.push(roll)
+        if (!passed(roll)) {
+          step.reasons.push(`No ${skill}: its talent roll failed.`)
+          return
+        }
       }
     }
     skills[skill] = after
@@ -799,12 +806,16 @@ export function buildCareer(
   /**
    * Raises a characteristic, or gains a skill, for one skill table entry. An entry such as "Drive or
    * Vacc Suit" asks the player to pick one first, under `${step.key}.pick`. With `level`, skills are
-   * raised to at least that level and characteristic entries are skipped (basic training).
+   * raised to at least that level and characteristic entries are skipped (basic training). `talentSteps` is
+   * passed to gainSkill; with 'blocked', a pick leaves out the talents the character lacks while another
+   * option is left.
    */
-  const applyTableEntry = (entry: string, step: Step, level?: number, pickKey = `${step.key}.pick`) => {
+  const applyTableEntry = (entry: string, step: Step, talentSteps: Step[] | 'blocked' | undefined, level?: number, pickKey = `${step.key}.pick`) => {
     // In basic training (level set) characteristic options give nothing, so they are not offered.
     const all = entryOptions(entry)
-    const options = level === undefined ? all : all.filter((o) => asCharacteristic(o) === undefined)
+    const skillOptions = level === undefined ? all : all.filter((o) => asCharacteristic(o) === undefined)
+    const held = talentSteps === 'blocked' ? skillOptions.filter((o) => missingTalent(o) === undefined) : skillOptions
+    const options = held.length > 0 ? held : skillOptions
     if (options.length === 0) return
     const picked = pickOption(pickKey, options)
     const c = asCharacteristic(picked)
@@ -812,7 +823,7 @@ export function buildCareer(
       if (level !== undefined) return
       changeCharacteristic(c.characteristic, c.change, step)
     } else {
-      gainSkill(picked, step, level)
+      gainSkill(picked, step, level, talentSteps)
     }
   }
 
@@ -823,7 +834,7 @@ export function buildCareer(
     const entry = entries[Math.min(Math.max((step.total ?? 1) - 1, 0), entries.length - 1)] ?? ''
     step.result = entry
     termSteps.push(step)
-    applyTableEntry(entry, step)
+    applyTableEntry(entry, step, termSteps)
   }
 
   /** Asks which table to use, then rolls 1D on it and applies the entry. */
@@ -915,7 +926,7 @@ export function buildCareer(
       }
       switch (effect.type) {
         case 'skill':
-          gainSkill(pickOption(`${effectKey}.skill`, effect.options), step, effect.level)
+          gainSkill(pickOption(`${effectKey}.skill`, effect.options), step, effect.level, termSteps)
           break
         case 'roll-table': {
           const blocked = tableBlocked(effect.table)
@@ -1041,7 +1052,7 @@ export function buildCareer(
             rs.extraBenefits -= amount
             roll.applied.push(`Lost ${amount} benefit roll${amount === 1 ? '' : 's'}`)
           }
-          if (effect.gainUsedSkill) gainSkill(skill, roll)
+          if (effect.gainUsedSkill) gainSkill(skill, roll, undefined, termSteps)
           break
         }
         case 'fail-graduation':
@@ -1074,6 +1085,10 @@ export function buildCareer(
           }
           if (target.id === career?.id) {
             step.notes.push(`The character is already in ${target.name}, so this changes nothing.`)
+            break
+          }
+          if (target.entry === 'psi-tested' && psi === undefined) {
+            step.notes.push(`${target.name} needs a tested PSI, and the character's PSI hasn't been tested, so this changes nothing.`)
             break
           }
           forcedNext = { kind: 'career', career: target }
@@ -1346,13 +1361,13 @@ export function buildCareer(
         const skill = pickOption(`${termKey}.skills.pick-${i}`, list.filter((s) => !picked.includes(s)))
         if (skill === '') return
         picked.push(skill)
-        gainSkill(skill, skillsStep, level)
+        gainSkill(skill, skillsStep, level, undefined)
       })
     } else {
       const tiedId = edu.skills.career
       const tied = data.careers.find((c) => c.id === tiedId)
       if (!tied) skillsStep.notes.push(`Gain the Service Skills of the career "${tiedId}" at level 0 by hand: no loaded career pack has it.`)
-      else tied.skillTables.serviceSkills.forEach((entry, i) => applyTableEntry(entry, skillsStep, 0, `${termKey}.skills.pick-${i}`))
+      else tied.skillTables.serviceSkills.forEach((entry, i) => applyTableEntry(entry, skillsStep, undefined, 0, `${termKey}.skills.pick-${i}`))
     }
     applyEffects(edu.onEntry, `${termKey}.skills`, skillsStep, steps, term)
     skillsStep.result = skillsStep.applied.join(', ')
@@ -1390,7 +1405,7 @@ export function buildCareer(
         const benefits: Step = { key: `${termKey}.benefits`, label: honours ? 'Graduation with honours' : 'Graduation', result: '', applied: [], notes: [], reasons: [] }
         steps.push(benefits)
         const raise = edu.benefits.raisePickedSkills ?? 0
-        for (const skill of picked) for (let i = 0; i < raise; i += 1) gainSkill(skill, benefits)
+        for (const skill of picked) for (let i = 0; i < raise; i += 1) gainSkill(skill, benefits, undefined, undefined)
         applyEffects(edu.benefits.effects, `${termKey}.benefits`, benefits, steps, term)
         if (honours) applyEffects(edu.benefits.honoursEffects, `${termKey}.benefits.honours`, benefits, steps, term)
         benefits.result = benefits.applied.join(', ')
@@ -1450,7 +1465,7 @@ export function buildCareer(
         if (left.length === 0) break
         const skill = pickOption(`${termKey}.academy-skills.pick-${i}`, left)
         picked.push(skill)
-        gainSkill(skill, step, 1)
+        gainSkill(skill, step, 1, steps)
       }
       step.result = step.applied.join(', ')
     }
@@ -1509,7 +1524,8 @@ export function buildCareer(
 
       /**
        * Rolls the Draft under this career's prefix and returns the step, the career it names and its
-       * assignment. Stops for a new career pick when that career isn't loaded.
+       * assignment. Stops for a new career pick when that career isn't loaded, or needs a tested PSI the
+       * character doesn't have.
        */
       const rollDraft = (draft: NonNullable<Rules['draft']>) => {
         const { step, row } = tableRoll(`${prefix}draft`, 'Draft', 1, 0, draft)
@@ -1517,6 +1533,10 @@ export function buildCareer(
         step.result = entered?.name ?? row?.career ?? ''
         if (!entered) {
           problems.push(`The Draft career "${row?.career ?? ''}" isn't loaded.`)
+          throw new Stop({ kind: 'start', prefix, exclude, failedQualification: true, education: offeredEducation })
+        }
+        if (entered.entry === 'psi-tested' && psi === undefined) {
+          problems.push(`The Draft career ${entered.name} needs a tested PSI, and the character's PSI hasn't been tested.`)
           throw new Stop({ kind: 'start', prefix, exclude, failedQualification: true, education: offeredEducation })
         }
         return { step, entered, assignmentId: row?.assignment }
@@ -1548,10 +1568,10 @@ export function buildCareer(
           career = forcedDraft.entered
           assignment = undefined
         } catch (error) {
-          // The Draft named a career no pack has: rollDraft listed the problem, and the player picks the
-          // next career as usual instead.
+          // The Draft named a career that can't be entered: rollDraft listed the problem, and the player picks
+          // the next career as usual instead.
           if (!(error instanceof Stop)) throw error
-          problems.push('An event sent the character to the Draft, but the Draft named a career no pack has, so pick the next career.')
+          problems.push("An event sent the character to the Draft, but the Draft named a career the character can't enter, so pick the next career.")
           forcedTo = undefined
         }
       }
@@ -1731,7 +1751,6 @@ export function buildCareer(
         terms.push(term)
         rs.terms.push(term)
         const steps = term.steps
-        currentSteps = steps
         if (changedTo) {
           steps.push({ key: `${termKey}.assignment`, label: 'Assignment', result: changedTo.name, applied: [], notes: [], reasons: [] })
         }
@@ -1739,19 +1758,17 @@ export function buildCareer(
         if (n === 1 && career.talents) {
           // Talent rolls come before basic training, in the order the player picks.
           const talents = career.talents
-          const tried: string[] = []
           for (let i = 0; ; i += 1) {
-            const left = talents.list
-              .filter((t) => skills[t.name] === undefined && !tried.includes(t.name) && !talentsRolled.has(t.name))
-              .map((t) => t.name)
+            const left = talents.list.filter((t) => skills[t.name] === undefined && !talentsTried.has(t.name)).map((t) => t.name)
             if (left.length === 0) break
             const key = `${termKey}.talents.pick-${i}`
-            const name = pickFrom(key, left, () => ({ kind: 'talent', key, options: left }))
+            const automatic = i === 0 && talents.automaticFirst !== undefined && left.includes(talents.automaticFirst) ? talents.automaticFirst : undefined
+            const name = pickFrom(key, left, () => ({ kind: 'talent', key, options: left, automatic }))
             const talent = talents.list.find((t) => t.name === name)
             if (!talent) break
-            tried.push(talent.name)
             const rollKey = `${termKey}.talents.roll-${i}`
-            if (i === 0 && talent.name === talents.automaticFirst) {
+            if (talent.name === automatic) {
+              talentsTried.add(talent.name)
               const free: Step = {
                 key: rollKey,
                 label: `Talent: ${talent.name} (automatic)`,
@@ -1761,13 +1778,13 @@ export function buildCareer(
                 reasons: ['The first talent picked is gained with no roll.'],
               }
               steps.push(free)
-              gainSkill(talent.name, free, 0, true)
+              gainSkill(talent.name, free, 0, undefined)
               free.result = free.applied.join(', ')
               continue
             }
             const roll = talentRoll(rollKey, talent)
             steps.push(roll)
-            if (passed(roll)) gainSkill(talent.name, roll, 0, true)
+            if (passed(roll)) gainSkill(talent.name, roll, 0, undefined)
           }
         }
 
@@ -1783,25 +1800,26 @@ export function buildCareer(
           }
           // The step is shown before its entries are applied, so a pick asked for here appears under it.
           steps.push(training)
-          inBasicTraining = true
-          try {
-            if (careerNumber === 1) {
-              tableEntries(trainingTable).forEach((entry, i) => {
-                applyTableEntry(entry, training, rules.basicTraining.level, `${termKey}.training.pick-${i}`)
-                training.result = training.applied.join(', ')
-              })
-            } else {
-              // A later career's basic training gives one skill from the table, picked by the player.
-              const options = [
-                ...new Set(tableEntries(trainingTable).flatMap((e) => entryOptions(e).filter((o) => asCharacteristic(o) === undefined))),
-              ]
-              if (options.length > 0) {
-                gainSkill(pickOption(`${termKey}.training.pick`, options), training, rules.basicTraining.level)
-                training.result = training.applied.join(', ')
-              }
+          // Basic training gives no talent the character lacks: term 1 has just rolled for each one.
+          if (careerNumber === 1) {
+            tableEntries(trainingTable).forEach((entry, i) => {
+              applyTableEntry(entry, training, 'blocked', rules.basicTraining.level, `${termKey}.training.pick-${i}`)
+              training.result = training.applied.join(', ')
+            })
+          } else {
+            // A later career's basic training gives one skill from the table, picked by the player, from the
+            // skills that aren't talents the character lacks.
+            const options = [
+              ...new Set(
+                tableEntries(trainingTable).flatMap((e) =>
+                  entryOptions(e).filter((o) => asCharacteristic(o) === undefined && missingTalent(o) === undefined),
+                ),
+              ),
+            ]
+            if (options.length > 0) {
+              gainSkill(pickOption(`${termKey}.training.pick`, options), training, rules.basicTraining.level, 'blocked')
+              training.result = training.applied.join(', ')
             }
-          } finally {
-            inBasicTraining = false
           }
           reachRank(0, steps, term, `${termKey}.rank-0`)
           const parole = rollParole(`${termKey}.parole`)
@@ -1981,7 +1999,6 @@ export function buildCareer(
         if (next !== 'continue') throw new Stop({ kind: 'next', key: nextKey, forced: undefined, reason: undefined })
       }
 
-      currentSteps = undefined
       // For benefits, an officer's rank is the officer rank plus the enlisted rank held when commissioned.
       const benefitRank = rs.officerRank === undefined ? rs.rank : rs.officerRank + (rs.enlistedRankAtCommission ?? 0)
       const highest = <T extends { minRank: number }>(list: T[]) =>

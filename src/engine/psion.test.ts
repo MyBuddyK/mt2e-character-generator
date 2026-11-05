@@ -142,7 +142,7 @@ describe('talents', () => {
   // Criteria: PP-18.
   it('term 1 rolls each talent in the picked order', () => {
     const asks = build(TESTED, TESTED_ROLLS)
-    expect(asks.pending).toEqual({ kind: 'talent', key: 'career-2.term-1.talents.pick-0', options: ['Mindspeech', 'Farsight', 'Lifting'] })
+    expect(asks.pending).toEqual({ kind: 'talent', key: 'career-2.term-1.talents.pick-0', options: ['Mindspeech', 'Farsight', 'Lifting'], automatic: 'Mindspeech' })
     const rolls = { ...TESTED_ROLLS, 'career-2.term-1.talents.roll-1': 12, 'career-2.term-1.talents.roll-2': 12 }
     const result = build({ ...TESTED, ...TALENTS }, rolls)
     expect(step(result, 'career-2.term-1.talents.roll-0').label).toBe('Talent: Mindspeech (automatic)')
@@ -253,14 +253,65 @@ describe('talent rolls after term 1 starts', () => {
     expect(keys.filter((k) => k.startsWith('career-4.term-1.talents'))).toEqual([])
   })
 
-  // Fails the Lifting talent roll, picks Lifting in basic training, and expects a reason, no Lifting and no
-  // talent roll on the training step.
+  // Fails the Lifting talent roll and expects the basic training pick to leave out Lifting and keep Mindspeech,
+  // which the character holds; with a saved pick of Lifting, expects no Lifting and no talent roll.
   // Criteria: PP-24.
   it('basic training gives no talent the character lacks', () => {
-    const choices = { ...FAILED.choices, 'career-2.term-1.training.pick': 'Lifting' }
-    const result = build(choices, FAILED.rolls)
-    expect(step(result, 'career-2.term-1.training').reasons).toContain('No Lifting: in basic training a talent comes only from its talent roll.')
+    const { 'career-2.term-1.training.pick': _, ...unpicked } = FAILED.choices
+    const asks = build(unpicked, FAILED.rolls)
+    expect(asks.pending).toEqual({
+      kind: 'skill-option',
+      key: 'career-2.term-1.training.pick',
+      options: ['Mindspeech', 'Deception', 'Stealth', 'Streetwise', 'Melee'],
+    })
+    const result = build({ ...FAILED.choices, 'career-2.term-1.training.pick': 'Lifting' }, FAILED.rolls)
     expect(result.skills['Lifting']).toBeUndefined()
     expect(result.terms.flatMap((t) => t.steps).some((s) => s.key.startsWith('career-2.term-1.training.talent'))).toBe(false)
+  })
+})
+
+// Tests for the rules that keep talent rolls and PSI-tested careers consistent.
+describe('talent and PSI-tested career limits', () => {
+  // Gives the Testing career's roll 8 event a next-career effect naming the Mind career, with no PSI test, and
+  // expects a note and no forced career; then sends the character to a Draft whose only row is the Mind
+  // career, and expects a problem and the next career pick.
+  // Criteria: PP-25.
+  it('an event or the Draft enters a psi-tested career only after a PSI test', () => {
+    const choices = { ...TESTED, 'term-1.next': 'muster' }
+    const sent = build(choices, TESTED_ROLLS, data(testingWithEvent8([{ type: 'next-career', career: 'test-mind' }])))
+    expect(step(sent, 'term-1.event').notes).toEqual([
+      "Mind career needs a tested PSI, and the character's PSI hasn't been tested, so this changes nothing.",
+    ])
+    expect(sent.runs[1]?.forced).toBeFalsy()
+    const rules: Rules = { ...sampleRules, draft: [{ roll: 1, career: 'test-mind' }] }
+    const drafted = build({ ...TESTED, 'term-1.next': 'muster' }, TESTED_ROLLS, data(testingWithEvent8([{ type: 'next-career', career: 'draft' }]), rules))
+    expect(drafted.problems).toContain("The Draft career Mind career needs a tested PSI, and the character's PSI hasn't been tested.")
+    expect(drafted.runs[1]?.career.id).not.toBe('test-mind')
+  })
+
+  // With a skill limit of level 0, fails the Lifting talent roll, rolls service skills 3 ("Lifting"), and
+  // expects the gain lost to the limit with no talent roll for it.
+  // Criteria: PP-26.
+  it('a skill gain the skill limits block makes no talent roll', () => {
+    const rules: Rules = { ...sampleRules, skillLimits: { maxLevel: 0 } }
+    const choices = { ...TESTED, ...TALENTS, 'career-2.term-1.training.pick': 'Deception', 'career-2.term-1.skill-0.table': 'serviceSkills' }
+    const rolls = { ...TESTED_ROLLS, 'career-2.term-1.talents.roll-1': 2, 'career-2.term-1.talents.roll-2': 12, 'career-2.term-1.skill-0': 3 }
+    const result = build(choices, rolls, data(undefined, rules))
+    expect(step(result, 'career-2.term-1.skill-0').reasons).toEqual(['Lost: Lifting 1 is above the skill limit of 0.'])
+    expect(result.terms.flatMap((t) => t.steps).some((s) => s.key.startsWith('career-2.term-1.skill-0.talent'))).toBe(false)
+  })
+
+  // Moves Mindspeech, the automatic first talent, to the end of the Mind career's list, runs Finish career,
+  // and expects Mindspeech picked first and gained with no roll.
+  // Criteria: PP-27.
+  it('Finish career picks the automatic first talent first', () => {
+    const { testing, mind } = packCareers()
+    const talents = mind.talents
+    if (!talents) throw new Error('the Mind career has no talents')
+    const reordered: CareerDefinition = { ...mind, talents: { ...talents, list: [...talents.list.slice(1), ...talents.list.slice(0, 1)] } }
+    const d: CareerData = { careers: [testing, reordered], rules: sampleRules }
+    const finished = finishCareer(SEED, BASE, { ...EMPTY_INPUT, choices: TESTED, rolls: TESTED_ROLLS }, d)
+    expect(finished.choices['career-2.term-1.talents.pick-0']).toBe('Mindspeech')
+    expect(step(buildCareer(SEED, BASE, finished, d), 'career-2.term-1.talents.roll-0').label).toBe('Talent: Mindspeech (automatic)')
   })
 })
