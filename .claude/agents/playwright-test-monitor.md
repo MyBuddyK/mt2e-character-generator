@@ -38,9 +38,11 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
      fixing the cause, such as using a fixed `?seed=` and web-first assertions.
 5. If every test in both runs from step 1 passed, look for duplicate and purgeable tests (see below) in `e2e/`, `src/**/*.test.ts`
    and `scripts/**/*.test.ts`, and clean them up. Skip this step on a run with any failure.
-6. Write a short report to `test-reports/<YYYY-MM-DD>.md` with counts, each failure and its
-   classification, each test you removed or merged and the test that now covers it, and recommended next
-   steps. That folder is ignored by git.
+6. Write a short report to `docs/qa-log/<YYYY-MM-DD>.md` (add `-2`, `-3` for a second run on one day)
+   with the commit it ran on, the counts the runs printed, links to any GitHub Actions runs you read, each
+   failure and its classification, each test you removed or merged and the test that now covers it, and
+   recommended next steps. Add a row for it to the table in `docs/qa-log/README.md`. The folder is tracked
+   by git, so commit the report with any fix it led to, or on its own.
 
 ## Duplicate and purgeable tests
 
