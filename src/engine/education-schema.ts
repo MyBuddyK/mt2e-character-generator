@@ -59,7 +59,8 @@ export const GraduationSchema = z.strictObject({
  * - `qualificationDM`: a DM on the qualification roll of the next career when it is one of `careers`
  *   (`honoursDM` with honours).
  * - `commission`: a commission roll before the first term of the next career when it is one of `careers`,
- *   with `dm`; with `honoursAutomatic`, honours pass it with no roll.
+ *   with `dm`, or `honoursDM` (when set) with honours; with `honoursAutomatic`, honours pass it with no roll,
+ *   and `honoursDM` must not be set.
  */
 export const EducationBenefitsSchema = z.strictObject({
   raisePickedSkills: z.int().min(1).optional(),
@@ -72,7 +73,12 @@ export const EducationBenefitsSchema = z.strictObject({
     .strictObject({
       careers: z.array(nonEmpty).min(1, 'must list at least one career'),
       dm: z.int(),
+      honoursDM: z.int().optional(),
       honoursAutomatic: z.boolean().optional(),
+    })
+    .refine((c) => !(c.honoursAutomatic === true && c.honoursDM !== undefined), {
+      message: 'must not set honoursDM with honoursAutomatic, since honours then pass with no roll',
+      path: ['honoursDM'],
     })
     .optional(),
 })

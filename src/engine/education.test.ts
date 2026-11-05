@@ -243,6 +243,42 @@ describe('graduation bonuses', () => {
     expect(honours.runs[0]?.officerRank).toBe(1)
   })
 
+  // Gives the school a commission with DM +0 and an honours DM of +2, enters the Sample Navy after graduating
+  // with and without honours, and expects the school's DM reason to be +2 for honours and absent without; with a
+  // DM of +1 and no honours DM, expects DM +1 with honours. Also expects the schema to reject an honours DM
+  // together with honoursAutomatic.
+  // Criteria: ED-36.
+  it('a pre-career commission uses the honours DM with honours', () => {
+    const base = sampleCareer()
+    const navy: CareerDefinition = {
+      ...base,
+      id: 'sample-navy',
+      name: 'Sample Navy',
+      commission: { characteristic: 'SOC', target: 8 },
+      officerRanks: [{ rank: 1, title: 'Ensign' }],
+    }
+    const trade = school(tradeSchoolJson)
+    const withCommission = (commission: NonNullable<EducationDefinition['benefits']['commission']>): CareerData => ({
+      careers: [base, navy],
+      rules: { ...sampleRules, commission: { anyTermFromSOC: 9, dmPerLaterTerm: -1 } },
+      education: [{ ...trade, benefits: { ...trade.benefits, commission } }],
+    })
+    const schoolReasons = (result: CareerResult) =>
+      step(result, 'career-2.term-1.education-commission').reasons.filter((r) => r.startsWith('DM') && r.includes(trade.name))
+    const choices = { ...GRADUATE, 'career-2.start.career': 'sample-navy', 'career-2.start.assignment': 'debris-sweep' }
+    const honoursRolls = { ...ENTERED, 'education.graduation': 12, 'career-2.qualification': 12 }
+    const split = withCommission({ careers: ['sample-navy'], dm: 0, honoursDM: 2 })
+    expect(schoolReasons(build(choices, honoursRolls, split))).toEqual([`DM +2 from ${trade.name}, for graduating with honours.`])
+    expect(schoolReasons(build(choices, { ...GRADUATED, 'career-2.qualification': 12 }, split))).toEqual([])
+    const single = withCommission({ careers: ['sample-navy'], dm: 1 })
+    expect(schoolReasons(build(choices, honoursRolls, single))).toEqual([`DM +1 from ${trade.name}.`])
+    const both = { ...tradeSchoolJson, benefits: { ...tradeSchoolJson.benefits, commission: { careers: ['sample-navy'], dm: 0, honoursDM: 2, honoursAutomatic: true } } }
+    expect(parseEducation(both)).toEqual({
+      ok: false,
+      errors: ['benefits.commission.honoursDM: must not set honoursDM with honoursAutomatic, since honours then pass with no roll'],
+    })
+  })
+
   // Graduates from the academy, enters the sample career, and expects no qualification roll, then three
   // Service Skill picks raised to 1.
   // Criteria: ED-10.
