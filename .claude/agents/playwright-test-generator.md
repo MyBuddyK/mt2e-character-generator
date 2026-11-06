@@ -37,6 +37,8 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
   - Checks results with web-first assertions (`await expect(locator).toBeVisible()`,
     `toHaveText`, `toHaveCount`) and no fixed waits
   - Loads career pack test data from `e2e/fixtures/`, which holds only invented careers
+- After adding a test with a `// Criteria:` line, run `npm run criteria` to rewrite `docs/criteria-coverage.md`
+  and commit it with the test; `npm run check` fails while the table is out of date
 - Run the new test with `test_run`. If it fails, report the failure for `playwright-test-healer`
   instead of changing an expected value to match what the app shows.
 

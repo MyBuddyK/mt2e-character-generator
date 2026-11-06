@@ -12,12 +12,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm run check:conventions && npm test",
+    "check": "npm run lint && npm run typecheck && npm run check:conventions && npm run check:criteria && npm test",
     "schema": "tsx scripts/write-pack-schema.ts",
     "validate-pack": "tsx scripts/validate-pack.ts",
     "check:conventions": "tsx scripts/check-conventions.ts",
     "test:coverage": "vitest run --coverage",
-    "test:mutation": "stryker run"
+    "test:mutation": "stryker run",
+    "criteria": "tsx scripts/criteria-coverage.ts",
+    "check:criteria": "tsx scripts/criteria-coverage.ts --check"
   },
   "dependencies": {
     "react": "^19.3.1",

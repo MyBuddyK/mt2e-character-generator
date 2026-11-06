@@ -38,9 +38,11 @@ Follow the documentation rules in `CLAUDE.md` for every comment and test plan yo
      fixing the cause, such as using a fixed `?seed=` and web-first assertions.
 5. If every test in both runs from step 1 passed, look for duplicate and purgeable tests (see below) in `e2e/`, `src/**/*.test.ts`
    and `scripts/**/*.test.ts`, and clean them up. Skip this step on a run with any failure.
-6. Write a short report to `test-reports/<YYYY-MM-DD>.md` with counts, each failure and its
-   classification, each test you removed or merged and the test that now covers it, and recommended next
-   steps. That folder is ignored by git.
+6. Write a short report to `docs/qa-log/<YYYY-MM-DD>.md` (add `-2`, `-3` for a second run on one day)
+   with the commit it ran on, the counts the runs printed, links to any GitHub Actions runs you read, each
+   failure and its classification, each test you removed or merged and the test that now covers it, and
+   recommended next steps. Add a row for it to the table in `docs/qa-log/README.md`. The folder is tracked
+   by git, so commit the report with any fix it led to, or on its own.
 
 ## Duplicate and purgeable tests
 
@@ -62,7 +64,9 @@ To clean them up:
 3. If the removed test's `// Criteria:` comment names an id, the kept test's comment must name it too,
    so `npm run check:conventions` still finds a test for every ticked criterion. If you can't tell which
    criterion a test checks, keep it.
-4. Run `npm run check` and `npm run test:e2e` after the changes. Both must pass.
+4. Run `npm run criteria` to rewrite `docs/criteria-coverage.md`, which lists each test's file and title by
+   the criteria it names, then run `npm run check` and `npm run test:e2e`. Both must pass. Commit the
+   rewritten table with the cleanup.
 5. Make the cleanup its own commit, separate from any fix. In the commit message, list each removed test
    and the test that replaces it, or the spec line that removed the behavior. Report the test counts the
    runs printed; don't describe coverage in any other terms.
