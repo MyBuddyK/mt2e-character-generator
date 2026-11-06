@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCriteriaCoverage } from './criteria-coverage'
+import { buildCriteriaCoverage, NO_TITLE } from './criteria-coverage'
 
 const SPEC = {
   path: 'docs/features/demo.md',
@@ -35,12 +35,12 @@ describe('buildCriteriaCoverage', () => {
   })
 
   // Passes a Criteria comment in a file that is not a test file and one in a test file whose next line has no
-  // test call, and expects the first ignored and the second listed with the placeholder title.
+  // test call, and expects the first ignored and the second listed with the NO_TITLE placeholder.
   it('reads Criteria comments only in test files and marks a missing title', () => {
     const notTest = { path: 'src/demo.ts', text: '// Criteria: DM-2.\nexport const x = 1\n' }
     const test = { path: 'src/demo.test.ts', text: '// Criteria: DM-1.\nconst helper = 1\n' }
     const table = buildCriteriaCoverage([SPEC, notTest, test])
-    expect(table).toContain('| DM-1 | yes | First criterion. | `src/demo.test.ts` (title not on the next line) |')
+    expect(table).toContain(`| DM-1 | yes | First criterion. | \`src/demo.test.ts\` ${NO_TITLE} |`)
     expect(table).toContain('| DM-2 | no | Second criterion, | none |')
   })
 
@@ -57,5 +57,58 @@ describe('buildCriteriaCoverage', () => {
   it('gives the same output for the same files in any order', () => {
     const test = { path: 'src/demo.test.ts', text: "// Criteria: DM-1.\nit('t', () => {})\n" }
     expect(buildCriteriaCoverage([test, SPEC])).toBe(buildCriteriaCoverage([SPEC, test]))
+  })
+
+  // Passes Criteria comments above it.each(...)(...), test.describe.serial(...), a call whose title is on the
+  // next line and a title with an escaped quote, and expects each title read, with the escape undone.
+  it('reads titles of .each, .serial, next-line and escaped-quote calls', () => {
+    const text = [
+      '// Criteria: DM-1.',
+      "it.each([1, 2])('each title %i', (n) => {})",
+      '// Criteria: DM-1.',
+      "test.describe.serial('serial title', () => {})",
+      '// Criteria: DM-1.',
+      'it(',
+      "  'next line title',",
+      '// Criteria: DM-1.',
+      "it('the player\\'s term', () => {})",
+    ].join('\n')
+    const row = buildCriteriaCoverage([SPEC, { path: 'src/demo.test.ts', text }]).split('\n').find((l) => l.startsWith('| DM-1 '))
+    expect(row).toBe(
+      "| DM-1 | yes | First criterion. | `src/demo.test.ts` each title %i<br>`src/demo.test.ts` serial title<br>`src/demo.test.ts` next line title<br>`src/demo.test.ts` the player's term |",
+    )
+  })
+
+  // Passes a test title with a backtick, a pipe and a < character, and expects each escaped in the cell.
+  it('escapes backticks, pipes and < in test titles', () => {
+    const text = "// Criteria: DM-1.\nit('shows `x` | <b>', () => {})\n"
+    const row = buildCriteriaCoverage([SPEC, { path: 'src/demo.test.ts', text }]).split('\n').find((l) => l.startsWith('| DM-1 '))
+    expect(row).toBe('| DM-1 | yes | First criterion. | `src/demo.test.ts` shows \\`x\\` \\| &lt;b> |')
+  })
+
+  // Passes a criterion longer than 100 characters with a code span that the cut at 97 characters would leave
+  // open, and expects the cut moved back to before that code span's opening backtick.
+  it('does not cut a criterion inside a code span', () => {
+    const long = `${'y'.repeat(90)} \`code span\` end`
+    const spec = { path: 'docs/features/span.md', text: `# Span\n\n- [x] **SN-1** ${long}\n` }
+    const row = buildCriteriaCoverage([spec]).split('\n').find((l) => l.startsWith('| SN-1 '))
+    expect(row).toBe(`| SN-1 | yes | ${'y'.repeat(90)}... | none |`)
+  })
+
+  // Passes a criterion line with an id and no text, and a Criteria comment "DM-1,DM-2" with no space, and expects
+  // a row for the criterion and the malformed entry left out (the conventions check reports it).
+  it('lists a criterion with no text and leaves out a malformed Criteria entry', () => {
+    const spec = { path: 'docs/features/bare.md', text: '# Bare\n\n- [x] **BR-1**\n' }
+    const test = { path: 'src/demo.test.ts', text: "// Criteria: BR-1,DM-2.\nit('t', () => {})\n" }
+    expect(buildCriteriaCoverage([spec, test])).toContain('| BR-1 | yes |  | none |')
+  })
+
+  // Passes two specs whose paths sort differently by code unit than by a case-insensitive locale ("Z" before
+  // "a"), and expects the sections in code unit order.
+  it('orders specs by code unit, not by locale', () => {
+    const upper = { path: 'docs/features/Zeta.md', text: '# Zeta\n' }
+    const lower = { path: 'docs/features/alpha.md', text: '# alpha\n' }
+    const table = buildCriteriaCoverage([lower, upper])
+    expect(table.indexOf('## Zeta')).toBeLessThan(table.indexOf('## alpha'))
   })
 })

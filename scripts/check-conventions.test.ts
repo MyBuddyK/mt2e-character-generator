@@ -36,6 +36,19 @@ describe('findConventionProblems', () => {
     ])
   })
 
+  // Passes uncommented test.describe.serial, it.concurrent and it.each calls in a test file, and expects a
+  // problem for each, and the same calls with comments above them to give none.
+  it('reports serial, concurrent and each test blocks with no comment above them', () => {
+    const bare = "test.describe.serial('s', () => {})\nit.concurrent('c', () => {})\nit.each([1])('e %i', () => {})\n"
+    expect(findConventionProblems([{ path: 'e2e/a.spec.ts', text: bare }])).toEqual([
+      'e2e/a.spec.ts:1: test or describe block has no comment above it',
+      'e2e/a.spec.ts:2: test or describe block has no comment above it',
+      'e2e/a.spec.ts:3: test or describe block has no comment above it',
+    ])
+    const commented = "// s\ntest.describe.serial('s', () => {})\n// c\nit.concurrent('c', () => {})\n// e\nit.each([1])('e %i', () => {})\n"
+    expect(findConventionProblems([{ path: 'e2e/a.spec.ts', text: commented }])).toEqual([])
+  })
+
   // Passes the same uncommented it call in a file that isn't a test file, and expects no problems.
   it('checks test blocks only in .test.ts and .spec.ts files', () => {
     expect(findConventionProblems([{ path: 'src/a.ts', text: "it('a', () => {})\n" }])).toEqual([])

@@ -42,4 +42,6 @@ Key principles:
 - Never skip, disable or delete a test, and never add `test.skip` or `test.fixme`. If a test still fails
   after your fixes, stop and report it with your findings; the owner decides what happens next.
 - Never weaken an assertion so that a regression passes
+- If a fix renames a test or changes its `// Criteria:` line, run `npm run criteria` to rewrite
+  `docs/criteria-coverage.md` and commit it with the fix; `npm run check` fails while the table is out of date
 - Never wait for networkidle or use other discouraged or deprecated APIs

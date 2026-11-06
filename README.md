@@ -31,7 +31,7 @@ Add `?seed=anything` to the URL to get the same character every time.
 | Unit tests (Vitest) | The rules engine, pack parsing and storage, and the scripts, on invented data | `src/**/*.test.ts`, `scripts/*.test.ts` |
 | Seed sweeps | The same checks on a fixed list of 200 seeds: repeatability, characteristic ranges, how Finish career ends | `src/engine/invariants.test.ts` |
 | Browser tests (Playwright) | User flows on a production build, on a desktop Chrome and a Pixel 7 viewport, at `/` and at the Pages path | `e2e/*.spec.ts` |
-| Accessibility (axe-core) | WCAG A and AA rules that axe can detect, on eight page states | `e2e/accessibility.spec.ts` |
+| Accessibility (axe-core) | WCAG A and AA rules that axe can detect, on the page states listed in the spec | `e2e/accessibility.spec.ts` |
 | Mutation testing (Stryker) | Which small edits to the engine no unit test fails on | `stryker.config.json`, `.github/workflows/mutation.yml` |
 | Conventions check | Comments on exports and tests, no skipped tests, no evaluative phrases, and a test for every ticked acceptance criterion | `scripts/check-conventions.ts` |
 | Criteria coverage | The table of acceptance criteria and the tests that name them is up to date | `scripts/criteria-coverage.ts`, [`docs/criteria-coverage.md`](docs/criteria-coverage.md) |
@@ -40,15 +40,16 @@ Add `?seed=anything` to the URL to get the same character every time.
 what the owner does, and which gaps are known. [`docs/qa-log/`](docs/qa-log/) holds dated reports of test
 runs and the list of review rounds.
 
-Latest mutation testing result for `src/engine` ([report](docs/qa-log/2026-11-05.md#mutation-testing)):
+Mutation testing results for `src/engine`, newest first. Each row links to the QA log report for that run.
 
 | Date | Commit | Mutants | Score | Score on covered code |
 | --- | --- | --- | --- | --- |
-| 2026-11-05 | f1bd49c | 3,825 | 79.76% | 81.55% |
+| [2026-11-05](docs/qa-log/2026-11-05.md#mutation-testing) | f1bd49c | 3,825 | 79.76% | 81.55% |
 
 The score is the share of mutants the unit tests detect (a test fails or times out), out of those that ran
 without a runtime error. No threshold is set, so a lower score does not
-fail CI. Add a row here, newest first, after each mutation run.
+fail CI. After each mutation run, add a row at the top of this table and write the per-file numbers in the
+QA log, not here.
 
 - **Reproducible results.** Every roll comes from the seed in the URL (`src/engine/dice.ts`), so each
   test loads a fixed `?seed=` and gets the same character every run.

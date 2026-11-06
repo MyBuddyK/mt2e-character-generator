@@ -64,7 +64,9 @@ To clean them up:
 3. If the removed test's `// Criteria:` comment names an id, the kept test's comment must name it too,
    so `npm run check:conventions` still finds a test for every ticked criterion. If you can't tell which
    criterion a test checks, keep it.
-4. Run `npm run check` and `npm run test:e2e` after the changes. Both must pass.
+4. Run `npm run criteria` to rewrite `docs/criteria-coverage.md`, which lists each test's file and title by
+   the criteria it names, then run `npm run check` and `npm run test:e2e`. Both must pass. Commit the
+   rewritten table with the cleanup.
 5. Make the cleanup its own commit, separate from any fix. In the commit message, list each removed test
    and the test that replaces it, or the spec line that removed the behavior. Report the test counts the
    runs printed; don't describe coverage in any other terms.

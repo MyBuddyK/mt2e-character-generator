@@ -3,7 +3,8 @@
 Dated records of test runs and reviews, kept in git so the history of each check can be read later. The
 [QA strategy](../qa-strategy.md) says which risks each check targets.
 
-- `YYYY-MM-DD.md`: one report per run of the monitor (`.claude/agents/playwright-test-monitor.md`) or per
+- `YYYY-MM-DD.md`, or `YYYY-MM-DD-2.md`, `YYYY-MM-DD-3.md` for a second or third report on the same day: one
+  report per run of the monitor (`.claude/agents/playwright-test-monitor.md`) or per
   mutation or flakiness run read by hand. Each report gives the commit it ran on, the commands, the counts
   they printed, links to the GitHub Actions runs, each failure and its classification, and any test removed
   or merged with the test that now covers it.

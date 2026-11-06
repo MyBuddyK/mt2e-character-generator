@@ -1,6 +1,14 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
-import type { SourceFile } from './check-conventions'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  CRITERION_ID,
+  isFeatureSpec,
+  isTestFile,
+  parseCriteriaComment,
+  parseCriterionLine,
+  TEST_CALL,
+  type SourceFile,
+} from './check-conventions'
 
 /** Repo-relative path of the generated criteria coverage table. */
 export const COVERAGE_PATH = 'docs/criteria-coverage.md'
@@ -8,9 +16,8 @@ export const COVERAGE_PATH = 'docs/criteria-coverage.md'
 /** Longest criterion text, in characters, that the table prints before cutting it with "...". */
 const MAX_TEXT = 100
 
-const CRITERION_LINE = /^- \[([x ])\] \*\*([A-Z]+-\d+)\*\* (.*)$/
-const CRITERIA_COMMENT = /^\s*\/\/ Criteria: (.+)\.$/
-const BLOCK_TITLE = /^\s*(?:it|test|describe|test\.describe)\(\s*(['"`])(.*?)\1/
+/** A quoted string at the start of the text (after spaces), allowing backslash escapes such as \'. */
+const QUOTED = /^\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/
 const SPEC_TITLE = /^# (.+)$/
 
 /** One test block that names a criterion: its file and its title. */
@@ -33,10 +40,48 @@ interface Spec {
   criteria: Criterion[]
 }
 
-/** Returns `text` cut to MAX_TEXT characters with "..." when it is longer, and with `|` escaped for a table cell. */
-function cell(text: string): string {
-  const short = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 3).trimEnd()}...` : text
+/** Placeholder title for a Criteria comment whose next line is not a test call with a quoted title. */
+export const NO_TITLE = '(no test title found after the comment)'
+
+/** Compares two strings by UTF-16 code units, so the order does not depend on the locale. */
+function byCodeUnit(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+/**
+ * Returns the Markdown `text` of a criterion for a table cell: cut to MAX_TEXT characters with "..." when it
+ * is longer, with the cut moved back before an unclosed backtick or a trailing backslash so that no code
+ * span or escape is left open, and with `|` escaped.
+ */
+function markdownCell(text: string): string {
+  let short = text
+  if (text.length > MAX_TEXT) {
+    short = text.slice(0, MAX_TEXT - 3)
+    const ticks = short.split('`').length - 1
+    if (ticks % 2 === 1) short = short.slice(0, short.lastIndexOf('`'))
+    short = `${short.replace(/\\+$/, '').trimEnd()}...`
+  }
   return short.replace(/\|/g, '\\|')
+}
+
+/** Returns plain `text`, such as a test title, escaped for a Markdown table cell: backslash, backtick, `<` and `|`. */
+function plainCell(text: string): string {
+  return text.replace(/[\\`|]/g, (c) => `\\${c}`).replace(/</g, '&lt;')
+}
+
+/**
+ * Returns the title of the test call that starts on `lines[index]`, or NO_TITLE when that line is not an
+ * `it`, `test`, `describe` or `test.describe` call (with the `.each(...)`, `.concurrent`, `.serial` and
+ * `.parallel` forms that TEST_CALL matches) followed by a quoted title on the same line or the next one.
+ * Backslash escapes in the title are undone, so 'the player\'s term' gives "the player's term".
+ */
+function titleAt(lines: readonly string[], index: number): string {
+  const line = lines[index] ?? ''
+  const call = TEST_CALL.exec(line)
+  if (!call) return NO_TITLE
+  const rest = `${line.slice(call[0].length)}\n${lines[index + 1] ?? ''}`
+  const quoted = QUOTED.exec(rest)?.[2]
+  return quoted === undefined ? NO_TITLE : quoted.replace(/\\(.)/g, '$1')
 }
 
 /**
@@ -46,15 +91,15 @@ function cell(text: string): string {
  */
 function readSpecs(files: readonly SourceFile[]): Spec[] {
   return files
-    .filter((f) => f.path.startsWith('docs/features/') && f.path.endsWith('.md'))
-    .sort((a, b) => a.path.localeCompare(b.path))
+    .filter((f) => isFeatureSpec(f.path))
+    .sort((a, b) => byCodeUnit(a.path, b.path))
     .map((file) => {
       const lines = file.text.split('\n')
       const title = lines.map((l) => SPEC_TITLE.exec(l)?.[1]).find((t) => t !== undefined) ?? file.path
       const criteria: Criterion[] = []
       for (const line of lines) {
-        const m = CRITERION_LINE.exec(line)
-        if (m?.[2] !== undefined) criteria.push({ id: m[2], ticked: m[1] === 'x', text: m[3] ?? '' })
+        const c = parseCriterionLine(line)
+        if (c?.id !== undefined) criteria.push({ id: c.id, ticked: c.ticked, text: c.text })
       }
       return { path: file.path, title, criteria }
     })
@@ -62,19 +107,18 @@ function readSpecs(files: readonly SourceFile[]): Spec[] {
 
 /**
  * Returns, for each criterion id named by a `// Criteria: ...` comment in a `.test.ts` or `.spec.ts` file
- * among `files`, the test blocks that name it. A block's title is read from the first `it(`, `test(` or
- * `describe(` call on the line after the comment; when that line has no quoted title, the title is
- * "(title not on the next line)".
+ * among `files`, the test blocks that name it, with the title read by titleAt from the line after the
+ * comment. Entries that are not ids (CRITERION_ID) are left out; the conventions check reports them.
  */
 function readTestRefs(files: readonly SourceFile[]): Map<string, TestRef[]> {
   const refs = new Map<string, TestRef[]>()
-  for (const file of [...files].sort((a, b) => a.path.localeCompare(b.path))) {
-    if (!/\.(test|spec)\.ts$/.test(file.path)) continue
+  for (const file of [...files].sort((a, b) => byCodeUnit(a.path, b.path))) {
+    if (!isTestFile(file.path)) continue
     const lines = file.text.split('\n')
     lines.forEach((line, i) => {
-      const ids = CRITERIA_COMMENT.exec(line)?.[1]?.split(', ') ?? []
+      const ids = (parseCriteriaComment(line) ?? []).filter((id) => CRITERION_ID.test(id))
       if (ids.length === 0) return
-      const title = BLOCK_TITLE.exec(lines[i + 1] ?? '')?.[2] ?? '(title not on the next line)'
+      const title = titleAt(lines, i + 1)
       for (const id of ids) refs.set(id, [...(refs.get(id) ?? []), { path: file.path, title }])
     })
   }
@@ -106,8 +150,8 @@ export function buildCriteriaCoverage(files: readonly SourceFile[]): string {
     out.push('', `## ${spec.title}`, '', `Spec: [\`${spec.path}\`](${spec.path.replace(/^docs\//, '')})`, '')
     out.push('| Id | Ticked | Criterion (first line) | Tests |', '| --- | --- | --- | --- |')
     for (const c of spec.criteria) {
-      const tests = (refs.get(c.id) ?? []).map((r) => `\`${r.path}\` ${cell(r.title)}`)
-      out.push(`| ${c.id} | ${c.ticked ? 'yes' : 'no'} | ${cell(c.text)} | ${tests.length > 0 ? tests.join('<br>') : 'none'} |`)
+      const tests = (refs.get(c.id) ?? []).map((r) => `\`${r.path}\` ${plainCell(r.title)}`)
+      out.push(`| ${c.id} | ${c.ticked ? 'yes' : 'no'} | ${markdownCell(c.text)} | ${tests.length > 0 ? tests.join('<br>') : 'none'} |`)
     }
   }
   return `${out.join('\n')}\n`
@@ -116,14 +160,16 @@ export function buildCriteriaCoverage(files: readonly SourceFile[]): string {
 /**
  * Usage: npm run criteria (writes the table) or npm run check:criteria (checks it).
  *
- * Reads the .md and .ts files git tracks and builds the table with buildCriteriaCoverage. With `--check`,
+ * Reads the .md and .ts files git tracks or would track (untracked files that .gitignore does not
+ * exclude), skipping any that are not on disk, such as a tracked file deleted but not yet staged, and builds the table with buildCriteriaCoverage. With `--check`,
  * compares it with the committed COVERAGE_PATH and returns 1, printing a message, when they differ or the
  * file is missing; otherwise returns 0. Without `--check`, writes the table to COVERAGE_PATH and returns 0.
  */
 function main(): number {
-  const paths = execFileSync('git', ['ls-files', '*.ts', '*.md'], { encoding: 'utf8' })
-    .split('\n')
-    .filter((p) => p !== '' && p !== COVERAGE_PATH)
+  const listed = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '*.ts', '*.md'], {
+    encoding: 'utf8',
+  })
+  const paths = [...new Set(listed.split('\n'))].filter((p) => p !== '' && p !== COVERAGE_PATH && existsSync(p))
   const table = buildCriteriaCoverage(paths.map((path) => ({ path, text: readFileSync(path, 'utf8') })))
   if (!process.argv.includes('--check')) {
     writeFileSync(COVERAGE_PATH, table)
