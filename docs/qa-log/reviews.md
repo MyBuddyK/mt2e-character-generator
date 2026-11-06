@@ -12,6 +12,7 @@ without quoting them, so the conventions check passes. From now on, a saved revi
 
 | PR | Date | Fix commit | Subject |
 | --- | --- | --- | --- |
+| #23 | 2026-11-06 | 91472b2 | Fix review findings on the criteria coverage table and QA docs |
 | #20 | 2026-11-04 | 4afed25 | Fix review findings on the Prisoner career rules |
 | #19 | 2026-11-04 | b3d8227 | Fix review findings on the education term |
 | #18 | 2026-11-04 | d8f2bb2 | Fix review findings on the education effects |
